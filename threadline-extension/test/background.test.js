@@ -17,7 +17,7 @@ function bootstrap(){
     return {};
   }
   const chrome={
-   runtime:{onInstalled:{addListener:fn=>{listeners.install=fn}},onStartup:{addListener:fn=>listeners.start=fn},onMessage:{addListener:fn=>listeners.message=fn}},
+   runtime:{id:'unit-ext',getURL:path=>'chrome-extension://unit-ext/'+path,onInstalled:{addListener:fn=>{listeners.install=fn}},onStartup:{addListener:fn=>listeners.start=fn},onMessage:{addListener:fn=>listeners.message=fn}},
    sidePanel:{setPanelBehavior:async()=>{}},
    storage:{
     local:{get:async key=>get(local,key),set:async v=>Object.assign(local,v)},
@@ -31,7 +31,7 @@ function bootstrap(){
   vm.runInContext(fs.readFileSync(path.join(files,'backup-core.js'),'utf8'),env);
   vm.runInContext(fs.readFileSync(path.join(files,'background.js'),'utf8'),env);
   const panel={url:'chrome-extension://id/panel.html'};
-  const sender=id=>id?{tab:tabs.find(t=>t.id===id)}:panel;
+  const sender=id=>typeof id==='object'?id:id?{tab:tabs.find(t=>t.id===id),id:'unit-ext',url:tabs.find(t=>t.id===id)?.url}:panel;
   async function send(msg,id){
    return new Promise(resolve=>{
     const done=listeners.message(msg,sender(id),resolve);
@@ -104,4 +104,25 @@ test('a page can acknowledge only its own ChatGPT conversation, not another bran
  assert.equal(good.ok,true);
  assert.equal(good.data.chat.seenVersion,1);
  assert.equal((await t.send({type:'PAGE_CONTEXT',href:t.tabs[1].url},2)).data.chat.seenVersion,1);
+});
+
+test('extension-owned panel tab is trusted without permitting arbitrary tab mutation',async()=>{
+ const t=bootstrap();
+ const panelURL='chrome-extension://unit-ext/panel.html';
+ const legit={id:'unit-ext',url:panelURL,tab:{id:100,url:panelURL}};
+ const created=await t.send({type:'MUTATE',action:{type:'createProject',name:'From panel tab'}},legit);
+ assert.equal(created.ok,true);
+ const snapshot=await t.send({type:'SNAPSHOT'},legit);
+ assert.equal(snapshot.ok,true);
+ assert.equal(snapshot.data.state.projects.length,1);
+ const attacks=[
+  {id:'unit-ext',url:'https://chatgpt.com/c/alpha',tab:{id:1,url:'https://chatgpt.com/c/alpha'}},
+  {id:'wrong-id',url:panelURL,tab:{id:100,url:panelURL}},
+  {id:'unit-ext',url:panelURL,tab:{id:100,url:'https://chatgpt.com/c/alpha'}}
+ ];
+ for(const attack of attacks){
+  assert.equal((await t.send({type:'SNAPSHOT'},attack)).ok,false);
+  assert.equal((await t.send({type:'MUTATE',action:{type:'createProject',name:'FORGED'}},attack)).ok,false);
+ }
+ assert.equal((await t.send({type:'SNAPSHOT'},legit)).data.state.projects.length,1);
 });

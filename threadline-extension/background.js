@@ -4,6 +4,18 @@ const SNAPSHOT_KEY = "threadline_state_snapshots";
 const CAPTURE_PREFIX = "tl_capture_owner_";
 let mutations = Promise.resolve();
 
+// The side panel normally sends messages without sender.tab. Chrome also
+// attaches sender.tab when the same extension-owned panel.html is opened in a
+// regular tab (e.g. full-width review and actual persistent-context E2E).
+// Trust that exact internal page, never a ChatGPT content script/tab URL.
+function isTrustedPanelSender(sender) {
+  if (!sender?.tab) return true;
+  const expected = chrome.runtime.getURL?.('panel.html');
+  return !!(expected && sender.id === chrome.runtime.id &&
+    sender.url === expected && (!sender.tab.url || sender.tab.url === expected));
+}
+
+
 function serialize(fn) {
   const next = mutations.then(fn,fn);
   mutations = next.catch(() => {});
@@ -326,16 +338,16 @@ chrome.runtime.onMessage.addListener((payload,sender,reply) => {
   (async () => {
     if (!payload || typeof payload.type !== "string") throw new Error("无效消息");
     if (payload.type === "CAPTURE_START") {
-      if(sender.tab)throw new Error("只有研线面板可启动采集");
+      if(!isTrustedPanelSender(sender))throw new Error("只有研线面板可启动采集");
       return beginCapture(payload.tabId);
     }
     if (["CAPTURE_RESET","CAPTURE_PAGE","CAPTURE_PROGRESS","CAPTURE_END","CAPTURE_FAIL"].includes(payload.type))return receiveCapture(payload,sender);
     if(payload.type === "WEB_ORGANIZE"){
-      if(sender.tab)throw new Error('只有研线面板可以管理网页版项目与归档');
+      if(!isTrustedPanelSender(sender))throw new Error('只有研线面板可以管理网页版项目与归档');
       return organizeWeb(payload);
     }
     if(payload.type === "NEW_CHAT"){
-      if(sender.tab)throw new Error("只有研线面板可接续研究");
+      if(!isTrustedPanelSender(sender))throw new Error("只有研线面板可接续研究");
       return openChatWithDraft(payload.handoff,payload.windowId,payload.projectId);
     }
     if(payload.type === "HANDOFF_GET"){
@@ -358,37 +370,37 @@ chrome.runtime.onMessage.addListener((payload,sender,reply) => {
       return {key,...ThreadLineCore.getContext(state,key)};
     }
     if (payload.type === "BACKUP_EXPORT") {
-      if(sender.tab)throw new Error('只能由研线侧栏导出');
+      if(!isTrustedPanelSender(sender))throw new Error('只能由研线侧栏导出');
       const state=await readState();
       const record=await chrome.storage.local.get(SNAPSHOT_KEY);
       return ThreadLineBackup.create(state,record[SNAPSHOT_KEY]||[]);
     }
     if (payload.type === "BACKUP_IMPORT") {
-      if(sender.tab)throw new Error('只能由研线侧栏导入');
+      if(!isTrustedPanelSender(sender))throw new Error('只能由研线侧栏导入');
       return importBackup(payload.json);
     }
     if (payload.type === "BACKUP_SNAPSHOTS") {
-      if(sender.tab)throw new Error('只能由研线侧栏读取');
+      if(!isTrustedPanelSender(sender))throw new Error('只能由研线侧栏读取');
       const record=await chrome.storage.local.get(SNAPSHOT_KEY);
       return (record[SNAPSHOT_KEY]||[]).map((r,index)=>({index,at:r.at,reason:r.reason,revision:r.state?.revision}));
     }
     if (payload.type === "BACKUP_ROLLBACK") {
-      if(sender.tab)throw new Error('只能由研线侧栏恢复');
+      if(!isTrustedPanelSender(sender))throw new Error('只能由研线侧栏恢复');
       return restoreSnapshot(payload.index);
     }
     if (payload.type === "HEALTH_CHECK") {
-      if(sender.tab)throw new Error('只能由研线侧栏自检');
+      if(!isTrustedPanelSender(sender))throw new Error('只能由研线侧栏自检');
       const result=await inspectTab(payload.tabId);
       const record=await chrome.storage.local.get(PAGE_HEALTH_KEY);
       return {page:result,lastSuccess:record[PAGE_HEALTH_KEY]||{},at:Date.now()};
     }
     if (payload.type === "SNAPSHOT") {
-      if (sender.tab) throw new Error("无权访问面板数据");
+      if (!isTrustedPanelSender(sender)) throw new Error("无权访问面板数据");
       await recoverCaptures();
       return snapshot();
     }
     if (payload.type === "MUTATE") {
-      if (sender.tab) throw new Error("只能在扩展面板中修改课题状态");
+      if (!isTrustedPanelSender(sender)) throw new Error("只能在扩展面板中修改课题状态");
       return mutate(payload.action);
     }
     if (["PAGE_CONTEXT","OBSERVE"].includes(payload.type)) {
