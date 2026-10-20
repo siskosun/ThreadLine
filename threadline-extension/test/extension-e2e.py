@@ -34,16 +34,20 @@ def run():
       panel.locator('#create-form button[type=submit]').click()
       # The write is complete only once both the background snapshot and the
       # persistent chrome.storage record agree. The UI may rerender sooner.
-      panel.wait_for_function("""async () => {
+      handle=panel.wait_for_function("""async () => {
         const [reply,record]=await Promise.all([
           chrome.runtime.sendMessage({type:'SNAPSHOT'}),
           chrome.storage.local.get('threadline_state_v1')
         ]);
-        return reply?.ok && reply.data?.state?.projects?.length===1
-          && record?.threadline_state_v1?.projects?.length===1;
+        const stored=record?.threadline_state_v1;
+        if (reply?.ok && reply.data?.state?.projects?.length===1 && stored?.projects?.length===1)
+          return {persisted:stored,background:reply.data.state};
+        return false;
       }""",timeout=15000)
-      state=panel.evaluate("async () => (await chrome.storage.local.get('threadline_state_v1')).threadline_state_v1")
-      assert isinstance(state,dict) and state.get('schema')==2, f'v2 schema not persisted: {state!r}'
+      verified=handle.json_value()
+      state=verified['persisted']
+      assert isinstance(state,dict) and state.get('schema')==2, f'v2 schema not persisted: {verified!r}'
+      assert verified['background']['revision']==state['revision'], 'worker and persistent revision differ'
       pid=state['projects'][0]['id']
       # The page's UUID route must retain identity when moved into a ChatGPT project URL.
       assert panel.evaluate("() => ThreadLineCore.getChatKey('https://chatgpt.com/g/g-p-123/c/demo-alpha')")=='chat:demo-alpha'
