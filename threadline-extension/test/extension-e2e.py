@@ -52,7 +52,14 @@ def run():
         }""")
         if verified: break
         sleep(0.15)
-      assert verified, 'UI create did not persist project in both worker and local storage'
+      if not verified:
+        diagnostic=panel.evaluate("""async () => {
+          const snapshot=await chrome.runtime.sendMessage({type:'SNAPSHOT'});
+          const stored=await chrome.storage.local.get(null);
+          return {snapshot,stored,toast:document.querySelector('#toast')?.textContent,
+            location:location.href,ready:document.readyState,js:typeof ThreadLineCore};
+        }""")
+        raise AssertionError(f'UI create was not persisted: {diagnostic!r}'[:3200])
       state=verified['persisted']
       assert isinstance(state,dict) and state.get('schema')==2, f'v2 schema not persisted: {verified!r}'
       assert verified['background']['revision']==state['revision'], 'worker and persistent revision differ'
