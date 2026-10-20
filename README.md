@@ -1,16 +1,16 @@
 # ThreadLine（研线）
 
-> **v0.6.0 测试版** · Chrome / Edge 右侧栏研究工作台
+> **v0.6.1 测试版** · Chrome / Edge 右侧栏研究工作台
 
 多条 ChatGPT 对话同时研究同一课题时，在不同窗口显示统一的有效结论、已收口状态和需核对的字段差异，避免误在旧分支继续工作。辅助提供按需对话采集、AI 整理、思维导图，以及手动触发的网页项目/归档操作。
 
 ## 下载安装包
 
-**[下载 ThreadLine v0.6.0 安装 ZIP](https://github.com/siskosun/ThreadLine/raw/refs/heads/main/dist/ThreadLine-v0.6.0.zip)**
+**[下载 ThreadLine v0.6.1 安装 ZIP（GitHub Release）](https://github.com/siskosun/ThreadLine/releases/download/v0.6.1/ThreadLine-v0.6.1.zip)**
 
 不需要构建工具。下载 ZIP → 解压 → 打开 `edge://extensions/` 或 `chrome://extensions/` → 启用开发人员模式 →「加载解压缩的扩展程序」→ 选中包含 `manifest.json` 的 `threadline-extension` 文件夹。
 
-直接下载地址也位于仓库 `dist/ThreadLine-v0.6.0.zip`。当前 GitHub 连接无法创建 Releases；这里是 **仓库内 ZIP 分发**，不是 GitHub Release，更没有自动更新承诺。[校验 SHA256](dist/SHA256SUMS.txt)。
+正式安装包由 GitHub Actions 在全部测试通过后构建并发布；[下载 SHA256 校验文件](https://github.com/siskosun/ThreadLine/releases/download/v0.6.1/SHA256SUMS.txt)。如 Release 尚未完成，可使用[旧版 v0.6.0 仓库压缩包](dist/ThreadLine-v0.6.0.zip)。侧载扩展不会自动更新。
 
 **从 v0.5.0 升级：** 使用相同扩展目录覆盖并重新加载，先在新版「全部课题与管理 → 课题备份与恢复」导出一次 JSON。v0.6.0 没有强行添加 `manifest.key`，避免改变旧扩展 ID 导致原状态不可见。以后迁移到其他安装路径，应先从原扩展导出 JSON，安装后导入。备份不包含短期采集全文。
 

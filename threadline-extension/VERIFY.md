@@ -1,4 +1,4 @@
-# v0.6.0 验收范围及限制
+# v0.6.1 验收范围及限制
 
 ## 已有离线检查
 
@@ -8,7 +8,7 @@
 
 ## 当前执行环境限制
 
-当前容器的 `/etc/chromium/policies/managed/` 配置包含 `ExtensionInstallBlocklist:["*"]` 及 `URLBlocklist:["*"]`。Chromium 因系统策略不能加载扩展，因此**这里不能把 persistent E2E 算作成功**。GitHub Actions 工作流提供没有这项管理策略的独立测试环境；须检查实际 CI 结果才能写已通过。
+当前容器的 `/etc/chromium/policies/managed/` 配置包含 `ExtensionInstallBlocklist:["*"]` 及 `URLBlocklist:["*"]`。Chromium 因系统策略不能加载扩展，因此**这里不能把 persistent E2E 算作成功**。GitHub Actions 已于 2026-10-20 在独立 Chromium 环境完成 94 项 Node 测试及 MV3 合成网页持久化验收（运行 39391488038）。真实登录的 ChatGPT 网页操作尚未验收。
 
 ## 尚未执行的真实 ChatGPT 账号测试
 

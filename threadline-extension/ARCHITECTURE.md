@@ -1,4 +1,4 @@
-# ThreadLine v0.6.0 架构
+# ThreadLine v0.6.1 架构
 
 ## 两层工作流
 
@@ -33,3 +33,7 @@
 - 无网络离线 DOM 模拟检查发送拦截和面板。
 - Playwright Chromium `launch_persistent_context` 真实加载未登录扩展 + 合成 ChatGPT 页面；测试存储真实持久化、真实消息协议，但不宣称生产网页兼容。
 - 用户授权的已登录 Edge 真实验收（尚未执行）。
+
+## v0.6.1 补充：扩展页面身份验证
+
+后台对由扩展侧栏发送的消息继续信任无 `sender.tab` 的内部上下文，同时通过运行时扩展 ID、`sender.url` 和内部 `panel.html` 路径显式识别独立打开的受信任面板标签页；其它网页标签页无权执行 `MUTATE`、`SNAPSHOT`、备份和组织操作。

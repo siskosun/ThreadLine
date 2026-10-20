@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "研线 | ThreadLine",
   "short_name": "研线",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "跨 ChatGPT 对话切换与课题版本同步；按需采集、AI 整理、思维导图以及网页项目与归档。",
   "minimum_chrome_version": "141",
   "permissions": [
