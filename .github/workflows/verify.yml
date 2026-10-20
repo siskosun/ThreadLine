@@ -22,7 +22,7 @@ jobs:
         run: npm run verify
       - name: Install Chromium for true MV3 extension integration (synthetic ChatGPT page only)
         run: |
-          python -m pip install playwright==1.55.0
+          python -m pip install playwright==1.60.0
           python -m playwright install --with-deps chromium
       - name: Persistent extension integration
         working-directory: threadline-extension

@@ -40,7 +40,7 @@ npm run verify
 浏览器持久化集成检查（合成网页，**不使用真实账号**）：
 
 ```bash
-python -m pip install playwright==1.55.0
+python -m pip install playwright==1.60.0
 python -m playwright install chromium
 python test/extension-e2e.py
 ```
