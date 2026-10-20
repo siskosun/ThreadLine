@@ -1,0 +1,21 @@
+#!/bin/sh
+# ThreadLine: run local verification before each Git push.
+# Covers the committed working tree, not only currently staged files.
+set -eu
+
+ROOT=$(git rev-parse --show-toplevel)
+cd "$ROOT"
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "ThreadLine pre-push: Node.js 22+ is required" >&2
+  exit 1
+fi
+if ! command -v npm >/dev/null 2>&1; then
+  echo "ThreadLine pre-push: npm is required" >&2
+  exit 1
+fi
+
+printf '\n== ThreadLine pre-push: syntax, version, tests ==\n'
+cd "$ROOT/threadline-extension"
+npm run verify
+printf '== ThreadLine pre-push OK ==\n'

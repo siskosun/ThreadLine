@@ -47,6 +47,18 @@ python test/extension-e2e.py
 
 仓库包含 `.github/workflows/verify.yml` 自动执行测试。详见 [验收范围与真实账号检查清单](threadline-extension/VERIFY.md)。测试通过不等于生产兼容性已验收。
 
+## 本机推送前检查（Git Bash）
+
+为避免代码未验证就推送，仓库提供可版本管理的 [pre-push 钩子](.githooks/pre-push) 和[安装脚本](scripts/install-pre-push.sh)。**克隆或下载仓库不会自动启用 Git hooks**。在本机仓库根目录的 Git Bash 中运行一次：
+
+```sh
+sh scripts/install-pre-push.sh
+```
+
+安装脚本会把钩子复制到本仓库的 `.git/hooks/pre-push` 并赋予执行权限；再次运行是幂等的。遇到已有钩子或 `core.hooksPath` 自定义配置时会停止，**不会覆盖已有逻辑**。此钩子在每次 `git push` 前运行 `threadline-extension/npm run verify`，包括所有 JavaScript 语法、版本一致性和 Node 单元回归测试；失败时阻止推送。它不重复运行需要 Chromium 的完整 E2E，后者保留给 CI。
+
+可先手工测试：`sh .githooks/pre-push`。**不要用 `git diff --cached` 检测“即将推送的代码”**，因为已提交但未暂存的改动不会出现在这个差异中。本钩子检查整个被跟踪的扩展源码。运行钩子要求本机安装 Node.js 22+ 与 npm。
+
 ## 许可证
 
 项目自有代码按 [MIT License](LICENSE) 发布；第三方许可及版权见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 和 `threadline-extension/licenses/`。

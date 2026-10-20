@@ -11,6 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Check POSIX hook scripts
+        run: sh -n .githooks/pre-push scripts/install-pre-push.sh
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
