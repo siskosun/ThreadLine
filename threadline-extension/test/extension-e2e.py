@@ -3,6 +3,7 @@ No real accounts or network calls. Use actual extension APIs, service worker and
 """
 from pathlib import Path
 import os
+from time import monotonic, sleep
 from tempfile import TemporaryDirectory
 from playwright.sync_api import sync_playwright
 
@@ -34,17 +35,24 @@ def run():
       panel.locator('#create-form button[type=submit]').click()
       # The write is complete only once both the background snapshot and the
       # persistent chrome.storage record agree. The UI may rerender sooner.
-      handle=panel.wait_for_function("""async () => {
-        const [reply,record]=await Promise.all([
-          chrome.runtime.sendMessage({type:'SNAPSHOT'}),
-          chrome.storage.local.get('threadline_state_v1')
-        ]);
-        const stored=record?.threadline_state_v1;
-        if (reply?.ok && reply.data?.state?.projects?.length===1 && stored?.projects?.length===1)
-          return {persisted:stored,background:reply.data.state};
-        return false;
-      }""",timeout=15000)
-      verified=handle.json_value()
+      # Playwright wait_for_function treats a returned Promise as truthy;
+      # do NOT pass an async predicate there. page.evaluate does await it.
+      verified=None
+      deadline=monotonic()+15
+      while monotonic()<deadline:
+        verified=panel.evaluate("""async () => {
+          const [reply,record]=await Promise.all([
+            chrome.runtime.sendMessage({type:'SNAPSHOT'}),
+            chrome.storage.local.get('threadline_state_v1')
+          ]);
+          const stored=record?.threadline_state_v1;
+          if (reply?.ok && reply.data?.state?.projects?.length===1 && stored?.projects?.length===1)
+            return {persisted:stored,background:reply.data.state};
+          return null;
+        }""")
+        if verified: break
+        sleep(0.15)
+      assert verified, 'UI create did not persist project in both worker and local storage'
       state=verified['persisted']
       assert isinstance(state,dict) and state.get('schema')==2, f'v2 schema not persisted: {verified!r}'
       assert verified['background']['revision']==state['revision'], 'worker and persistent revision differ'
