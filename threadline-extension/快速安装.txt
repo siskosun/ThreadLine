@@ -1,0 +1,12 @@
+研线 ThreadLine v0.5.0
+
+Windows Edge：edge://extensions/
+Chrome：chrome://extensions/
+开启「开发人员模式」→「加载解压缩的扩展」→ 选择此文件夹（包含 manifest.json）。
+
+从旧版升级：优先备份；覆盖原扩展目录的文件，保留原目录路径，扩展管理页点「重新加载」并刷新 ChatGPT 网页。不要先卸载。
+
+打开研线后默认进入「对话切换」：当前研究状态在顶部，下面可切到同课题其他分支。
+「研究整理」中保留跨对话采集、AI 分析、思维导图、创建网页项目与归档。
+
+真实 ChatGPT 登录页面兼容性需实测。更多说明见 README.md 和 VERIFY.md。

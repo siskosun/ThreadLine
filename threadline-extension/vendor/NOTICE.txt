@@ -1,0 +1,5 @@
+ThreadLine includes a small modified subset of the ChatGPT Shadow DOM helpers:
+https://github.com/dialoguesai/chatgpt-shadow-extension
+Copyright 2026 Dialogues and contributors.
+Licensed under Apache License, Version 2.0. See licenses/Apache-2.0.txt.
+Only URL, title and streaming detection logic is adapted. No conversation text is copied or stored.
