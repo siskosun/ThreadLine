@@ -112,3 +112,21 @@ footer{display:flex;align-items:flex-start;gap:8px;margin-top:21px;color:#9ba7b3
 .report-promote-hint{font-size:10px;line-height:1.6;color:#687e94;margin:0}
 .promote-btn{background:#f0f6fa!important;border-color:#c3d4e6!important;color:#24567b!important;font-weight:700;min-height:34px}
 @media(min-width:600px){.workspace-tabs{top:0}.quick-list{gap:7px}}
+
+/* v0.6: recovery, diagnostics, field-level changes. */
+.backup-section,.health-section {padding:15px 12px;border-top:1px solid #e6eaf0;margin-top:12px}
+.backup-section h3,.health-section h3 {font-size:14px;margin:0 0 8px}
+.backup-section label {display:block;font-size:12px;margin:12px 0 5px;color:#596579}
+.backup-actions {display:flex;gap:7px;flex-wrap:wrap;margin-bottom:5px}
+#backup-file{width:100%;max-width:100%;box-sizing:border-box}
+#backup-import {margin-top:8px}
+.health-result{font-size:12px;color:#334456;padding:9px;background:#f5f8fb;border-radius:9px;margin-top:8px;overflow-wrap:anywhere}
+.health-result p {margin:4px 0;line-height:1.5}
+.diff-preview{font-size:11px;margin-top:3px;max-height:6em;overflow:auto;overflow-wrap:anywhere}
+.history-details{background:#f8fafc;padding:11px;border-radius:10px;font-size:12px}
+.history-row{padding:6px 0;border-bottom:1px solid #e9eef3;overflow-wrap:anywhere}
+.history-row p{margin:4px 0}.history-row del{color:#9e5555}
+.promote-review{padding:13px;border:1px solid #d8e2eb;border-radius:12px;background:#f9fbfd;margin:10px 0}
+.promote-review h3{margin:0 0 8px;font-size:14px}
+.promote-review textarea{display:block;width:100%;box-sizing:border-box;margin:8px 0 12px;min-height:105px}
+.promote-review .promote-confirm{display:flex;gap:9px;align-items:flex-start;font-size:12px;line-height:1.5}

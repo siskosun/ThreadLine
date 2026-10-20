@@ -53,6 +53,20 @@
       </div>
       <div id="topic-list" class="topic-list"></div>
     </section>
+    <section class="backup-section" aria-label="备份与恢复">
+      <h3>课题备份与恢复</h3>
+      <p class="caption">导出本地课题、分支和结论历史（不包含临时采集全文）。导出文件可能含研究资料，请妥善保管。</p>
+      <div class="backup-actions"><button type="button" id="backup-export">导出 JSON 备份</button><button type="button" id="backup-rollback">恢复最近快照</button></div>
+      <label for="backup-file">从 JSON 恢复课题状态</label><input id="backup-file" type="file" accept=".json,application/json"/>
+      <button type="button" id="backup-import" class="soft">检查并导入（覆盖当前课题）</button>
+      <p id="backup-status" role="status" class="caption"></p>
+    </section>
+    <section class="health-section" aria-label="网页适配自检">
+      <h3>网页适配自检</h3>
+      <p class="caption">只读检查当前 ChatGPT 标签页的控件，不会自动发消息、创建项目或归档。显示上次真实完成操作的时间，尚未验证的功能仍标记未知。</p>
+      <button type="button" id="health-check">检查当前 ChatGPT 网页</button>
+      <div id="health-result" class="health-result" role="status">尚未检查</div>
+    </section>
       </div>
     </details>
     </section>
@@ -105,7 +119,15 @@
           <p id="report-organize-status" class="remote-status" role="status" aria-live="polite"></p>
           <button id="report-open-source" class="remote-source" hidden>打开源对话，手动检查操作结果</button>
         </section>
-        <div class="report-actions"><button id="report-promote-state" class="promote-btn" hidden>将 AI 结论提交为课题新状态</button></div>
+        <div class="report-actions"><button id="report-promote-state" class="promote-btn" hidden>审核并发布 AI 候选结论</button></div>
+        <section id="promote-review" class="promote-review" hidden aria-label="审核课题有效结论">
+          <h3>审核即将共享的结论</h3>
+          <p id="promote-review-notice" class="report-note"></p>
+          <label for="promote-review-text">仅填写已由你核实、仍然有效的结论</label>
+          <textarea id="promote-review-text" rows="5" maxlength="1000"></textarea>
+          <label class="promote-confirm"><input type="checkbox" id="promote-review-check"/> 已核对来源与表述，确认同步给同课题其他分支</label>
+          <div class="report-actions"><button id="promote-review-save" class="primary" disabled>发布至共享课题</button><button id="promote-review-cancel">取消</button></div>
+        </section>
         <p id="report-promote-hint" class="report-promote-hint" role="status" aria-live="polite"></p>
         <div class="report-actions"><button id="report-copy">复制提要</button><button id="report-ai">打开 ChatGPT 草稿</button><button id="report-delete">清除本次采集</button></div>
         <div class="report-actions"><button class="handoff-primary" id="report-new-chat">关闭侧栏并开启新对话 →</button></div>
@@ -117,6 +139,7 @@
     <div id="toast" role="status" aria-live="polite"></div>
   </main>
   <script src="core.js"></script>
+  <script src="backup-core.js"></script>
   <script src="organize-core.js"></script>
   <script src="capture-core.js"></script>
   <script src="capture-db.js"></script>

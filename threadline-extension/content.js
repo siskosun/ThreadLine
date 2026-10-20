@@ -1,4 +1,6 @@
 (() => {
+  if (globalThis.__threadlineContentInjected) return;
+  globalThis.__threadlineContentInjected = true;
   // Observes minimal metadata only; never reads or transmits messages/prompts.
   let knownHref = location.href;
   let lastFingerprint = "";
@@ -25,6 +27,13 @@
     });
   }
 
+  // UI-only compatibility probe: no fetch, no cookies, no mutation, no message bodies.
+  chrome.runtime.onMessage.addListener((msg,_sender,reply) => {
+    if (msg?.type !== 'TL_HEALTH_CHECK') return false;
+    try { reply({ok:true,data:ThreadLineSelectors.probe(document,location.href)}); }
+    catch (error) { reply({ok:false,error:String(error.message||error)}); }
+    return false;
+  });
   function watch() {
     if (orphaned) return;
     if (knownHref !== location.href) {

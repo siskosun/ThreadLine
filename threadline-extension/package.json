@@ -1,0 +1,14 @@
+{
+  "name": "threadline-extension",
+  "version": "0.6.0",
+  "private": true,
+  "description": "ThreadLine — temporary cross-conversation research workspace",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "check": "node scripts/check-version.mjs",
+    "lint:syntax": "node scripts/check-syntax.mjs",
+    "verify": "npm run lint:syntax && npm run check && npm test",
+    "test:e2e": "python test/extension-e2e.py"
+  },
+  "engines": {"node": ">=22"}
+}

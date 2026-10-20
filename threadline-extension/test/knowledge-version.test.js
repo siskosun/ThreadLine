@@ -67,7 +67,7 @@ test('v0.4.1 state migration keeps original project and does not invent stale st
  delete legacy.chats['chat:a'].seenVersion;
  delete legacy.chats['chat:b'].seenVersion;
  const upgraded=Core.normalizedState(legacy);
- assert.equal(upgraded.schema,1);
+ assert.equal(upgraded.schema,2);
  assert.equal(upgraded.projects[0].knowledgeVersion,0);
  assert.equal(upgraded.chats['chat:a'].seenVersion,0);
  assert.equal(Core.isOutdated(upgraded,upgraded.chats['chat:b']),false);

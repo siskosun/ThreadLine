@@ -1,53 +1,35 @@
-# 技术设计与源码复用审计（v0.4）
+# ThreadLine v0.6.0 架构
 
-## 项目目标
+## 两层工作流
 
-同一浏览器中将多个 ChatGPT 对话关联到临时课题，按需总结；用户点击时，操作**指定源对话**在 ChatGPT 网页上的项目移动或归档，不使用隐藏的删除/移动后端接口，也不依赖外部云服务器。
+**Core（默认第一屏）**：`panel.html/panel.js`（切换面板）→ `background.js`（权限、串行状态变更）→ `core.js`（纯函数 schema2 状态、版本差异、对话 UUID）。只写入本地 `chrome.storage.local`，自动轮转五份前态快照。`backup-core.js` 校验导入/导出。`content.js` 为当前 ChatGPT 页显示非阻塞的待核对状态；只有人工收口、完成分支才尝试拦截新发送。
 
-## 主要模块
+**Labs（按需触发）**：`capture-*.js`、`ai-core.js`、`ai-providers.js`、`web-analyzer.js`、`organize-*.js`。按需采集 ChatGPT 网页文本、整理研究及执行指定来源对话的项目创建/移入、归档；不自动进行或重试不可确认的外部写操作。实验性 ChatGPT 网页模型自动分析不是官方 API。
 
-- `background.js`：运行锁、精确来源标签页验证、隔离的项目辅助标签页、分步状态持久化、异常恢复。
-- `organize-core.js`：与 DOM 无关的 URL/名称验证、生成项目名。
-- `organize-page.js`：只执行用户按钮触发的网页项目新建、移入与归档；找不到准确目标立即停止。
-- `web-analyzer.js`：**仅在用户选择实验性网页模型并确认后**注入新建的辅助 ChatGPT 标签页；不使用隐藏后端或提取令牌。
-- `capture-ui.js`、`capture-db.js`：报告按钮、状态显示和持久化；本地课题收口不因网页动作而改变。
-- `capture-main.js` / `capture-page.js`：旧版对话采集。
-- `ai-core.js`：JSON 归一化、分段合并、来源序号校验、有效结论与行动提取。
+目前 Core/Labs 是**逻辑分层**，没有拆成单独发布的浏览器扩展，第三方站点权限仍由 manifest 声明。不要把该层次描述成已完成 optional-permissions 隔离。
 
-## 开源调研与复用选择
+## 状态与一致性
 
-- [Chat Organizer](https://github.com/kayuling/chat-organizer-extension)：其仓库具备 ChatGPT 侧栏定位和“移至项目”的浏览器 UI 工作流，但未实现“新建项目”和“归档”。README 有 MIT 徽章，仓库当前没有可核对的 LICENSE 文件。**只参考实现思想，未复制其源码。**
-- [Dichrome](https://github.com/SillySerpent/Dichrome)（Apache-2.0）：已有通过 ChatGPT 可见界面创建项目的实现。参考“新建按钮→对话框名称输入→确认→验证项目上下文”的设计；此版独立编写适配代码，避免导入其完整隐藏页面/iframe 组件。
-- [AI Page Summarizer](https://github.com/ImagineBowl/AI-Page-Summarizer)（README 标注 MIT）：通过独立 ChatGPT 标签页发送提示词并取回结果；本版参考其标签页消息工作流，自行实现简化的 `web-analyzer.js`，不复制其代码。
-- CGO/ChatGPT Shadow：原 v0.2 的分页/DOM 采集思路与通知已保留；许可证文件继续随包携带。
+- `schema:2` 是显式、幂等迁移：v1 补足知识版本、分支已读版本和历史数组；未来 schema 会拒绝回退操作而非清空状态。
+- `revision` 为后台串行更新的单调序号；编辑课题时可提交 `expectedRevision`，遇到其他窗口已变更即拒绝旧值覆盖。
+- `knowledgeVersion` 只由人工修改目标/有效结论/状态的实质变更推进；只改常见标点和空白不推进。历史 `history[]` 限额 30 条并保留字段 `before/after`。
+- `seenVersion` 记录每条分支已人工核对的进展；`changesSince` 显示具体差异。分支尚未声明依赖的结论项，不应把本机制称为精确语义冲突检测。
+- 已保存的对话键从 URL 提取 conversation UUID；移入项目不会改变键。未正式保存的新对话暂用 `tab:<id>`，随后迁移。
+- `chrome.storage.local` 单键状态与五份独立快照是短期小规模方案，不提供真正跨服务工作线程崩溃的事务性 CAS 保证。
 
-## 不复用的部分
+## MV3 与采集生命周期
 
-- 不使用 Chat Organizer 的批量删除、自动接受删除确认框功能。
-- 不使用 Dichrome 的 iframe 绕过、隐藏工作区、整套状态机。
-- 不引入 Node 服务、MCP、WebSocket 或 Selenium 常驻进程。
-- 不使用非公开 ChatGPT 项目创建/归档 API，正式使用需遵守适用条款。
+`background.js` 将 `tl_capture_owner_*` 与 `tl_org_lock_*` 记录到 `chrome.storage.session`，从面板快照、服务工作线程启动和标签页关闭时检查过期记录。采集中断时标错；网页组织操作中断时要求人工核实，不会再次点击创建或归档。
 
-## 状态模型
+`capture-db.js` 仍用 IndexedDB 持久化短期采集文本；目前 `pages()` 使用 getAll 汇总，超大规模单对话的游标流式读取是后续性能工作。
 
-每条 capture run 中新增：
+## 网页可观测性和限度
 
-`remoteProject = {name,id,url,status,at,reused,error?,helperTabId?}`
+`selectors.js` 提供只读 DOM 健康探测。只有真正在扩展中明确成功的采集、移入和归档操作才更新 `tl_health_successes`；没有尝试的项目仍列为未验证。网页菜单、项目新建和非公开分页接口无法仅凭 DOM 探测证明成功。
 
-`archiveWeb = {status,at,error?}`
+## 验收层
 
-状态 `moved`/`archived` 必须经过网页层的状态检测；操作结果无法确认则保存 `creation_unverified`、`move_unverified`、`submitted_unverified`，不自称成功。
-
-## 测试边界
-
-本次 Node 和离线 Chromium 可以证明：逻辑流程、UI 回显、数据隔离、失败恢复按预期运行。**无法证明真实登录账号的网页选择器当前可用，也没有真实创建任何 ChatGPT 项目或归档任何用户聊天。**
-
-## v0.5：显式的课题版本和分支已读位置
-
-`threadline_state_v1` 的 `schema` 仍为 1，不使用破坏性迁移。读取旧对象时，为每个项目补 `knowledgeVersion:0` 和 `lastChange:null`，为每条对话补 `seenVersion:<所属项目当前版本>`。无字段的旧数据不会立刻变成过期分支。
-
-`updateProject` 仅在 `goal`、`decision` 或 `stage` 的值实际变化时增加一次版本。可选的 `sourceKey` 用于识别经人工发布新状态的源分支，将其 `seenVersion` 设为当前版本。其他分支保持已读版本；`acknowledgeProject` 用于用户明确确认。单纯 `observeChat` 或 `linkChat` 不得视为核对新知识。
-
-内容脚本只能通过 `ACK_PAGE` 核对 `sender.tab.url` 与消息声明的同一对话，不能冒用别的标签页去确认其它分支。待核对仅显示差异提醒；手动收口和「已完成」仍按原有边界拦截发送。
-
-默认面板 `workspace-switch` 呈现当前会话、核心结论、同课题直接跳转和按需展开的课题编辑。`workspace-research` 保留原采集和 AI 分析 UI。结构变化不改变采集数据库和外部自动化调用方式。
+- Node 纯函数/模拟后台回归。
+- 无网络离线 DOM 模拟检查发送拦截和面板。
+- Playwright Chromium `launch_persistent_context` 真实加载未登录扩展 + 合成 ChatGPT 页面；测试存储真实持久化、真实消息协议，但不宣称生产网页兼容。
+- 用户授权的已登录 Edge 真实验收（尚未执行）。

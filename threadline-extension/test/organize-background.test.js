@@ -12,7 +12,7 @@ function setup(options={}){
      if(msg.type==='TL_ORG_MOVE'){if(options.moveFails)throw Error('project menu missing');tabMap.get(7).url='https://chatgpt.com/g/g-p-999/c/source-123';return{ok:true,data:{status:'moved'}};}
      if(msg.type==='TL_ORG_ARCHIVE'){tabMap.get(7).url='https://chatgpt.com/';return{ok:true,data:{status:'archived'}};}
      return {ok:true};},async remove(id){records.push(['remove',id]);tabMap.delete(id)}},
-  scripting:{async executeScript(arg){records.push(['script',arg.target.tabId]);}},sidePanel:{setPanelBehavior:async()=>{}},storage:{local:{async get(k){return{[k]:local.get(k)}},async set(o){for(const [k,v]of Object.entries(o))local.set(k,v)}},session:{async get(k){return{[k]:session.get(k)}},async set(o){for(const [k,v]of Object.entries(o))session.set(k,v)},async remove(){}}}};
+  scripting:{async executeScript(arg){records.push(['script',arg.target.tabId]);}},sidePanel:{setPanelBehavior:async()=>{}},storage:{local:{async get(k){return{[k]:local.get(k)}},async set(o){for(const [k,v]of Object.entries(o))local.set(k,v)}},session:{async get(k){return{[k]:session.get(k)}},async set(o){for(const [k,v]of Object.entries(o))session.set(k,v)},async remove(k){for(const key of Array.isArray(k)?k:[k])session.delete(key)}}}};
  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'..','background.js'),'utf8'),{importScripts:()=>{},ThreadLineCore:Core,ThreadLineCaptureCore:CaptureCore,ThreadLineCaptureDB:db,ThreadLineOrganizeCore:OrgCore,chrome,crypto:globalThis.crypto,console,Date,Promise,URL,setTimeout,clearTimeout});
  const message=(input,sender={})=>new Promise((resolve,reject)=>{callbacks.message(input,sender,r=>r.ok?resolve(r.data):reject(Error(r.error)))});
  return {message,runs,records,tabMap};

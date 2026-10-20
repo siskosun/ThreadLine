@@ -99,6 +99,13 @@
     const key = getKey(activeTab());
     return state.chats[key]?.projectId === projectId ? key : null;
   }
+  function changeDescriptions(project,seen) {
+    const delta=ThreadLineCore.changesSince(project,seen);
+    const label={goal:'研究目标',decision:'有效结论',stage:'课题状态'};
+    if (!delta.items.length) return project.lastChange?.label || '存在历史更新，详细差异未保留';
+    const rows=delta.items.slice(-4).map(v=>`${label[v.field]||v.field}：${String(v.before||'（空）').slice(0,90)} → ${String(v.after||'（空）').slice(0,90)}`);
+    return `${delta.truncated?'部分较早记录已清理；':''}${rows.join('；')}`;
+  }
   function renderCurrent() {
     const host = $("#current-content");
     const tab = activeTab();
@@ -121,7 +128,7 @@
         ${project.goal ? `<div class="current-summary"><strong>研究目标：</strong>${escape(project.goal)}</div>` : ""}
         ${project.decision ? `<div class="current-summary"><strong>当前有效结论：</strong>${escape(project.decision)}</div>` : '<div class="current-summary">尚未登记权威结论。分支的 AI 回答不代表课题已经完成。</div>'}
         ${closed ? `<div class="current-closed">课题已收口。旧分支继续发送前会有确认提醒。</div>` : ""}
-        ${stale ? `<div class="current-risk"><strong>版本待核对：</strong>本分支已核对 v${chat.seenVersion||0}，课题当前 v${version}。${escape(project.lastChange?.label||"课题状态有更新")}。请先阅读新结论。</div>` : ""}
+        ${stale ? `<div class="current-risk"><strong>版本待核对：</strong>本分支已核对 v${chat.seenVersion||0}，课题当前 v${version}。${escape(changeDescriptions(project,chat.seenVersion))}。请先阅读新结论。</div>` : ""}
         <div class="current-actions">${isGenerating(tab) ? '<span class="badge review">AI 正在回答</span>' : ''}
           ${stale ? `<button class="primary" data-action="ack-current" data-key="${escape(key)}">已核对最新状态</button>` : `<span class="badge muted">版本 v${version} 已同步</span>`}
           <button data-action="view-project" data-id="${escape(project.id)}">管理课题</button>
@@ -189,7 +196,7 @@
       const tab=bestTab(c);
       return `<article class="branch-card"><div class="branch-top"><div class="branch-name">${escape(c.label||c.title)}</div><span class="badge ${c.stage==='done'?'done':c.stage==='review'?'review':''}">${stageLabels[c.stage]}</span></div>
       <div class="branch-mini">${tab?(isGenerating(tab)?"● 正在回答":"● 标签页已打开"):"○ 标签页未打开"}${c.note?" · "+escape(c.note):""}</div>
-      ${ThreadLineCore.isOutdated(state,c)?`<div class="branch-version">待核对：分支 v${c.seenVersion||0} → 课题 v${p.knowledgeVersion||0}</div>`:""}
+      ${ThreadLineCore.isOutdated(state,c)?`<div class="branch-version">待核对：分支 v${c.seenVersion||0} → 课题 v${p.knowledgeVersion||0}<div class="diff-preview">${escape(changeDescriptions(p,c.seenVersion))}</div></div>`:""}
       <div class="branch-actions"><select aria-label="分支状态" data-stage-key="${escape(c.key)}">${options.map(([v,label])=>`<option value="${v}" ${c.stage===v?"selected":""}>${label}</option>`).join('')}</select>
       <button data-action="go-chat" data-key="${escape(c.key)}" ${(!tab && c.key.startsWith('tab:'))?'disabled':''}>打开</button>
       <button data-action="label-chat" data-key="${escape(c.key)}">命名</button>
@@ -197,6 +204,7 @@
       ${ThreadLineCore.isOutdated(state,c)?`<button data-action="ack-branch" data-key="${escape(c.key)}">已核对</button>`:""}
       <button data-action="unlink-chat" data-key="${escape(c.key)}">移除</button></div></article>`;
     }).join("");
+    const hist=(p.history||[]).slice(-8).reverse().map(v=>`<article class="history-row"><strong>v${v.version} · ${escape({goal:'目标',decision:'结论',stage:'状态'}[v.field]||v.field)}</strong><p><del>${escape(String(v.before||'（空）').slice(0,180))}</del> → ${escape(String(v.after||'（空）').slice(0,180))}</p></article>`).join('');
     host.innerHTML=`
       <div class="detail-head"><div><h2>课题详情</h2><div class="details-mini">${branches.length} 条分支 · v${p.knowledgeVersion||0} · ${p.stage==="closed"?"已收口":"进行中"}</div></div>
       <button class="text-button" data-action="collapse-details">收起详情 ↑</button></div>
@@ -208,6 +216,7 @@
         <div class="detail-controls"><button class="primary" data-action="save-details">保存课题状态</button>
         <button class="${p.stage==='closed'?'soft':'danger'}" data-action="toggle-close">${p.stage==='closed'?'重新开启课题':'收口整个课题'}</button></div>
       </div>
+      <details class="history-details"><summary>课题结论与状态变更记录（最近 ${Math.min((p.history||[]).length,8)} 条）</summary>${hist||'<p class="caption">旧版本没有差异历史，从下次修改开始记录。</p>'}</details>
       <div class="divider"></div>
       <div class="branch-title">关联对话 <span class="badge muted">${branches.length}</span></div>
       ${branchMarkup || '<div class="empty">尚未关联对话。<br>从下方选择已经打开的 ChatGPT 标签页。</div>'}
@@ -242,6 +251,53 @@
     }
     await change({type:"linkChat",key,projectId:p.id,title:tab.title||"新对话",url:tab.url},"对话已关联，其他窗口的状态会同步更新");
   }
+  async function exportBackup(){
+    try {
+      const data=await message({type:'BACKUP_EXPORT'});
+      const text=JSON.stringify(data,null,2);
+      const url=URL.createObjectURL(new Blob([text],{type:'application/json;charset=utf-8'}));
+      const anchor=document.createElement('a');
+      anchor.href=url;anchor.download=`ThreadLine-课题备份-${new Date().toISOString().slice(0,10)}.json`;
+      document.body.append(anchor);anchor.click();anchor.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),2500);
+      $('#backup-status').textContent=`已下载 ${data.state.projects.length} 个课题、${Object.keys(data.state.chats).length} 条关联。临时采集原文未包含。`;
+    } catch(e){$('#backup-status').textContent='导出失败：'+e.message;}
+  }
+  async function importBackup(){
+    const file=$('#backup-file').files?.[0];if(!file)return notify('请选择 .json 备份文件',true);
+    try {
+      if(file.size>ThreadLineBackup.MAX_BYTES)throw new Error('备份文件超过 2MB');
+      const json=await file.text();const state=ThreadLineBackup.parse(json);
+      if(!confirm(`确认用备份中的 ${state.projects.length} 个课题、${Object.keys(state.chats).length} 条关联覆盖当前数据吗？当前状态会先保留为本地快照。`))return;
+      const info=await message({type:'BACKUP_IMPORT',json});
+      selectedId=null;await refresh(true);
+      $('#backup-status').textContent=`恢复成功：${info.projects} 个课题、${info.chats} 条关联。`;
+    }catch(e){$('#backup-status').textContent='导入失败：'+e.message;}
+  }
+  async function rollbackBackup(){
+    try {
+      const snapshots=await message({type:'BACKUP_SNAPSHOTS'});
+      if(!snapshots.length)return notify('尚无可恢复的快照',true);
+      const latest=snapshots.at(-1);
+      if(!confirm(`恢复 ${new Date(latest.at).toLocaleString()} 的快照（${latest.reason}）？当前状态也会存为新快照。`))return;
+      await message({type:'BACKUP_ROLLBACK',index:latest.index});selectedId=null;
+      await refresh(true);$('#backup-status').textContent='已恢复最近快照。';
+    }catch(e){$('#backup-status').textContent='快照恢复失败：'+e.message;}
+  }
+  function formatHealthTime(value){return value?new Date(value).toLocaleString('zh-CN',{hour12:false}):'尚无已验证成功记录';}
+  async function runHealth(){
+    const current=activeTab();const host=$('#health-result');
+    if(!current)return host.textContent='请先打开要检查的 ChatGPT 标签页。';
+    host.textContent='正在执行只读自检…';
+    try {
+      const data=await message({type:'HEALTH_CHECK',tabId:current.id});
+      const parts=data.page.parts;
+      host.innerHTML=`<p><strong>${data.page.status==='basic_ready'?'基本页面可识别':'可能已降级'}</strong> · ${escape(data.page.notes)}</p>`+
+        Object.entries(parts).map(([k,v])=>`<p>${escape({composer:'输入框',sendButton:'发送控件',sidebar:'侧栏',conversation:'消息区域'}[k]||k)}：${v.available?'已识别':'未识别'}</p>`).join('')+
+        Object.entries({capture:'完整采集',move:'移入项目',archive:'归档'}).map(([k,name])=>`<p>${name}上次真实成功：${escape(formatHealthTime(data.lastSuccess[k]))}</p>`).join('')+
+        '<p>仅通过 DOM 识别不能证明项目创建、归档、分页接口和自动分析可用；这些仍需真实任务验证。</p>';
+    } catch(e){host.textContent='网页自检失败：'+e.message;}
+  }
   document.addEventListener("submit",event=>{
     if (event.target.id!=="create-form") return;
     event.preventDefault();
@@ -259,6 +315,10 @@
     if (nav){setWorkspace(nav.dataset.workspace);return;}
     const f=event.target.closest("[data-filter]");
     if (f){filter=f.dataset.filter;renderTopics();return;}
+    if (event.target.id==='backup-export')return exportBackup();
+    if (event.target.id==='backup-import')return importBackup();
+    if (event.target.id==='backup-rollback')return rollbackBackup();
+    if (event.target.id==='health-check')return runHealth();
     if (event.target.id==="clear-closed"){
       if (confirm("清理所有已收口课题？只删除扩展中的临时记录，不会删除 ChatGPT 对话。")) change({type:"clearClosed"},"已清理收口课题");
       return;
@@ -296,11 +356,11 @@
     }
     const p=ThreadLineCore.getProject(state,selectedId);
     if (!p) return;
-    if (action==="save-details") return change({type:"updateProject",projectId:p.id,sourceKey:activeSourceKey(p.id),patch:updatePayload()},"课题状态已保存；如有实质变化，其他分支会出现待核对标记");
+    if (action==="save-details") return change({type:"updateProject",expectedRevision:state.revision,projectId:p.id,sourceKey:activeSourceKey(p.id),patch:updatePayload()},"课题状态已保存；如有实质变化，其他分支会出现待核对标记");
     if (action==="toggle-close") {
       const next=p.stage==="closed"?"active":"closed";
       if (next==="closed" && !confirm("确定收口整个课题？关联的所有对话将同步显示收口提示，并尝试拦截后续发送。")) return;
-      return change({type:"updateProject",projectId:p.id,sourceKey:activeSourceKey(p.id),patch:updatePayload({stage:next})},next==="closed"?"课题已收口，旧对话会收到提醒":"课题已重新开启");
+      return change({type:"updateProject",expectedRevision:state.revision,projectId:p.id,sourceKey:activeSourceKey(p.id),patch:updatePayload({stage:next})},next==="closed"?"课题已收口，旧对话会收到提醒":"课题已重新开启");
     }
     if (action==="delete-project") {
       if (confirm(`删除临时课题「${p.name}」和其中的关联记录？ChatGPT 原对话不会删除。`)) change({type:"deleteProject",projectId:p.id},"临时课题已删除");

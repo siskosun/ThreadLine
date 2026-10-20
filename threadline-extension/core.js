@@ -4,24 +4,59 @@ const ThreadLineCore = (() => {
   const PROJECT_STAGES = Object.freeze(["active", "closed"]);
   const MAX_PROJECTS = 100;
   const MAX_CHATS = 600;
+  const SCHEMA = 2, HISTORY_LIMIT = 30;
 
-  function emptyState() { return { schema: 1, revision: 0, projects: [], chats: {} }; }
-  function normalizedState(input) {
-    if (!input || input.schema !== 1 || !Array.isArray(input.projects) || !input.chats || typeof input.chats !== "object") return emptyState();
+  function emptyState() { return { schema: SCHEMA, revision: 0, projects: [], chats: {} }; }
+  // Explicit, idempotent schema migration: refuse future schema instead of silently clearing data.
+  function migrate(input) {
+    if (input === undefined || input === null) return emptyState();
+    if (typeof input !== "object" || !Array.isArray(input.projects) || !input.chats || typeof input.chats !== "object" || Array.isArray(input.chats))
+      asError("本地课题状态格式损坏，已停止写入以保护数据");
     const state = structuredClone(input);
-    // Backward-compatible v0.1-v0.4.1 migration. Only explicit substantive updates
-    // create versions, so upgrading does not make existing conversations outdated.
-    for (const project of state.projects) {
-      if (!Number.isSafeInteger(project.knowledgeVersion) || project.knowledgeVersion < 0) project.knowledgeVersion = 0;
-      if (!project.lastChange || typeof project.lastChange !== "object") project.lastChange = null;
+    if (state.schema > SCHEMA) asError("课题数据来自更新版本，请升级扩展后再操作");
+    if (state.schema !== 1 && state.schema !== 2) asError("无法识别课题数据版本");
+    if (state.projects.length > MAX_PROJECTS || Object.keys(state.chats).length > MAX_CHATS) asError("课题备份超出数量上限");
+    if (state.schema === 1) {
+      for (const p of state.projects) {
+        if (!Array.isArray(p.history)) p.history = [];
+        if (!Number.isSafeInteger(p.knowledgeVersion) || p.knowledgeVersion < 0) p.knowledgeVersion = 0;
+        if (!p.lastChange || typeof p.lastChange !== "object") p.lastChange = null;
+      }
+      for (const c of Object.values(state.chats)) {
+        if (!c || typeof c !== "object") continue;
+        const p = state.projects.find(p => p.id === c.projectId);
+        if (!Number.isSafeInteger(c.seenVersion) || c.seenVersion < 0) c.seenVersion = p?.knowledgeVersion ?? 0;
+      }
+      state.schema = 2;
     }
-    for (const chat of Object.values(state.chats)) {
-      if (!chat || typeof chat !== "object") continue;
-      const project = state.projects.find(p => p.id === chat.projectId);
-      if (!Number.isSafeInteger(chat.seenVersion) || chat.seenVersion < 0)
-        chat.seenVersion = project?.knowledgeVersion ?? 0;
+    for (const p of state.projects) {
+      if (!p || typeof p !== "object" || typeof p.id !== "string" || typeof p.name !== "string") asError("课题记录损坏");
+      if (!Number.isSafeInteger(p.knowledgeVersion) || p.knowledgeVersion < 0) p.knowledgeVersion = 0;
+      p.history = Array.isArray(p.history) ? p.history.slice(-HISTORY_LIMIT) : [];
+      if (typeof p.goal !== "string") p.goal = "";
+      if (typeof p.decision !== "string") p.decision = "";
+      if (!PROJECT_STAGES.includes(p.stage)) asError("课题阶段无效");
     }
+    if (new Set(state.projects.map(p => p.id)).size !== state.projects.length) asError("课题 ID 重复");
+    for (const [key,c] of Object.entries(state.chats)) {
+      if (!validChatKey(key) || !c || typeof c !== "object" || !state.projects.some(p => p.id === c.projectId)) asError("关联对话记录损坏");
+      const p = state.projects.find(p => p.id === c.projectId);
+      if (!Number.isSafeInteger(c.seenVersion) || c.seenVersion < 0) c.seenVersion = p.knowledgeVersion;
+    }
+    state.revision = Number.isSafeInteger(state.revision) && state.revision >= 0 ? state.revision : 0;
     return state;
+  }
+  function normalizedState(input) { return migrate(input); }
+  function normalizeSubstance(value) {
+    // Keep decimal points, minus signs, percent signs and operators: numeric findings must not collapse.
+    return String(value ?? "").replace(/(\d)\.(\d)/g,"$1\uE000$2")
+      .replace(/[\s，。！？；：、,!?:;“”‘’（）()\[\]{}]+/gu, "")
+      .replace(/\uE000/g,".");
+  }
+  function changesSince(project, seenVersion) {
+    const history = Array.isArray(project?.history) ? project.history : [];
+    const latest = history.filter(h => h.version > (seenVersion || 0));
+    return {items:latest, truncated: history.length > 0 && history[0].version > (seenVersion || 0) + 1};
   }
   function isChatURL(href) {
     try { return ["chatgpt.com", "chat.openai.com"].includes(new URL(href).hostname); }
@@ -38,7 +73,7 @@ const ThreadLineCore = (() => {
   }
   function text(value, max) { return String(value ?? "").trim().slice(0, max); }
   function suggestProject(title, projects) {
-    const normalized = value => String(value || "").toLowerCase().replace(/chatgpt/ig,"").replace(/[\s\d\p{P}\p{S}]+/gu,"").slice(0,80);
+    const normalized = value => String(value || "").toLowerCase().replace(/chatgpt/ig, "").replace(/[\s\d\p{P}\p{S}]+/gu, "").slice(0, 80);
     const grams = value => {
       const s = normalized(value);
       const out = new Set();
@@ -101,7 +136,7 @@ const ThreadLineCore = (() => {
         if (!name) asError("请输入课题名称");
         if (state.projects.length >= MAX_PROJECTS) asError("课题已达上限，请清理旧课题");
         const id = makeId();
-        state.projects.unshift({ id, name, goal: "", decision: "", stage: "active", knowledgeVersion: 0, lastChange: null, createdAt: now, updatedAt: now, closedAt: null });
+        state.projects.unshift({ id, name, goal: "", decision: "", stage: "active", knowledgeVersion: 0, lastChange: null, history: [], createdAt: now, updatedAt: now, closedAt: null });
         if (action.chat) setChat(state, {...action.chat, projectId:id}, now);
         result = { projectId: id };
         break;
@@ -129,19 +164,25 @@ const ThreadLineCore = (() => {
             p.closedAt = patch.stage === "closed" ? now : null;
           }
         }
-        const changed = before.goal !== p.goal || before.decision !== p.decision || before.stage !== p.stage;
+        // Pure punctuation, whitespace and reformatting edits are saved but do not create stale-branch warnings.
+        const diffs = ["goal", "decision", "stage"].filter(field =>
+          field === "stage" ? before[field] !== p[field] : normalizeSubstance(before[field]) !== normalizeSubstance(p[field]));
+        const changed = diffs.length > 0;
         if (changed) {
           p.knowledgeVersion += 1;
           const source = validChatKey(action.sourceKey) ? state.chats[action.sourceKey] : null;
           const sourceKey = source?.projectId === p.id ? action.sourceKey : null;
+          const descriptions = {goal:"研究目标",decision:"有效结论",stage:"课题状态"};
           p.lastChange = {
             version: p.knowledgeVersion,
             at: now,
             sourceKey,
-            label: before.stage !== p.stage ? (p.stage === "closed" ? "课题已收口" : "课题已重新开启")
-              : before.decision !== p.decision ? "有效结论已更新" : "研究目标已更新"
+            label: before.stage !== p.stage ? (p.stage === "closed" ? "课题已收口" : "课题已重新开启") :
+              diffs.map(f => descriptions[f]).join("、") + "已更新"
           };
-          // The branch where a verified decision was published is already informed.
+          p.history = Array.isArray(p.history) ? p.history : [];
+          for (const field of diffs) p.history.push({version:p.knowledgeVersion,at:now,sourceKey,field,before:before[field],after:p[field]});
+          p.history = p.history.slice(-HISTORY_LIMIT);
           if (sourceKey) state.chats[sourceKey].seenVersion = p.knowledgeVersion;
         }
         p.updatedAt = now;
@@ -213,7 +254,7 @@ const ThreadLineCore = (() => {
     state.revision += 1;
     return {state, result};
   }
-  return {emptyState,normalizedState,isChatURL,getChatKey,getContext,getProject,isOutdated,suggestProject,apply,STAGES,PROJECT_STAGES};
+  return {emptyState,normalizedState,migrate,changesSince,normalizeSubstance,isChatURL,getChatKey,getContext,getProject,isOutdated,suggestProject,apply,STAGES,PROJECT_STAGES,SCHEMA};
 })();
 if (typeof globalThis !== "undefined") globalThis.ThreadLineCore = ThreadLineCore;
 if (typeof module !== "undefined") module.exports = ThreadLineCore;

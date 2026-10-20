@@ -28,6 +28,7 @@ function bootstrap(){
   const env={chrome,structuredClone,URL,Date,Promise,crypto:globalThis.crypto,setTimeout,clearTimeout,importScripts:()=>{}};
   vm.createContext(env);
   vm.runInContext(fs.readFileSync(path.join(files,'core.js'),'utf8'),env);
+  vm.runInContext(fs.readFileSync(path.join(files,'backup-core.js'),'utf8'),env);
   vm.runInContext(fs.readFileSync(path.join(files,'background.js'),'utf8'),env);
   const panel={url:'chrome-extension://id/panel.html'};
   const sender=id=>id?{tab:tabs.find(t=>t.id===id)}:panel;

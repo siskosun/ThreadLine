@@ -18,8 +18,10 @@ test('AI report promotion uses explicit human approval, not closure automation',
  const capture=fs.readFileSync(require('node:path').join(base,'capture-ui.js'),'utf8');
  assert.ok(html.includes('id="report-promote-state"'));
  assert.ok(capture.includes('function promoteAnalysisToProject'));
- assert.ok(capture.includes('confirm(`确定将亲自核对后的结论发布'));
- assert.ok(capture.includes('sourceKey:key,patch:{decision,goal:brief.aim||project.goal}'));
+ assert.ok(html.includes('id="promote-review-check"'));
+ assert.ok(capture.includes("$('promote-review-check').checked"));
+ assert.ok(capture.includes('expectedRevision:target.revision'));
+ assert.ok(capture.includes('patch:{decision}'));
  assert.ok(!capture.includes('patch:{stage:"closed"'));
 });
 test('stale branch reminder stays nonblocking, unlike explicit closure',()=>{

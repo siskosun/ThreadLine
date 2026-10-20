@@ -68,7 +68,8 @@
     let p=null;
     try {const snapshot=await reply({type:"SNAPSHOT"});const c=snapshot.state.chats[`chat:${run.conversationId}`];p=c?snapshot.state.projects.find(x=>x.id===c.projectId):null;}catch{}
     linkedProjectId=p?.id||null;
-    $("report-promote-state").hidden=!(run.aiReport&&linkedProjectId&&p?.stage==="active");
+    $('report-promote-state').hidden=!(run.aiReport&&linkedProjectId&&p?.stage==='active');
+    if(promoteDraft?.runId!==run.id)cancelPromote();
     rulesBrief=ThreadLineCaptureCore.digest(messages,{title:run.title,complete:run.complete,url:run.url,tabId:run.tabId,projectName:p?.name,projectId:p?.id,projectStage:p?.stage,projectDecision:p?.decision});
     brief=run.aiReport?ThreadLineAI.toBrief(run.aiReport,rulesBrief,run.aiProvider||"manual"):rulesBrief;
     $("capture-report").hidden=false;
@@ -108,30 +109,40 @@
     $("report-archive").disabled=organizing||["archived","submitted_unverified"].includes(a?.status);
     $("report-open-source").hidden=!p&&!a;
   }
+  let promoteDraft=null;
   async function promoteAnalysisToProject(){
-    if(!currentRun?.aiReport || !brief || !linkedProjectId){aiStatus("只有关联到进行中课题的 AI 报告才能提交状态建议",true);return;}
+    if(!currentRun?.aiReport || !brief || !linkedProjectId){aiStatus('请先完成 AI 分析并关联进行中的课题',true);return;}
     try {
-      const snapshot=await reply({type:"SNAPSHOT"});
+      const snap=await reply({type:'SNAPSHOT'});
       const key=`chat:${currentRun.conversationId}`;
-      const linked=snapshot.state.chats[key];
-      const project=snapshot.state.projects.find(p=>p.id===linkedProjectId);
-      if(!linked || linked.projectId!==linkedProjectId || !project || project.stage!=="active")throw new Error("源对话已不在这个进行中的课题，未修改状态");
-      const proposed=(brief.conclusions||[]).slice(0,3).map(row=>row.text).join("；").slice(0,950);
-      if(!proposed)throw new Error("AI 未提取到可用的结论候选，不能同步空状态");
-      const reviewed=prompt(`将以下候选结论作为「${project.name}」的新课题状态发布给所有分支。请核对并修改；取消则不发布。
-
-采集${currentRun.complete?"分页已结束":"不完整，可能缺失重要历史"}；模型判断不等于已验证事实。`,proposed);
-      if(reviewed===null)return;
-      const decision=reviewed.trim();
-      if(!decision)throw new Error("有效结论不能为空；取消即可保持原状态");
-      if(!confirm(`确定将亲自核对后的结论发布到「${project.name}」？
-其他分支将显示“新课题状态待核对”。
-整个课题不会因此自动收口。`))return;
-      await reply({type:"MUTATE",action:{type:"updateProject",projectId:project.id,sourceKey:key,patch:{decision,goal:brief.aim||project.goal}}});
+      const linked=snap.state.chats[key];
+      const project=snap.state.projects.find(p=>p.id===linkedProjectId);
+      if(!linked || linked.projectId!==linkedProjectId || !project || project.stage!=='active')throw new Error('来源对话不在进行中的课题中');
+      const proposed=(brief.conclusions||[]).slice(0,3).map(row=>row.text).join('；').slice(0,950);
+      if(!proposed)throw new Error('没有可发布的结论候选');
+      promoteDraft={projectId:project.id,key,revision:snap.state.revision,runId:currentRun.id};
+      $('promote-review-text').value=proposed;
+      $('promote-review-check').checked=false;
+      $('promote-review-save').disabled=true;
+      $('promote-review-notice').textContent=`目标课题：${project.name}。${currentRun.complete?'分页采集已结束，但仍需核验历史覆盖':'历史采集不完整，尤其需要核对缺失的证据'}。本操作不关闭课题、不改变其他分支研究。`;
+      $('promote-review').hidden=false;
+      $('promote-review-text').focus();
+    }catch(e){$('report-promote-hint').textContent='无法打开审核：'+e.message;}
+  }
+  function cancelPromote(){promoteDraft=null;$('promote-review').hidden=true;$('promote-review-check').checked=false;}
+  async function savePromoted(){
+    if(!promoteDraft || !$('promote-review-check').checked)return;
+    const decision=$('promote-review-text').value.trim();
+    if(!decision){$('report-promote-hint').textContent='有效结论不能为空';return;}
+    try {
+      const target=promoteDraft;
+      if(!currentRun || currentRun.id!==target.runId)throw new Error('来源报告已切换，未发布');
+      await reply({type:'MUTATE',action:{type:'updateProject',expectedRevision:target.revision,projectId:target.projectId,sourceKey:target.key,patch:{decision}}});
+      cancelPromote();
       const fresh=await ThreadLineCaptureDB.getRun(currentRun.id);
       if(fresh)await showReport(fresh);
-      $("report-promote-hint").textContent="已发布为共享课题状态。其他分支需主动核对，原课题收口状态未改变。";
-    } catch(e){$("report-promote-hint").textContent="提交未完成："+e.message;}
+      $('report-promote-hint').textContent='经人工确认的有效结论已发布，其他分支将显示具体变化。';
+    }catch(e){$('report-promote-hint').textContent='发布未完成：'+e.message+'。如其他窗口有更新，请关闭并重新审核。';}
   }
   async function remoteAction(action){
     if(!currentRun || currentRun.status!=="done")return;
@@ -340,7 +351,10 @@
     $("report-create-project").addEventListener("click",()=>remoteAction("create_and_move"));
     $("report-archive").addEventListener("click",()=>remoteAction("archive"));
     $("report-open-source").addEventListener("click",openSource);
-    $("report-promote-state").addEventListener("click",promoteAnalysisToProject);
+    $('report-promote-state').addEventListener('click',promoteAnalysisToProject);
+    $('promote-review-check').addEventListener('change',()=>{$('promote-review-save').disabled=!$('promote-review-check').checked;});
+    $('promote-review-save').addEventListener('click',savePromoted);
+    $('promote-review-cancel').addEventListener('click',cancelPromote);
     $("capture-start").addEventListener("click",begin);
     $("ai-provider").addEventListener("change",updateProvider);
     $("ai-run").addEventListener("click",analyzeWithProvider);

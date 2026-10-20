@@ -1,5 +1,7 @@
-importScripts("core.js", "capture-core.js", "capture-db.js", "organize-core.js");
+importScripts("core.js", "backup-core.js", "capture-core.js", "capture-db.js", "organize-core.js");
 const STORE_KEY = "threadline_state_v1";
+const SNAPSHOT_KEY = "threadline_state_snapshots";
+const CAPTURE_PREFIX = "tl_capture_owner_";
 let mutations = Promise.resolve();
 
 function serialize(fn) {
@@ -11,12 +13,45 @@ async function readState() {
   const record = await chrome.storage.local.get(STORE_KEY);
   return ThreadLineCore.normalizedState(record[STORE_KEY]);
 }
+async function writeState(previous,next,reason) {
+  const preserve = !["observeChat", "acknowledgeProject"].includes(reason);
+  if (!preserve) { await chrome.storage.local.set({[STORE_KEY]:next}); return; }
+  const record = await chrome.storage.local.get(SNAPSHOT_KEY);
+  const before = Array.isArray(record[SNAPSHOT_KEY]) ? record[SNAPSHOT_KEY] : [];
+  // Snapshots store complete, *previous* states; rollback will not erase the undo history.
+  const snapshots = [...before,{at:Date.now(),reason, state:previous}].slice(-ThreadLineBackup.SNAPSHOT_LIMIT);
+  await chrome.storage.local.set({[SNAPSHOT_KEY]:snapshots,[STORE_KEY]:next});
+}
 async function mutate(action) {
   return serialize(async () => {
     const previous = await readState();
+    if (action.expectedRevision !== undefined && action.expectedRevision !== previous.revision) {
+      throw new Error("课题已在其他窗口更新，请刷新后重新审阅，避免覆盖新结论");
+    }
     const changed = ThreadLineCore.apply(previous,action);
-    await chrome.storage.local.set({[STORE_KEY]:changed.state});
+    await writeState(previous,changed.state,action.type);
     return changed;
+  });
+}
+async function importBackup(json) {
+  return serialize(async () => {
+    const restored = ThreadLineBackup.parse(json);
+    const previous = await readState();
+    restored.revision = Math.max(previous.revision,restored.revision)+1;
+    await writeState(previous,restored,"restoreImport");
+    return {revision:restored.revision,projects:restored.projects.length, chats:Object.keys(restored.chats).length};
+  });
+}
+async function restoreSnapshot(index) {
+  return serialize(async () => {
+    const record = await chrome.storage.local.get(SNAPSHOT_KEY);
+    const snapshots = Array.isArray(record[SNAPSHOT_KEY]) ? record[SNAPSHOT_KEY] : [];
+    if (!Number.isInteger(index) || index < 0 || index >= snapshots.length) throw new Error("快照不存在");
+    const previous = await readState();
+    const state = ThreadLineBackup.assertState(snapshots[index].state);
+    state.revision = Math.max(state.revision,previous.revision)+1;
+    await writeState(previous,state,"restoreSnapshot");
+    return {revision:state.revision};
   });
 }
 async function snapshot() {
@@ -63,6 +98,7 @@ async function beginCapture(tabId) {
   const id="cap_"+crypto.randomUUID();
   const run={id,tabId,conversationId,url:tab.url,title:tab.title||"未命名对话",status:"capturing",createdAt:Date.now(),updatedAt:Date.now(),pageCount:0,messageCount:0,complete:false,mode:"",notice:"",error:""};
   await ThreadLineCaptureDB.putRun(run);
+  await chrome.storage.session.set({[`${CAPTURE_PREFIX}${id}`]:{tabId,startedAt:Date.now()}});
   captureOwners.set(id,tabId);
   try {
     // Also works with ChatGPT tabs opened before the extension was installed.
@@ -70,7 +106,7 @@ async function beginCapture(tabId) {
     await chrome.scripting.executeScript({target:{tabId},files:["capture-page.js"],world:"ISOLATED"});
     const reply=await chrome.tabs.sendMessage(tabId,{type:"TL_CAPTURE_START",id,conversationId});
     if(!reply?.ok)throw new Error(reply?.error||"无法与源标签页通讯");
-  }catch(e){captureOwners.delete(id);await ThreadLineCaptureDB.modifyRun(id,{status:"error",error:String(e.message||e)});}
+  }catch(e){captureOwners.delete(id);await chrome.storage.session.remove(`${CAPTURE_PREFIX}${id}`);await ThreadLineCaptureDB.modifyRun(id,{status:"error",error:String(e.message||e)});}
   await chrome.storage.local.set({tl_last_capture_id:id});
   return {id};
 }
@@ -93,10 +129,10 @@ async function receiveCapture(payload,sender){
       await ThreadLineCaptureDB.modifyRun(run.id,{pageCount:Number(payload.pageCount)||0,messageCount:Number(payload.messageCount)||0,phase:String(payload.phase||"")});return {ok:true};
     case "CAPTURE_END":{
       await ThreadLineCaptureDB.modifyRun(run.id,{status:"done",complete:payload.complete===true,mode:String(payload.mode||""),pageCount:Number(payload.pageCount)||0,messageCount:Number(payload.count)||0,notice:String(payload.notice||"").slice(0,1200)});
-      captureOwners.delete(run.id);return {ok:true};
+      captureOwners.delete(run.id);await chrome.storage.session.remove(`${CAPTURE_PREFIX}${run.id}`);await markSuccess("capture");return {ok:true};
     }
     case "CAPTURE_FAIL":
-      await ThreadLineCaptureDB.modifyRun(run.id,{status:"error",error:String(payload.message||"采集失败").slice(0,1200)});captureOwners.delete(run.id);return {ok:true};
+      await ThreadLineCaptureDB.modifyRun(run.id,{status:"error",error:String(payload.message||"采集失败").slice(0,1200)});captureOwners.delete(run.id);await chrome.storage.session.remove(`${CAPTURE_PREFIX}${run.id}`);return {ok:true};
     default:throw new Error("未知采集状态");
   }
 }
@@ -120,6 +156,27 @@ async function openChatWithDraft(handoff,windowId,projectId){
 // ChatGPT web organization uses only visible UI on the user-selected source tab.
 // Create a project in a separate helper tab so the source conversation stays intact.
 const organizeLocks = new Set();
+const ORG_LOCK_PREFIX = 'tl_org_lock_';
+async function acquireOrganizeLock(key,run,action,tabId) {
+  if(organizeLocks.has(key))throw new Error('该对话正在执行其他组织操作');
+  const slot=`${ORG_LOCK_PREFIX}${key}`;
+  const record=(await chrome.storage.session.get(slot))[slot];
+  if(record){
+    if(Date.now()-record.at<15*60*1000)throw new Error('上次网页操作仍未确认，请检查原标签页后再重试');
+    // A suspended MV3 worker may have clicked the UI already. Persist uncertainty; never silently repeat.
+    if(record.action==='archive')await ThreadLineCaptureDB.modifyRun(run.id,{archiveWeb:{status:'submitted_unverified',at:Date.now(),error:'后台在归档过程中中断，结果待核实'}});
+    else await ThreadLineCaptureDB.modifyRun(run.id,{remoteProject:{status:'creation_unverified',name:record.name||'',at:Date.now(),error:'后台在创建/移动过程中中断，结果待核实'}});
+    await chrome.storage.session.remove(slot);
+    throw new Error('上次操作中途被中断，已记录为待核实。请检查 ChatGPT 后手动处理，避免重复操作');
+  }
+  await chrome.storage.session.set({[slot]:{at:Date.now(),tabId,runId:run.id,action,name:run.remoteProject?.name||''}});
+  organizeLocks.add(key);
+}
+async function releaseOrganizeLock(key) {
+  organizeLocks.delete(key);
+  await chrome.storage.session.remove(`${ORG_LOCK_PREFIX}${key}`);
+}
+
 const delayOrg = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 async function waitOrgTab(tabId, timeoutMs=24000){
   const start=Date.now();
@@ -148,8 +205,7 @@ async function organizeWeb(payload){
   const run=await ThreadLineCaptureDB.getRun(payload.runId);
   const source=await sourceForOrganization(run,payload.tabId);
   const key=run.conversationId;
-  if(organizeLocks.has(key))throw new Error('该对话正在执行其他组织操作');
-  organizeLocks.add(key);
+  await acquireOrganizeLock(key,run,payload.action,source.id);
   try{
     if(payload.action==='archive'){
       if(run.archiveWeb?.status==='archived')return run.archiveWeb;
@@ -164,6 +220,7 @@ async function organizeWeb(payload){
       }
       const record={status:result.status,at:Date.now()};
       await ThreadLineCaptureDB.modifyRun(run.id,{archiveWeb:record});
+      if(record.status==="archived")await markSuccess("archive");
       return record;
     }
     if(payload.action!=='create_and_move')throw new Error('未知网页组织操作');
@@ -208,14 +265,52 @@ async function organizeWeb(payload){
     }
     remote={...remote,status:moved.status==='moved'||moved.status==='already_in_project'?'moved':'move_unverified',error:'',at:Date.now()};
     await ThreadLineCaptureDB.modifyRun(run.id,{remoteProject:remote});
+    if(remote.status==='moved')await markSuccess("move");
     if(helperId && remote.status==='moved')await chrome.tabs.remove(helperId).catch(()=>{});
     return remote;
-  }finally{organizeLocks.delete(key);}
+  }finally{await releaseOrganizeLock(key);}
+}
+// Called during normal UI activity too: MV3 service workers can restart without onStartup.
+async function recoverCaptures(closedTabId=null) {
+  const all=await chrome.storage.session.get(null);
+  for (const [key,value] of Object.entries(all)) {
+    if (!key.startsWith(CAPTURE_PREFIX)) continue;
+    const id=key.slice(CAPTURE_PREFIX.length);
+    const run=await ThreadLineCaptureDB.getRun(id);
+    if (!run || run.status !== 'capturing') { await chrome.storage.session.remove(key); continue; }
+    const tab = await chrome.tabs.get(value.tabId).catch(()=>null);
+    if (closedTabId===value.tabId || !tab || Date.now() - (run.updatedAt||run.createdAt) > 15*60*1000) {
+      await ThreadLineCaptureDB.modifyRun(id,{status:'error',error:!tab?'来源对话标签页已关闭':'采集中断或超时，请重新采集'});
+      await chrome.storage.session.remove(key);
+      captureOwners.delete(id);
+    }
+  }
+}
+const PAGE_HEALTH_KEY = 'tl_health_successes';
+async function markSuccess(kind) {
+  const record=await chrome.storage.local.get(PAGE_HEALTH_KEY);
+  const prev=record[PAGE_HEALTH_KEY]||{};
+  await chrome.storage.local.set({[PAGE_HEALTH_KEY]:{...prev,[kind]:Date.now()}});
+}
+async function inspectTab(tabId) {
+  if(!Number.isInteger(tabId)) throw new Error('请先打开 ChatGPT 标签页');
+  const tab=await chrome.tabs.get(tabId);
+  if(!ThreadLineCore.isChatURL(tab.url)) throw new Error('只能自检 ChatGPT 网页');
+  try {
+    const result=await chrome.tabs.sendMessage(tabId,{type:'TL_HEALTH_CHECK'});
+    if (result?.ok && result.data) return result.data;
+  } catch {}
+  // Content scripts in tabs opened before an extension upgrade may not handle the new probe.
+  await chrome.scripting.executeScript({target:{tabId},files:['vendor/shadow-helpers.js','selectors.js','content.js']});
+  const result=await chrome.tabs.sendMessage(tabId,{type:'TL_HEALTH_CHECK'});
+  if (result?.ok && result.data) return result.data;
+  throw new Error('未能完成只读自检');
 }
 chrome.runtime.onInstalled.addListener(() => {
   chrome.sidePanel.setPanelBehavior({openPanelOnActionClick:true}).catch(() => {});
 });
 chrome.runtime.onStartup.addListener(() => {
+  recoverCaptures().catch(()=>{});
   chrome.sidePanel.setPanelBehavior({openPanelOnActionClick:true}).catch(() => {});
 });
 chrome.tabs.onUpdated.addListener(async(tabId,change)=>{
@@ -223,8 +318,9 @@ chrome.tabs.onUpdated.addListener(async(tabId,change)=>{
   try{const r=await chrome.storage.session.get(`tl_handoff_${tabId}`);if(r[`tl_handoff_${tabId}`])await chrome.tabs.sendMessage(tabId,{type:"TL_HANDOFF_READY"});}catch{}
 });
 chrome.tabs.onRemoved.addListener((tabId) => {
+  recoverCaptures(tabId).catch(()=>{});
   chrome.storage.session.remove([`tl_live_${tabId}`,`tl_handoff_${tabId}`]).catch(() => {});
-  for(const [id,owner] of captureOwners)if(owner===tabId){captureOwners.delete(id);ThreadLineCaptureDB.modifyRun(id,{status:"error",error:"源对话标签页已关闭"}).catch(()=>{});}
+  for(const [id,owner] of captureOwners)if(owner===tabId)captureOwners.delete(id);
 });
 chrome.runtime.onMessage.addListener((payload,sender,reply) => {
   (async () => {
@@ -261,8 +357,34 @@ chrome.runtime.onMessage.addListener((payload,sender,reply) => {
       const state = await readState();
       return {key,...ThreadLineCore.getContext(state,key)};
     }
+    if (payload.type === "BACKUP_EXPORT") {
+      if(sender.tab)throw new Error('只能由研线侧栏导出');
+      const state=await readState();
+      const record=await chrome.storage.local.get(SNAPSHOT_KEY);
+      return ThreadLineBackup.create(state,record[SNAPSHOT_KEY]||[]);
+    }
+    if (payload.type === "BACKUP_IMPORT") {
+      if(sender.tab)throw new Error('只能由研线侧栏导入');
+      return importBackup(payload.json);
+    }
+    if (payload.type === "BACKUP_SNAPSHOTS") {
+      if(sender.tab)throw new Error('只能由研线侧栏读取');
+      const record=await chrome.storage.local.get(SNAPSHOT_KEY);
+      return (record[SNAPSHOT_KEY]||[]).map((r,index)=>({index,at:r.at,reason:r.reason,revision:r.state?.revision}));
+    }
+    if (payload.type === "BACKUP_ROLLBACK") {
+      if(sender.tab)throw new Error('只能由研线侧栏恢复');
+      return restoreSnapshot(payload.index);
+    }
+    if (payload.type === "HEALTH_CHECK") {
+      if(sender.tab)throw new Error('只能由研线侧栏自检');
+      const result=await inspectTab(payload.tabId);
+      const record=await chrome.storage.local.get(PAGE_HEALTH_KEY);
+      return {page:result,lastSuccess:record[PAGE_HEALTH_KEY]||{},at:Date.now()};
+    }
     if (payload.type === "SNAPSHOT") {
       if (sender.tab) throw new Error("无权访问面板数据");
+      await recoverCaptures();
       return snapshot();
     }
     if (payload.type === "MUTATE") {
