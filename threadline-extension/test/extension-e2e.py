@@ -32,9 +32,18 @@ def run():
       panel.locator('#manage-accordion').evaluate('(node)=>node.open=true')
       panel.locator('#topic-name').fill('真实扩展模拟验收')
       panel.locator('#create-form button[type=submit]').click()
-      panel.wait_for_function("async () => (await chrome.storage.local.get('threadline_state_v1')).threadline_state_v1?.projects.length===1")
+      # The write is complete only once both the background snapshot and the
+      # persistent chrome.storage record agree. The UI may rerender sooner.
+      panel.wait_for_function("""async () => {
+        const [reply,record]=await Promise.all([
+          chrome.runtime.sendMessage({type:'SNAPSHOT'}),
+          chrome.storage.local.get('threadline_state_v1')
+        ]);
+        return reply?.ok && reply.data?.state?.projects?.length===1
+          && record?.threadline_state_v1?.projects?.length===1;
+      }""",timeout=15000)
       state=panel.evaluate("async () => (await chrome.storage.local.get('threadline_state_v1')).threadline_state_v1")
-      assert state['schema']==2, 'v2 explicit schema'
+      assert isinstance(state,dict) and state.get('schema')==2, f'v2 schema not persisted: {state!r}'
       pid=state['projects'][0]['id']
       # The page's UUID route must retain identity when moved into a ChatGPT project URL.
       assert panel.evaluate("() => ThreadLineCore.getChatKey('https://chatgpt.com/g/g-p-123/c/demo-alpha')")=='chat:demo-alpha'
