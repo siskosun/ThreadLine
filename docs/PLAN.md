@@ -2,7 +2,7 @@
 
 **唯一正式计划：** 本文件 `docs/PLAN.md`。其他 ChatGPT 资料库、对话、PR 说明和 `docs/ff/` 附录仅作为参考或证据，均不能覆盖本文件的任务状态。
 **事实核查日：** 2026-10-21。
-**基线：** main `d40d13f2918c33961ced333a9884af9c853157ad`，v0.6.1。
+**原始基线：** main `d40d13f2918c33961ced333a9884af9c853157ad`，v0.6.1。当前核实的 main 为 `f3109ebb6e5e76f4c34670b10654bd0127471bea`，版本仍为 v0.6.1。
 **实施授权范围：** 第零步与第一期；第二期暂缓。不得仅凭 Agent 声称完成而更新状态。
 
 ## 执行任务与验收门禁
@@ -15,7 +15,7 @@
 | R-REUSE | 复用调研与 Fork 审计 | in_review | - | 上游代码、Fork 差异及移植边界经评审 | PR#2 | no |
 | Z0-BASE | Windows 测试基线与路径修复 | in_review | - | Windows npm run verify 和合成 E2E 有原始日志 | PR#1 | yes |
 | Z0-LIVE | 真实登录 ChatGPT 的页面适配验收 | blocked | Z0-BASE | 双标签创建、长草稿回读、人工发送核实、完整采集、异常恢复由用户验收 | docs/ff/BLOCKED.md | yes |
-| P1-CORE | 冻结材料、独立存储及四态状态机 | in_progress | - | 24KB 输入和 SHA-256、attempts、单写者与原有功能回归经测试 | - | no |
+| P1-CORE | 冻结材料、独立存储及四态状态机 | in_review | - | 24KB 输入和 SHA-256、attempts、单写者与原有功能回归经测试 | PR#3 | no |
 | P2-FORK | 双会话创建与人工发送工作流 | planned | Z0-LIVE,P1-CORE | 两边输入完整且相同，0 自动发送，分支身份和重启恢复经测试 | - | yes |
 | P3-REPORT | 完整结果采集、去标签对照及 JSON 导出 | planned | P2-FORK | 双 done 才可对照，用户裁决持久化，不重放未知状态，导出可独立复算 | - | yes |
 | BETA-RELEASE | 安装升级与正式 Beta 验收 | planned | P3-REPORT | 真实双分支闭环、同路径旧数据升级、CI 与用户验收均通过 | - | yes |
@@ -46,10 +46,10 @@
 
 | 项目 | 状态 | 证据 |
 | --- | --- | --- |
-| 主仓基线 | main `d40d13f2918c33961ced333a9884af9c853157ad`，v0.6.1 | GitHub main |
+| 主仓基线 | main `f3109ebb6e5e76f4c34670b10654bd0127471bea`，v0.6.1 | GitHub main |
 | Windows 修复及第零步文档 | Draft PR #1，尚未合并；CI success | https://github.com/siskosun/ThreadLine/pull/1 |
-| 开发前开源复用/Fork 审计 | Draft PR #2，尚未合并；CI success | https://github.com/siskosun/ThreadLine/pull/2 |
-| PR-1 功能开发 | 仅创建 `feat/ff-core-pr1-20261021` 分支，未提交功能代码 | GitHub 分支 |
+| 开发前开源复用/Fork 审计 | PR #2 已合并；研究验收证据尚未转为 done | https://github.com/siskosun/ThreadLine/pull/2 |
+| PR-1 功能开发 | Draft PR #3 已提交 P1 核心代码；118 项 Node 与两套合成 Chromium E2E 通过，尚未合并 | https://github.com/siskosun/ThreadLine/pull/3 |
 | 真实登录 ChatGPT 网页验收 | **未执行、未通过** | PR #1 `docs/ff/VERIFY.md` |
 | PR-2/PR-3、正式发布 | 尚未开始 | 阶段门禁 |
 
@@ -156,7 +156,7 @@ GitHub CI 成功只证明相应分支的现有自动化检查通过，不代表 
 
 ## 十、下一步与维护规则
 
-当前顺序：审核开源复用调查和 Draft PR #2；PR #1 的 Windows 路径修复虽 CI 通过，但 Windows 实机与登录网页均未完成人工确认；PR-1 可以独立推进冻结与状态基础；PR-2 必须等待 Z0-LIVE 和 P1-CORE 满足放行；PR-3 等待 P2-FORK；第二期保持 `deferred`。
+当前顺序：PR #2 已合并但 R-REUSE 未补齐 done 证据；PR #1 的 Windows 路径修复虽 Linux CI 通过，但 Windows 实机和登录网页仍未完成人工确认；PR #3 的 P1 核心实现已送评审（118 项 Node 与两套合成 Chromium E2E 通过），未合并、未标 done。PR-2 必须等待 Z0-LIVE 和 P1-CORE 满足放行；PR-3 等待 P2-FORK；第二期保持 `deferred`。
 
 **GitHub 是唯一权威持久位置。** 本文件负责目标、阶段、任务状态及验收标准。根目录 `AGENTS.md` 约束执行者；`docs/ff/REUSE_AUDIT_20261021.md` 是复用证据，不是计划；`docs/ff/DEVELOPMENT_PLAN.md` 只保留重定向。ChatGPT Library 中的历史副本只供查看，不能作为当前状态来源。
 
