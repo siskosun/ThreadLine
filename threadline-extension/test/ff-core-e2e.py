@@ -4,7 +4,7 @@ No authenticated account, real-site adapter, or message sending. Z0-LIVE remains
 import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, expect
 
 EXT = Path(__file__).resolve().parents[1]
 SITE = """<!doctype html><title>Offline synthetic tab</title>
@@ -40,7 +40,7 @@ def run():
             page = ctx.new_page()
             page.goto(f"chrome-extension://{eid}/ff.html", wait_until="domcontentloaded")
             page.wait_for_selector("#ff-enable")
-            page.wait_for_function("document.querySelector('#ff-notice').textContent.includes('未启用')")
+            expect(page.locator("#ff-notice")).to_contain_text("未启用")
             assert not page.locator("#ff-enable").is_checked()
             assert page.locator("#ff-local").is_hidden()
 
@@ -61,7 +61,7 @@ def run():
             page.locator("#ff-w0").fill(evil)
             page.locator("#ff-p").fill("回答问题")
             page.locator("#ff-save").click()
-            page.wait_for_function("document.querySelector('#ff-sha').textContent.includes('SHA-256')")
+            expect(page.locator("#ff-sha")).to_contain_text("SHA-256")
             assert not page.locator("#ff-detail img").count()
             assert page.locator("#ff-text").text_content().startswith("【共同材料 W₀】\n" + evil)
             assert page.evaluate("window.ffXss === undefined")
@@ -131,7 +131,7 @@ def run():
             assert eid2 == eid, "Persistent extension ID should not change"
             reopened = ctx2.new_page()
             reopened.goto(f"chrome-extension://{eid2}/ff.html")
-            reopened.wait_for_function("document.querySelector('#ff-enable').checked")
+            expect(reopened.locator("#ff-enable")).to_be_checked()
             rows = reopened.evaluate("() => chrome.runtime.sendMessage({type:'FF_LIST'})")
             assert rows["ok"] and len(rows["data"]) == 2, rows
             after = reopened.evaluate("(id) => chrome.runtime.sendMessage({type:'FF_READ',id})", first)
