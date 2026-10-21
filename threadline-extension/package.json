@@ -7,8 +7,9 @@
     "test": "node --test test/*.test.js",
     "check": "node scripts/check-version.mjs",
     "lint:syntax": "node scripts/check-syntax.mjs",
-    "verify": "npm run lint:syntax && npm run check && npm test",
-    "test:e2e": "python test/extension-e2e.py"
+    "verify": "npm run lint:syntax && npm run check && npm run check:plan && npm test",
+    "test:e2e": "python test/extension-e2e.py",
+    "check:plan": "node ../scripts/check-plan.mjs"
   },
   "engines": {
     "node": ">=22"
