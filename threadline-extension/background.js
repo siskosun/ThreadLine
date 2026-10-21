@@ -1,4 +1,4 @@
-importScripts("core.js", "backup-core.js", "capture-core.js", "capture-db.js", "organize-core.js");
+importScripts("core.js", "backup-core.js", "capture-core.js", "capture-db.js", "organize-core.js", "ff-core.js", "ff-db.js");
 const STORE_KEY = "threadline_state_v1";
 const SNAPSHOT_KEY = "threadline_state_snapshots";
 const CAPTURE_PREFIX = "tl_capture_owner_";
@@ -337,6 +337,17 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 chrome.runtime.onMessage.addListener((payload,sender,reply) => {
   (async () => {
     if (!payload || typeof payload.type !== "string") throw new Error("无效消息");
+    // Fork Beta cannot access legacy MUTATE/backup protocols.
+    // Source is checked even for panel-in-tab contexts.
+    if (payload.type.startsWith("FF_")) {
+      const own = chrome.runtime.getURL("ff.html");
+      const trusted = sender.id === chrome.runtime.id && sender.url === own &&
+        (!sender.tab || sender.tab.url === own);
+      if (!trusted) throw new Error("only the Fork extension page may access FF data");
+      if (payload.type === "FF_STATUS") return {enabled:false,phase:"core_only"};
+      // No creation/mutation is exposed until the opt-in UX and provenance gate is reviewed.
+      throw new Error("Fork Beta is disabled until explicit activation");
+    }
     if (payload.type === "CAPTURE_START") {
       if(!isTrustedPanelSender(sender))throw new Error("只有研线面板可启动采集");
       return beginCapture(payload.tabId);
