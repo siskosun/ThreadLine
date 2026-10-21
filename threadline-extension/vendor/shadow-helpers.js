@@ -45,3 +45,4 @@ const ThreadLinePage = (() => {
 })();
 
 if (typeof globalThis !== "undefined") globalThis.ThreadLinePage = ThreadLinePage;
+if (typeof module !== "undefined") module.exports = ThreadLinePage;
