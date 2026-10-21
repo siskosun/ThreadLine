@@ -108,9 +108,13 @@ def run():
             # Inclusive 24000 UTF-8 bytes of the final assembled text.
             overhead = len(("【共同材料 W₀】\n" + "\n\n【任务指令 P】\n任务").encode("utf-8"))
             at_limit = "x" * (24000 - overhead)
-            maximum = message({"type":"FF_CREATE","w0":at_limit,"p":"任务"})
+            maximum = message({"type":"FF_CREATE","operationId":"op_length001","w0":at_limit,"p":"任务"})
             assert maximum["ok"] and maximum["data"]["bytes"] == 24000, maximum
-            too_large = message({"type":"FF_CREATE","w0":at_limit+"x","p":"任务"})
+            replay = message({"type":"FF_CREATE","operationId":"op_length001","w0":at_limit,"p":"任务"})
+            assert replay["ok"] and replay["data"]["id"] == maximum["data"]["id"], replay
+            changed = message({"type":"FF_CREATE","operationId":"op_length001","w0":at_limit[:-1],"p":"任务"})
+            assert not changed["ok"], changed
+            too_large = message({"type":"FF_CREATE","operationId":"op_length002","w0":at_limit+"x","p":"任务"})
             assert not too_large["ok"], too_large
 
             legacy = page.evaluate("() => chrome.storage.local.get('threadline_state_v1')")
