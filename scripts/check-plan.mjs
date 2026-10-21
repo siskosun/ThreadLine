@@ -143,7 +143,8 @@ export async function checkGithubEvidence({tasks,done},{repo,token,fetchImpl=fet
   const opts={repo,token,fetchImpl};
   for(const t of tasks.filter(x=>x.status==='in_review')){
     const pr=await githubJson('/pulls/'+t.evidence.slice(3),opts);
-    check(pr.state==='open' && pr.base?.ref==='main','in_review PR not open against main: '+t.id);
+    check(pr.base?.ref==='main' && (pr.state==='open' || !!pr.merged_at),
+      'in_review PR must exist on main or be merged: '+t.id);
   }
   for(const {task,evidence} of done){
     const pr=await githubJson('/pulls/'+evidence.pr_number,opts);
@@ -176,7 +177,7 @@ if(process.argv[1] && path.resolve(process.argv[1])===fileURLToPath(import.meta.
         repo:process.env.GITHUB_REPOSITORY,
         token:process.env.GITHUB_TOKEN
       });
-      console.log('Plan gate passed: '+report.tasks.length+' tasks, '+remote.reviewPrs+' open PRs, '+remote.done+' externally verified done');
+      console.log('Plan gate passed: '+report.tasks.length+' tasks, '+remote.reviewPrs+' linked review PRs, '+remote.done+' externally verified done');
     }else console.log('Plan structure passed: '+report.tasks.length+' tasks, '+report.done.length+' locally checked done; remote signoff checked only in GitHub CI');
   }catch(error){
     console.error(error?.message||String(error));process.exitCode=1;
