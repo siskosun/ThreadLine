@@ -35,3 +35,13 @@ test("FF unknown attempt is not silently retried or replaced",async()=>{
  assert.throws(()=>F.advance(x,{branch:"A",expectedRevision:1,operationId:"op_456789",attemptId:"att_345678",status:"done",phase:"capturing"}),/terminal/);
  assert.equal(x.branches.A.attempts.length,1);
 });
+
+test("FF manual retry after unknown must have new attempt ID",async()=>{
+ let x=F.newExperiment(await F.freeze("W","P"),"exp_retry1");
+ x=F.advance(x,{branch:"A",expectedRevision:0,operationId:"op_retry1",attemptId:"att_retry1",status:"unknown",phase:"awaiting_send"});
+ assert.throws(()=>F.advance(x,{branch:"A",expectedRevision:1,operationId:"op_retry2",attemptId:"att_retry2",status:"pending",phase:"created"}),/terminal/);
+ x=F.advance(x,{branch:"A",expectedRevision:1,operationId:"op_retry2",attemptId:"att_retry2",status:"pending",phase:"created",manualNewAttempt:true});
+ assert.equal(x.branches.A.attempts.length,2);
+ assert.equal(x.branches.A.attempts[0].status,"unknown");
+ assert.equal(x.branches.A.status,"pending");
+});
