@@ -28,6 +28,12 @@
 
 网页自动模型分析并非 OpenAI 官方 API；正式使用可选授权模型服务。网页操作不在后台默默重试。仅在主动开启采集时读取指定对话正文；研究内容保存在本地，点击模型分析时才按界面确认发送。**GitHub 仓库公开，不能在源码或 Issues 中上传内部研究文本和凭据。**
 
+## 正式开发计划
+
+**[GitHub 唯一正式计划：docs/PLAN.md](docs/PLAN.md)** 记录开发目标、分阶段任务、当前状态、依赖和验收条件。任何 Agent 应先阅读 [AGENTS.md](AGENTS.md) 再执行；[证据规范](docs/ff/EVIDENCE.md) 说明何时可以把任务标记为完成。
+
+GitHub Actions 会执行计划状态、实际 PR 合并/检查结果核验，以及全部既有回归测试。**自动化通过不代替真实登录 ChatGPT 的人工验收**。旧版计划文件和外部资料库副本不再作为当前状态来源。
+
 ## 验证与开发
 
 源码位于 [`threadline-extension/`](threadline-extension/)，不需要 Node 才能安装；Node 22+ 用于开发和测试：
