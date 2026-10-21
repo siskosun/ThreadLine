@@ -6,6 +6,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  checks: read
+  pull-requests: read
+  issues: read
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -19,9 +22,26 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Node syntax, version and regression tests
+      - name: Node syntax, version, plan and regression tests
         working-directory: threadline-extension
-        run: npm run verify
+        run: |
+          set -o pipefail
+          npm run verify | tee ../plan-node-test.log
+      - name: Check regression test-count floor
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          data = Path('plan-node-test.log').read_text(encoding='utf-8', errors='replace')
+          counts = [int(n) for n in re.findall(r'(?m)^# tests (\d+)\s*$', data)]
+          if not counts or counts[-1] < 94:
+              raise SystemExit(f'Regression test count below original baseline 94: {counts}')
+          print(f'Node regression cases: {counts[-1]} (baseline floor: 94)')
+          PY
+      - name: Validate plan evidence against GitHub PRs and checks
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/check-plan.mjs --github
       - name: Install Chromium for true MV3 extension integration (synthetic ChatGPT page only)
         run: |
           python -m pip install playwright==1.60.0
