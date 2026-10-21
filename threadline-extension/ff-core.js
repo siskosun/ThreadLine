@@ -42,14 +42,14 @@ function newExperiment(frozen,experimentId){
  const make=label=>({id:experimentId+"_"+label,label,status:"pending",phase:"created",revision:0,attempts:[],history:[]});
  return {id:experimentId,revision:0,frozen,createdAt:Date.now(),branches:{A:make("A"),B:make("B")},decision:null};
 }
-function advance(exp,{branch,expectedRevision,operationId,attemptId,status,phase,evidence={},reason=""}){
+function advance(exp,{branch,expectedRevision,operationId,attemptId,status,phase,evidence={},reason="",manualNewAttempt=false}){
  assert(exp&&["A","B"].includes(branch),"invalid branch");
  id(operationId);id(attemptId);
  const b=exp.branches[branch];
  assert(Number.isSafeInteger(expectedRevision)&&expectedRevision===exp.revision,"stale revision");
  assert(STATES.includes(status)&&PHASES.includes(phase),"invalid state");
  assert(!b.history.some(x=>x.operationId===operationId),"duplicate operation");
- assert(b.status==="pending"||status===b.status&&status!=="done","terminal state cannot be replaced");
+ assert(b.status==="pending"||(manualNewAttempt===true&&b.status!=="done"&&status==="pending"&&!b.attempts.some(x=>x.id===attemptId)),"terminal state cannot be replaced");
  assert(status==="pending"||status==="unknown"||status==="failed"||status==="done","invalid transition");
  const current=b.attempts.find(x=>x.id===attemptId);
  assert(!current||current.status==="pending","terminal attempt immutable");
