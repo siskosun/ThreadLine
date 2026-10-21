@@ -77,6 +77,24 @@ def run():
       tabid=next(t['id'] for t in tabs if '/c/demo-alpha' in t['url'])
       result=panel.evaluate('''async (tabId) => chrome.runtime.sendMessage({type:'HEALTH_CHECK',tabId})''',tabid)
       assert result['ok'] and result['data']['page']['status']=='basic_ready',result
+      # Reproduce the reported Edge DOM shape: recognized composer form with a
+      # bare submit button and unattributed user/assistant text candidates.
+      chat.evaluate('''() => {
+        document.querySelector('#composer-form button[type="submit"]').removeAttribute('data-testid');
+        document.querySelector('main').insertAdjacentHTML('beforeend',
+          '<div class="whitespace-pre-wrap">probe user</div><p>probe assistant</p>');
+      }''')
+      observed=panel.evaluate('''async (tabId) => chrome.runtime.sendMessage({type:'HEALTH_CHECK',tabId})''',tabid)
+      assert observed['ok'],observed
+      checked=observed['data']['page']['parts']
+      assert checked['sendButton']['available'] and checked['sendButton']['method']=='recognized_composer_form',checked
+      assert checked['conversation']['available'], 'Existing strong message role selector should retain priority'
+      # Remove the role evidence to test the conservative candidate-only fallback.
+      chat.evaluate('''() => document.querySelector('[data-message-author-role]').removeAttribute('data-message-author-role')''')
+      weak=panel.evaluate('''async (tabId) => chrome.runtime.sendMessage({type:'HEALTH_CHECK',tabId})''',tabid)
+      assert weak['ok'],weak
+      assert not weak['data']['page']['parts']['conversation']['available'],weak
+      assert weak['data']['page']['parts']['conversation']['candidate'],weak
       backup=panel.evaluate('''async () => chrome.runtime.sendMessage({type:'BACKUP_EXPORT'})''')
       assert backup['ok'] and backup['data']['state']['projects'][0]['knowledgeVersion']==1
       panel.evaluate('''async () => {const db=await ThreadLineCaptureDB.getRun('not-exist');return db;}''')

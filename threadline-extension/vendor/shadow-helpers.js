@@ -28,7 +28,18 @@ const ThreadLinePage = (() => {
   }
   function isStreaming(root) {
     const doc = root.ownerDocument || root;
-    return Boolean(doc.querySelector('[data-testid="stop-button"], [data-testid="composer-stop-button"]'));
+    const stop = doc.querySelector('[data-testid="stop-button"], [data-testid="composer-stop-button"]');
+    if (!stop) return false;
+    // Visibility is only a UI signal, never evidence of response completion.
+    if (stop.hidden || stop.getAttribute?.('aria-hidden') === 'true' ||
+        stop.closest?.('[hidden], [inert], [aria-hidden="true"]')) return false;
+    const view = doc.defaultView || stop.ownerDocument?.defaultView;
+    const style = view?.getComputedStyle?.(stop);
+    if (style && (style.display === 'none' || style.visibility === 'hidden' ||
+        style.visibility === 'collapse')) return false;
+    if (typeof stop.getClientRects === 'function' && stop.getClientRects().length === 0)
+      return false;
+    return true;
   }
   return { conversationIdFromUrl, conversationTitleFromPageTitle, extractTitle, isStreaming };
 })();
