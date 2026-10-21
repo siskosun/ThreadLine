@@ -1,36 +1,93 @@
-/* Independent IndexedDB storage. All writes must be routed through background.js. */
-const ThreadLineFFDB=(()=>{
-"use strict";
-const NAME="threadline_ff_v1";
-function open(){return new Promise((resolve,reject)=>{
- const req=indexedDB.open(NAME,1);
- req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains("experiments"))db.createObjectStore("experiments",{keyPath:"id"});};
- req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);
-});}
-async function read(id){const db=await open();try{return await new Promise((resolve,reject)=>{
- const tx=db.transaction("experiments","readonly"),req=tx.objectStore("experiments").get(id);
- req.onsuccess=()=>resolve(req.result??null);req.onerror=()=>reject(req.error);
-});}finally{db.close();}}
-async function write(id,expectedRevision,update){
- const db=await open();
- try{return await new Promise((resolve,reject)=>{
-  const tx=db.transaction("experiments","readwrite"),os=tx.objectStore("experiments");
-  let value;
-  const req=os.get(id);
-  req.onsuccess=()=>{
-   try{
-    const prev=req.result??null;
-    if((prev?.revision??null)!==expectedRevision)throw new Error("stale revision");
-    value=update(prev);
-    if(!value||value.id!==id||!Number.isSafeInteger(value.revision)||value.revision!==(prev?.revision??-1)+1)throw new Error("invalid revision");
-    os.put(value);
-   }catch(e){tx.abort();reject(e);}
-  };
-  req.onerror=()=>{tx.abort();reject(req.error);};
-  tx.oncomplete=()=>resolve(value);
-  tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error??new Error("transaction aborted"));
- });}finally{db.close();}}
-return {NAME,read,write};
+/* Separate Fork Beta database. Only background.js is allowed to invoke writes. */
+const ThreadLineFFDB = (() => {
+  "use strict";
+  const NAME = "threadline_ff_v1";
+  const VERSION = 1, STORE = "experiments";
+
+  function open() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(NAME, VERSION);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(STORE))
+          db.createObjectStore(STORE, {keyPath:"id"});
+      };
+      req.onsuccess = () => {
+        const db = req.result;
+        db.onversionchange = () => db.close();
+        resolve(db);
+      };
+      req.onerror = () => reject(req.error || new Error("Fork database unavailable"));
+      req.onblocked = () => reject(new Error("Fork database upgrade blocked by another page"));
+    });
+  }
+  async function transaction(mode, action) {
+    const db = await open();
+    try {
+      return await new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, mode);
+        let value, aborted = false;
+        tx.oncomplete = () => resolve(value);
+        tx.onerror = () => reject(tx.error || new Error("Fork database write failed"));
+        tx.onabort = () => reject(tx.error || new Error("Fork database transaction aborted"));
+        const fail = error => {
+          if (aborted) return;
+          aborted = true;
+          try {tx.abort();} catch {}
+          reject(error);
+        };
+        try {
+          action(tx.objectStore(STORE), result => {value = result;}, fail);
+        } catch (error) {fail(error);}
+      });
+    } finally {
+      db.close();
+    }
+  }
+  function read(id) {
+    return transaction("readonly", (store, result) => {
+      const req = store.get(id);
+      req.onsuccess = () => result(req.result || null);
+    });
+  }
+  function list() {
+    return transaction("readonly", (store, result) => {
+      const req = store.getAll();
+      req.onsuccess = () => result(req.result || []);
+    });
+  }
+  function create(record) {
+    if (!record || typeof record.id !== "string" || record.revision !== 0)
+      return Promise.reject(new Error("invalid initial experiment"));
+    return transaction("readwrite", (store, result) => {
+      store.add(record); // Duplicate IDs abort the entire transaction.
+      result(record);
+    });
+  }
+  function update(id, expectedRevision, reducer) {
+    if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0 ||
+      typeof reducer !== "function")
+      return Promise.reject(new Error("invalid expected revision"));
+    return transaction("readwrite", (store, result, fail) => {
+      const req = store.get(id);
+      req.onsuccess = () => {
+        try {
+          const previous = req.result;
+          if (!previous) throw new Error("experiment not found");
+          const next = reducer(previous);
+          if (next === previous) {result(previous); return;} // Idempotent replay.
+          if (previous.revision !== expectedRevision) throw new Error("stale revision");
+          if (!next || next.id !== id || next.revision !== previous.revision + 1)
+            throw new Error("invalid revision");
+          if (JSON.stringify(next.frozen) !== JSON.stringify(previous.frozen))
+            throw new Error("frozen input is immutable");
+          store.put(next);
+          result(next);
+        } catch (error) {fail(error);}
+      };
+    });
+  }
+  return {NAME, VERSION, read, list, create, update};
 })();
-if(typeof globalThis!=="undefined")globalThis.ThreadLineFFDB=ThreadLineFFDB;
-if(typeof module!=="undefined")module.exports=ThreadLineFFDB;
+if (typeof globalThis !== "undefined") globalThis.ThreadLineFFDB = ThreadLineFFDB;
+if (typeof module !== "undefined") module.exports = ThreadLineFFDB;
