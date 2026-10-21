@@ -15,7 +15,7 @@
 | R-REUSE | 复用调研与 Fork 审计 | in_review | - | 上游代码、Fork 差异及移植边界经评审 | PR#2 | no |
 | Z0-BASE | Windows 测试基线与路径修复 | in_review | - | Windows npm run verify 和合成 E2E 有原始日志 | PR#1 | yes |
 | Z0-LIVE | 真实登录 ChatGPT 的页面适配验收 | blocked | Z0-BASE | 双标签创建、长草稿回读、人工发送核实、完整采集、异常恢复由用户验收 | docs/ff/BLOCKED.md | yes |
-| P1-CORE | 冻结材料、独立存储及四态状态机 | planned | - | 24KB 输入和 SHA-256、attempts、单写者与原有功能回归经测试 | - | no |
+| P1-CORE | 冻结材料、独立存储及四态状态机 | in_progress | - | 24KB 输入和 SHA-256、attempts、单写者与原有功能回归经测试 | - | no |
 | P2-FORK | 双会话创建与人工发送工作流 | planned | Z0-LIVE,P1-CORE | 两边输入完整且相同，0 自动发送，分支身份和重启恢复经测试 | - | yes |
 | P3-REPORT | 完整结果采集、去标签对照及 JSON 导出 | planned | P2-FORK | 双 done 才可对照，用户裁决持久化，不重放未知状态，导出可独立复算 | - | yes |
 | BETA-RELEASE | 安装升级与正式 Beta 验收 | planned | P3-REPORT | 真实双分支闭环、同路径旧数据升级、CI 与用户验收均通过 | - | yes |
