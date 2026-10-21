@@ -14,7 +14,7 @@ test("FF frozen input preserves BOM, CRLF, trailing spaces, CJK, emoji and code 
 });
 test("FF rejects oversize UTF-8 and forged hashes",async()=>{
  await assert.rejects(F.freeze("中".repeat(8001),"p"),/24000/);
- const f=await F.freeze("W","P");f.w0Hashes.raw="fake";
+ const f=structuredClone(await F.freeze("W","P"));f.w0Hashes.raw="fake";
  await assert.rejects(F.verifyFrozen(f),/hash mismatch/);
 });
 test("FF status machine requires distinct completion signals and one task",async()=>{
@@ -27,7 +27,7 @@ test("FF status machine requires distinct completion signals and one task",async
  assert.equal(x.branches.A.status,"done");
  assert.equal(x.branches.B.status,"pending");
  assert.throws(()=>F.advance(x,{...event,expectedRevision:1,operationId:"op_234567"}),/terminal/);
- assert.throws(()=>F.advance(x,{...event,expectedRevision:0}),/stale/);
+ assert.throws(()=>F.advance(x,{...event,expectedRevision:0,operationId:"op_345678"}),/stale/);
 });
 test("FF unknown attempt is not silently retried or replaced",async()=>{
  let x=F.newExperiment(await F.freeze("W","P"),"exp_234567");
