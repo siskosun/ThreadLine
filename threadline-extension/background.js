@@ -318,6 +318,76 @@ async function inspectTab(tabId) {
   if (result?.ok && result.data) return result.data;
   throw new Error('未能完成只读自检');
 }
+// P1 only: separate FF storage and explicit local opt-in; no browser automation.
+const FF_ENABLED_KEY = "tl_ff_enabled_v1";
+function trustedFFSender(sender) {
+  const own = chrome.runtime.getURL("ff.html");
+  return !!(sender && sender.id === chrome.runtime.id && sender.url === own &&
+    (!sender.tab || sender.tab.url === own));
+}
+async function ffEnabled() {
+  const state = await chrome.storage.local.get(FF_ENABLED_KEY);
+  return state[FF_ENABLED_KEY] === true;
+}
+async function handleFF(payload, sender) {
+  if (!trustedFFSender(sender)) throw new Error("only Fork extension page may access FF data");
+  if (payload.type === "FF_STATUS")
+    return {enabled:await ffEnabled(), phase:"core_only", sendsAutomatically:false};
+  if (payload.type === "FF_SET_ENABLED") {
+    if (typeof payload.enabled !== "boolean" || payload.ack !== "local-only-no-send")
+      throw new Error("explicit local-only acknowledgement required");
+    return serialize(async () => {
+      await chrome.storage.local.set({[FF_ENABLED_KEY]:payload.enabled});
+      return {enabled:payload.enabled};
+    });
+  }
+  if (!await ffEnabled()) throw new Error("Fork Beta is disabled");
+  if (payload.type === "FF_CREATE") {
+    return serialize(async () => {
+      const frozen = await ThreadLineFFCore.freeze(payload.w0, payload.p);
+      const id = "ff_" + crypto.randomUUID().replace(/-/g, "");
+      const record = ThreadLineFFCore.newExperiment(frozen, id);
+      await ThreadLineFFDB.create(record); // Reply after IDB transaction completes.
+      return {id, revision:record.revision, bytes:frozen.bytes,
+        sha256:frozen.textHashes.frozen, createdAt:record.createdAt};
+    });
+  }
+  if (payload.type === "FF_LIST") {
+    const rows = await ThreadLineFFDB.list();
+    return rows.map(x => ({id:x.id, revision:x.revision, createdAt:x.createdAt,
+      bytes:x.frozen?.bytes, statusA:x.branches?.A?.status,
+      statusB:x.branches?.B?.status})).sort((a,b) => b.createdAt-a.createdAt);
+  }
+  if (payload.type === "FF_READ") {
+    const row = await ThreadLineFFDB.read(payload.id);
+    if (!row) throw new Error("experiment not found");
+    await ThreadLineFFCore.verifyFrozen(row.frozen);
+    return row;
+  }
+  if (payload.type === "FF_RECORD") {
+    // P1 has no way to establish a trusted final message or a completed send.
+    // Never allow the UI to mark a branch done; that authority belongs to P2/P3.
+    if (!["pending", "failed", "unknown"].includes(payload.status))
+      throw new Error("completion is not available in P1");
+    if (payload.evidence !== undefined && (payload.evidence === null ||
+      Array.isArray(payload.evidence) || typeof payload.evidence !== "object" ||
+      Object.keys(payload.evidence).length > 0))
+      throw new Error("P1 cannot accept webpage evidence");
+    return serialize(async () => {
+      const existing = await ThreadLineFFDB.read(payload.experimentId);
+      if (!existing) throw new Error("experiment not found");
+      await ThreadLineFFCore.verifyFrozen(existing.frozen);
+      return ThreadLineFFDB.update(existing.id, payload.expectedRevision,
+        record => ThreadLineFFCore.advance(record, {
+          branch:payload.branch, expectedRevision:payload.expectedRevision,
+          operationId:payload.operationId, attemptId:payload.attemptId,
+          status:payload.status, phase:payload.phase, reason:payload.reason || "",
+          evidence:{}, manualNewAttempt:payload.manualNewAttempt === true
+        }));
+    });
+  }
+  throw new Error("unknown Fork message type");
+}
 chrome.runtime.onInstalled.addListener(() => {
   chrome.sidePanel.setPanelBehavior({openPanelOnActionClick:true}).catch(() => {});
 });
@@ -337,17 +407,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 chrome.runtime.onMessage.addListener((payload,sender,reply) => {
   (async () => {
     if (!payload || typeof payload.type !== "string") throw new Error("无效消息");
-    // Fork Beta cannot access legacy MUTATE/backup protocols.
-    // Source is checked even for panel-in-tab contexts.
-    if (payload.type.startsWith("FF_")) {
-      const own = chrome.runtime.getURL("ff.html");
-      const trusted = sender.id === chrome.runtime.id && sender.url === own &&
-        (!sender.tab || sender.tab.url === own);
-      if (!trusted) throw new Error("only the Fork extension page may access FF data");
-      if (payload.type === "FF_STATUS") return {enabled:false,phase:"core_only"};
-      // No creation/mutation is exposed until the opt-in UX and provenance gate is reviewed.
-      throw new Error("Fork Beta is disabled until explicit activation");
-    }
+    if (payload.type.startsWith("FF_")) return handleFF(payload, sender);
     if (payload.type === "CAPTURE_START") {
       if(!isTrustedPanelSender(sender))throw new Error("只有研线面板可启动采集");
       return beginCapture(payload.tabId);
