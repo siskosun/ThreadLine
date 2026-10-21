@@ -3,6 +3,7 @@
   "use strict";
   const $ = id => document.getElementById(id);
   const inputs = ["ff-w0","ff-p"];
+  let pendingCreate = null; // Reuse across uncertain acknowledgements, never auto-replay.
   const send = payload => new Promise((resolve,reject) => {
     chrome.runtime.sendMessage(payload,response => {
       if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
@@ -71,12 +72,19 @@
       await refresh().catch(()=>{checkbox.checked = false;});
     } finally {checkbox.disabled = false;}
   });
-  for (const id of inputs) $(id).addEventListener("input",bytes);
+  for (const id of inputs) $(id).addEventListener("input", () => {
+    pendingCreate = null; // Editing invalidates the previous frozen creation intent.
+    bytes();
+  });
   $("ff-create").addEventListener("submit", async event => {
     event.preventDefault();
     $("ff-save").disabled = true;
     try {
-      const created = await send({type:"FF_CREATE",w0:$("ff-w0").value,p:$("ff-p").value});
+      const w0 = $("ff-w0").value, p = $("ff-p").value;
+      if (!pendingCreate || pendingCreate.w0 !== w0 || pendingCreate.p !== p)
+        pendingCreate = {operationId:crypto.randomUUID(),w0,p};
+      const created = await send({type:"FF_CREATE",...pendingCreate});
+      pendingCreate = null;
       await list();
       await read(created.id);
       notice("已冻结并保存到独立本地数据库；没有打开或发送网页消息。");
