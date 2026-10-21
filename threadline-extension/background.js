@@ -343,13 +343,31 @@ async function handleFF(payload, sender) {
   }
   if (!await ffEnabled()) throw new Error("Fork Beta is disabled");
   if (payload.type === "FF_CREATE") {
+    // The caller owns a stable operation ID for this deliberate create action.
+    // A lost acknowledgement must not silently create a second experiment.
     return serialize(async () => {
+      const operationId = payload.operationId;
+      if (typeof operationId !== "string" ||
+        !/^[a-zA-Z0-9_-]{6,100}$/.test(operationId))
+        throw new Error("explicit create operation ID required");
       const frozen = await ThreadLineFFCore.freeze(payload.w0, payload.p);
-      const id = "ff_" + crypto.randomUUID().replace(/-/g, "");
+      const id = "ff_" + operationId;
       const record = ThreadLineFFCore.newExperiment(frozen, id);
-      await ThreadLineFFDB.create(record); // Reply after IDB transaction completes.
-      return {id, revision:record.revision, bytes:frozen.bytes,
-        sha256:frozen.textHashes.frozen, createdAt:record.createdAt};
+      record.createOperationId = operationId;
+      let saved = record;
+      try {
+        await ThreadLineFFDB.create(record);
+      } catch (error) {
+        const existing = await ThreadLineFFDB.read(id);
+        if (!existing) throw error; // Storage failure, not a duplicate.
+        await ThreadLineFFCore.verifyFrozen(existing.frozen);
+        if (existing.createOperationId !== operationId ||
+          existing.frozen.w0 !== frozen.w0 || existing.frozen.p !== frozen.p)
+          throw new Error("create operation ID reused with different input");
+        saved = existing;
+      }
+      return {id, revision:saved.revision, bytes:saved.frozen.bytes,
+        sha256:saved.frozen.textHashes.frozen, createdAt:saved.createdAt};
     });
   }
   if (payload.type === "FF_LIST") {
