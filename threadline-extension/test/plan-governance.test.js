@@ -126,3 +126,21 @@ test('remote signoff succeeds only with merged PR, green check and exact owner a
     {repo:'siskosun/ThreadLine',token:'test',fetchImpl:route});
   assert.equal(out.done,1);
 });
+
+test('an already-merged PR may remain in_review until independent evidence and signoff',async()=>{
+  const {checkGithubEvidence}=await checks();
+  const task={id:'R-REUSE',status:'in_review',manual:'no',evidence:'PR#2'};
+  const fetchImpl=async()=>mock({state:'closed',merged_at:'2026-10-21T12:00:00Z',base:{ref:'main'}});
+  const result=await checkGithubEvidence({tasks:[task],done:[]},{repo:'siskosun/ThreadLine',token:'test',fetchImpl});
+  assert.equal(result.reviewPrs,1);
+});
+
+test('closed PR without merge is not acceptable review evidence',async()=>{
+  const {checkGithubEvidence}=await checks();
+  const task={id:'R-REUSE',status:'in_review',manual:'no',evidence:'PR#2'};
+  const fetchImpl=async()=>mock({state:'closed',merged_at:null,base:{ref:'main'}});
+  await assert.rejects(
+    ()=>checkGithubEvidence({tasks:[task],done:[]},{repo:'siskosun/ThreadLine',token:'test',fetchImpl}),
+    /in_review PR must exist on main or be merged/
+  );
+});
