@@ -35,3 +35,9 @@
   - 人工签署仍缺失；`docs/PLAN.md` 的 Z0-LIVE 必须保持 `blocked`，不得由 Agent 改为 done。
 - 远程连接：本机 `PersonalDesktopMCP` 与 `tunnel-client` 进程在运行，`status` 为 `waiting_chatgpt`（`healthy=true`、`ready=true`）；`control_plane` 与 `mcp_discovery` 读数为 `unknown`（字段缺失），`chatgpt_verification` 未记录。未执行 repair，也未把本地健康或隧道进程存在当作 ChatGPT 端在线；该设备仍未完成授权连接访问验收。
 - 不新增发送：人工发送预算已用尽 3/3；本轮全部真实网页操作均为无发送预填/只读检查。
+
+### 2026-10-22 本次代码复核后的残余风险（CI 122/122 通过）
+
+- 执行端页面类型防护已补齐：新聊天根路径以外禁止自动填入，包括 Project/Temporary、旧会话和未知参数；两套合成 MV3 E2E 与 Node 122/122 通过。真实登录 Edge 对这版新增 guard 的回归仍未执行。
+- **综合格式仍为 differs / NOT PASSED。** 现有截图与哈希不足以证明编辑器中多出的换行是否仅由 DOM 渲染映射引起；不得放宽 `canonicalization-v1` 来接受多余空行。需要无发送状态下的脱敏 DOM 块结构及首个不同位置证据，再以最小修改修复，并在真实 Edge 重新验证。
+- 真实 SW 暂停、旧监听器重注入、标签重开、断网/限流、可信角色/分页原文哈希、最终回复完整性、操作授权与真人签署仍未解除。Z0-LIVE 继续 `blocked`，人工发送预算 3/3 已用尽。

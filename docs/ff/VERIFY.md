@@ -74,3 +74,10 @@ PR-2/3 在用户签署此门禁通过前不得开展真实网页自动化集成�
   - 近 24KB 综合载荷（代码围栏、CRLF、连续空行、首尾空白）：预期 SHA-256 `4b9abbff...`；实际结构回读 23,559 字符、SHA-256 `dfac2fd5...`；CRLF 被归一化、代码围栏/空行产生额外空行；分类 `differs`，ACK=false，未发送。
 - 证据边界：`innerText` 是渲染文本，不能作为字节原文；结构回读使用多个顶层块级节点的文本按单换行连接，本次简单多行 exact 成立，但不证明服务端上下文、消息角色、最终回复完整性或并发重叠。`roles=0` 时不得用 `div.whitespace-pre-wrap` 推断用户/助手身份。
 - 仍未完成：Service Worker 单点暂停、旧监听器重复注入、标签关闭重开、真实断网/限流、可信分页消息/哈希、最终回复完整性、实际 Fork 端到端（P2）、远程设备在线和用户签署。Z0-LIVE 保持 `blocked / NOT SIGNED`，`docs/PLAN.md` 状态不变。
+
+## 2026-10-22 新增的执行端门禁与综合文本差异复核
+
+- 测试版本代码提交：`78d6d6f9cca26a4e8af0d286059d5b81f1702b03`。 `handoff.js` 在读取预填内容及向编辑器写入前，验证当前仍是无查询和片段的普通新聊天根路径；跳转到 Temporary / Project / 旧会话 / 未知路径，必须不取 handoff、不中途写草稿、不 ACK、不发送。
+- 新增 Node 测试复现用户报告中的 CRLF 仅规范化、代码围栏与连续空行引入额外换行两类差异；只能列出安全的长度、换行数量和差异类别，不得把后者自动认定为 exact 或 canonical_equivalent。原有正常预填测试不得回归。
+- [Linux CI 39732527414](https://github.com/siskosun/ThreadLine/actions/runs/39732527414) 与 [Windows CI 39732527403](https://github.com/siskosun/ThreadLine/actions/runs/39732527403) 已通过：122/122 Node，原 MV3 及 handoff 合成 E2E 全绿。
+- **真实 Edge 组合格式依旧未通过。** 后续可在用户创建的无发送测试标签中收集去内容化 DOM 结构差异，并完成修复后全文/规范化哈希对比；不得直接删除额外空行、不可擅自添加新规范化规则或消耗已用尽的人工发送额度。人工签署仍缺失。
