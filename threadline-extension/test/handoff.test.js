@@ -38,7 +38,7 @@ async function exercise(initial,insertion,expected='LONG USER CONTINUATION',opti
   };
   const env={
     document:doc,location:{href:options.url||'https://chatgpt.com/'},
-    TextEncoder,navigator:{clipboard:{writeText:async()=>{}}},
+    URL,TextEncoder,navigator:{clipboard:{writeText:async()=>{}}},
     HTMLTextAreaElement:function(){},InputEvent:class {},
     chrome:{runtime:{
       id:'extension',
