@@ -81,7 +81,7 @@ def run():
                   formCount:document.querySelectorAll('form').length,
                   bodyChildren:document.body?.children.length})""")
                 raise AssertionError("synthetic DOM missing: "+repr(diagnostic))
-            expect(page.locator("#tl-handoff-banner")).to_contain_text("不会自动替你发送", timeout=24000)
+            expect(page.locator("#tl-handoff-banner")).to_be_visible(timeout=24000)
             observed = page.locator("#prompt-textarea").evaluate("(el)=>el.innerText")
             first_diff=next((i for i,(a,b) in enumerate(zip(observed,text)) if a!=b),
                             min(len(observed),len(text)))
@@ -90,6 +90,7 @@ def run():
                 f"expectedBytes={len(text.encode('utf-8'))} observedBytes={len(observed.encode('utf-8'))} "
                 f"firstDiff={first_diff} expectedLF={text.count(chr(10))} observedLF={observed.count(chr(10))}; "
                 "never ACK nonidentical draft")
+            expect(page.locator("#tl-handoff-banner")).to_contain_text("不会自动替你发送")
             assert page.evaluate("window.submissions") == 0
             assert page.url == "https://chatgpt.com/"
             assert status_for(tid) is None, "ACK should follow exact readback only"
