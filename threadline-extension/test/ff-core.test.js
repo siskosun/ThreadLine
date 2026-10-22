@@ -134,3 +134,28 @@ test("FF attempt ID cannot migrate from branch A to B",async()=>{
    attemptId:"att_unique01",status:"pending",phase:"created"}),/another branch/);
  assert.equal(exp.branches.B.attempts.length,0);
 });
+
+
+test("FF must reject a second attempt ID while a branch is still pending",async()=>{
+ let x=F.newExperiment(await F.freeze("Common","Task"),"exp_oneactive01");
+ x=F.advance(x,{branch:"A",expectedRevision:0,operationId:"op_active001",
+   attemptId:"att_active001",status:"pending",phase:"draft_ready"});
+ assert.throws(()=>F.advance(x,{branch:"A",expectedRevision:1,operationId:"op_active002",
+   attemptId:"att_active002",status:"pending",phase:"created"}),
+   /another active attempt|already pending/);
+ assert.throws(()=>F.advance(x,{branch:"A",expectedRevision:1,operationId:"op_active003",
+   attemptId:"att_active002",status:"unknown",phase:"awaiting_send"}),
+   /another active attempt|already pending/);
+ assert.equal(x.revision,1);
+ assert.equal(x.branches.A.attempts.length,1);
+ // The current attempt may still progress using its own identity.
+ x=F.advance(x,{branch:"A",expectedRevision:1,operationId:"op_active004",
+   attemptId:"att_active001",status:"unknown",phase:"awaiting_send"});
+ assert.equal(x.branches.A.status,"unknown");
+ // A new attempt is allowed ONLY after manual restart of that terminal state.
+ x=F.advance(x,{branch:"A",expectedRevision:2,operationId:"op_active005",
+   attemptId:"att_active002",status:"pending",phase:"created",manualNewAttempt:true});
+ assert.equal(x.branches.A.attempts.length,2);
+ assert.equal(x.branches.A.attempts[0].status,"unknown");
+ assert.equal(x.branches.A.attempts[1].status,"pending");
+});
