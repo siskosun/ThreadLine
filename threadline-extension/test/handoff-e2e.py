@@ -1,0 +1,102 @@
+"""MV3 continuation draft checks against a synthetic ChatGPT DOM.
+Real extension and IndexedDB, never an authenticated account, never press Send.
+"""
+import html
+import os
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from time import monotonic, sleep
+from playwright.sync_api import sync_playwright, expect
+
+EXT = Path(__file__).resolve().parents[1]
+
+
+def run():
+    with TemporaryDirectory(prefix="threadline-handoff-") as profile:
+        with sync_playwright() as p:
+            ctx = p.chromium.launch_persistent_context(
+                profile, executable_path=os.environ.get("THREADLINE_CHROMIUM_PATH") or None,
+                channel="chromium", headless=True, args=[
+                    "--no-sandbox", "--disable-dev-shm-usage",
+                    f"--disable-extensions-except={EXT}",
+                    f"--load-extension={EXT}",
+                ])
+            current = {"draft": ""}
+            def serve(route):
+                initial = html.escape(current["draft"])
+                route.fulfill(status=200, content_type="text/html; charset=utf-8",
+                    body=f"""<!doctype html><html><title>Offline ChatGPT New Chat</title>
+                    <form id="composer">
+                      <div id="prompt-textarea" contenteditable="true">{initial}</div>
+                      <button type="submit">Send</button>
+                    </form>
+                    <script>window.submissions=0;
+                      document.querySelector('form').addEventListener('submit',e=>{{
+                        e.preventDefault();window.submissions++;
+                      }});
+                    </script></html>""")
+            ctx.route("https://chatgpt.com/**", serve)
+            worker = ctx.service_workers[0] if ctx.service_workers else \
+                ctx.wait_for_event("serviceworker", timeout=15000)
+            extension_id = worker.url.split("/")[2]
+            panel = ctx.new_page()
+            panel.goto(f"chrome-extension://{extension_id}/panel.html")
+            panel.wait_for_selector("#manage-accordion", timeout=15000)
+
+            def open_with_draft(payload):
+                response = panel.evaluate("""async text =>
+                    chrome.runtime.sendMessage({type:'NEW_CHAT',handoff:text})""", payload)
+                assert response["ok"], response
+                tid = response["data"]["tabId"]
+                started = monotonic()
+                while monotonic()-started < 15:
+                    for page in ctx.pages:
+                        if page.url == "https://chatgpt.com/":
+                            if not getattr(page, "_threadline_claimed", False):
+                                setattr(page, "_threadline_claimed", True)
+                                return page, tid
+                    sleep(.1)
+                raise AssertionError("handoff tab not created")
+
+            def status_for(tid):
+                return panel.evaluate("""async id =>
+                  (await chrome.storage.session.get('tl_handoff_'+id))['tl_handoff_'+id] || null""", tid)
+
+            # Exercise actual execCommand for mixed Unicode, NBSP and code blocks.
+            ticks=chr(96)*3
+            prefix="中文😀\n"+ticks+"js\nconst n = 1;\n"+ticks+"\nA\u00a0B\n\n"
+            text = prefix + ("x" * (23569 - len(prefix.encode("utf-8"))))
+            assert len(text.encode("utf-8")) == 23569
+            page, tid = open_with_draft(text)
+            expect(page.locator("#tl-handoff-banner")).to_contain_text("不会自动替你发送", timeout=24000)
+            observed = page.locator("#prompt-textarea").evaluate("(el)=>el.innerText")
+            assert observed == text, (
+                f"uncertain handoff: wanted {len(text)} chars, got {len(observed)}; "
+                "exact readback required")
+            assert page.evaluate("window.submissions") == 0
+            assert page.url == "https://chatgpt.com/"
+            assert status_for(tid) is None, "ACK should follow exact readback only"
+            page.close()
+
+            # Whitespace-only draft remains user data, never overwritten.
+            current["draft"] = "   "
+            page2, tid2 = open_with_draft("DO NOT REPLACE MY DRAFT")
+            expect(page2.locator("#tl-handoff-banner")).to_contain_text("不会覆盖", timeout=24000)
+            assert page2.locator("#prompt-textarea").evaluate("(el)=>el.innerText") == "   "
+            assert page2.evaluate("window.submissions") == 0
+            assert status_for(tid2) is not None, "existing draft must NOT ACK"
+            page2.close()
+
+            current["draft"] = "用户正在写作\n第二行"
+            page3, tid3 = open_with_draft("SHOULD NOT OVERWRITE")
+            expect(page3.locator("#tl-handoff-banner")).to_contain_text("不会覆盖", timeout=24000)
+            assert page3.locator("#prompt-textarea").evaluate("(el)=>el.innerText") == current["draft"]
+            assert page3.evaluate("window.submissions") == 0
+            assert status_for(tid3) is not None
+            ctx.close()
+    print("PASS: real MV3 handoff exact 23569-byte multiline readback; "
+          "whitespace/normal drafts untouched; only exact ACK; 0 sends (synthetic only)")
+
+
+if __name__ == "__main__":
+    run()
