@@ -350,14 +350,45 @@ chrome.runtime.onMessage.addListener((payload,sender,reply) => {
       if(!isTrustedPanelSender(sender))throw new Error("只有研线面板可接续研究");
       return openChatWithDraft(payload.handoff,payload.windowId,payload.projectId);
     }
-    if(payload.type === "HANDOFF_GET"){
-      if(!sender.tab?.id||!ThreadLineCore.isChatURL(sender.tab.url))throw new Error("只允许新 ChatGPT 页面访问其接续提示");
-      const record=await chrome.storage.session.get(`tl_handoff_${sender.tab.id}`);
-      return record[`tl_handoff_${sender.tab.id}`]||null;
-    }
-    if(payload.type === "HANDOFF_ACK"){
-      if(!sender.tab?.id)throw new Error("无法确认目标标签页");
-      await chrome.storage.session.remove(`tl_handoff_${sender.tab.id}`);return {ok:true};
+    if(["HANDOFF_GET","HANDOFF_BEGIN","HANDOFF_ACK"].includes(payload.type)){
+      // A stale tab, Project/Temporary redirect or background page cannot
+      // consume a draft reservation from another ChatGPT document.
+      const eligible = input => {
+        try {
+          const u = new URL(input);
+          return u.protocol === "https:" &&
+            ["chatgpt.com","chat.openai.com"].includes(u.hostname) &&
+            u.pathname === "/" && !u.search && !u.hash;
+        } catch {return false;}
+      };
+      if (!Number.isInteger(sender.tab?.id) ||
+          !eligible(sender.tab.url) || !eligible(sender.url))
+        throw new Error("only a plain new ChatGPT document may access handoff");
+      const key = `tl_handoff_${sender.tab.id}`;
+      if (payload.type === "HANDOFF_GET") {
+        const found = await chrome.storage.session.get(key);
+        const record = found[key];
+        return record ? {...record,autoAttempted:Number.isFinite(record.attemptedAt)} : null;
+      }
+      if (payload.type === "HANDOFF_BEGIN") {
+        // Reserve the only automatic insertion BEFORE touching the composer.
+        // Serialize against duplicate content-script or worker invocations.
+        return serialize(async () => {
+          const found = await chrome.storage.session.get(key);
+          const record = found[key];
+          if (!record?.text || Number.isFinite(record.attemptedAt))
+            return {autoFill:false};
+          await chrome.storage.session.set({[key]:{...record,attemptedAt:Date.now()}});
+          return {autoFill:true};
+        });
+      }
+      return serialize(async () => {
+        const found = await chrome.storage.session.get(key);
+        if (!Number.isFinite(found[key]?.attemptedAt))
+          throw new Error("no reserved handoff attempt to acknowledge");
+        await chrome.storage.session.remove(key);
+        return {ok:true};
+      });
     }
     if (payload.type === "ACK_PAGE") {
       // A content script can only acknowledge the page that sent the message.
