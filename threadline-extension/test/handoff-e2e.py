@@ -65,6 +65,17 @@ def run():
             text = prefix + ("x" * (23569 - len(prefix.encode("utf-8"))))
             assert len(text.encode("utf-8")) == 23569
             page, tid = open_with_draft(text)
+            expected_dom = page.locator("#prompt-textarea")
+            # The real test fixture must be loaded before making any completion claims.
+            try:
+                expect(expected_dom).to_have_count(1, timeout=10000)
+            except AssertionError:
+                diagnostic = page.evaluate("""() => ({url:location.origin+location.pathname,
+                  title:document.title,ready:document.readyState,
+                  editorCount:document.querySelectorAll('#prompt-textarea').length,
+                  formCount:document.querySelectorAll('form').length,
+                  bodyChildren:document.body?.children.length})""")
+                raise AssertionError("synthetic DOM missing: "+repr(diagnostic))
             expect(page.locator("#tl-handoff-banner")).to_contain_text("不会自动替你发送", timeout=24000)
             observed = page.locator("#prompt-textarea").evaluate("(el)=>el.innerText")
             assert observed == text, (
