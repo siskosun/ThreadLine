@@ -43,7 +43,7 @@ test('unrelated submit buttons and generic main prose must not be counted as ver
   const r=Selector.probe(doc,'https://chatgpt.com/');
   assert.equal(r.parts.sendButton.available,false);
   assert.equal(r.parts.conversation.available,false);
-  assert.equal(r.parts.conversation.candidate,false);
+  assert.equal(r.parts.conversation.candidate,undefined);
 });
 test('hidden stop controls never count as active generation',()=>{
   const Page=require('../vendor/shadow-helpers.js');
