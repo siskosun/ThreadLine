@@ -124,3 +124,13 @@ test("FF refuses malformed UTF-16 instead of silently hashing replacement bytes"
  assert.equal(await F.verifyFrozen(safe),true);
  assert.equal((await F.classify(replacement,bad,{trusted:true,complete:true})).level,"unverified");
 });
+
+
+test("FF attempt ID cannot migrate from branch A to B",async()=>{
+ let exp=F.newExperiment(await F.freeze("W","P"),"exp_unique01");
+ exp=F.advance(exp,{branch:"A",expectedRevision:0,operationId:"op_unique01",
+   attemptId:"att_unique01",status:"pending",phase:"draft_ready"});
+ assert.throws(()=>F.advance(exp,{branch:"B",expectedRevision:1,operationId:"op_unique02",
+   attemptId:"att_unique01",status:"pending",phase:"created"}),/another branch/);
+ assert.equal(exp.branches.B.attempts.length,0);
+});
