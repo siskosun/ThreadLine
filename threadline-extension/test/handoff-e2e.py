@@ -26,7 +26,7 @@ def run():
                 route.fulfill(status=200, content_type="text/html; charset=utf-8",
                     body=f"""<!doctype html><html><title>Offline ChatGPT New Chat</title>
                     <form id="composer">
-                      <div id="prompt-textarea" contenteditable="true">{initial}</div>
+                      <div id="prompt-textarea" contenteditable="true" style="white-space:pre-wrap">{initial}</div>
                       <button type="submit">Send</button>
                     </form>
                     <script>window.submissions=0;
@@ -83,9 +83,13 @@ def run():
                 raise AssertionError("synthetic DOM missing: "+repr(diagnostic))
             expect(page.locator("#tl-handoff-banner")).to_contain_text("不会自动替你发送", timeout=24000)
             observed = page.locator("#prompt-textarea").evaluate("(el)=>el.innerText")
+            first_diff=next((i for i,(a,b) in enumerate(zip(observed,text)) if a!=b),
+                            min(len(observed),len(text)))
             assert observed == text, (
-                f"uncertain handoff: wanted {len(text)} chars, got {len(observed)}; "
-                "exact readback required")
+                f"uncertain handoff: expectedChars={len(text)} observedChars={len(observed)} "
+                f"expectedBytes={len(text.encode('utf-8'))} observedBytes={len(observed.encode('utf-8'))} "
+                f"firstDiff={first_diff} expectedLF={text.count(chr(10))} observedLF={observed.count(chr(10))}; "
+                "never ACK nonidentical draft")
             assert page.evaluate("window.submissions") == 0
             assert page.url == "https://chatgpt.com/"
             assert status_for(tid) is None, "ACK should follow exact readback only"
