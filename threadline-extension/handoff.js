@@ -39,7 +39,19 @@
     const blockLevel = blocks.length > 1 &&
       blocks.every(child => /^(P|PRE|LI|BLOCKQUOTE)$/i.test(child.tagName || ''));
     if (blockLevel)
-      return blocks.map(child => String(child.innerText ?? child.textContent ?? '')).join('\n');
+      return blocks.map(child => {
+        const value = String(child.innerText ?? child.textContent ?? '');
+        // An empty ProseMirror paragraph is <p><br></p>. Its innerText
+        // can be a single LF, representing the placeholder BR rather than
+        // an additional line. Joining the paragraphs already adds the LF.
+        // Do not discard real BRs, nested nodes, PRE text, or extra paragraphs.
+        const onlyChild = child.childNodes?.length === 1 && child.childNodes[0];
+        const emptyPlaceholder = /^P$/i.test(child.tagName || '') &&
+          value === '\n' && String(child.textContent ?? '') === '' &&
+          onlyChild && onlyChild.nodeType === 1 &&
+          /^BR$/i.test(onlyChild.tagName || '');
+        return emptyPlaceholder ? '' : value;
+      }).join('\n');
     return String(el.innerText ?? '');
   }
   function isEmptyEditor(el) {
