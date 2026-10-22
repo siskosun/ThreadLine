@@ -64,6 +64,24 @@
     if (content.length) return false;
     if ((el.querySelectorAll?.('p')?.length || 0) > 1) return false;
     if ((el.querySelectorAll?.('br')?.length || 0) > 1) return false;
+    // Text-free does not mean empty: an image, file chip, noneditable widget
+    // or embed may have zero textContent/innerText. Fail closed unless the
+    // actual DOM is an explicitly recognized empty editor skeleton.
+    const nodes = el.childNodes ? Array.from(el.childNodes) : [];
+    if (nodes.length > 0) {
+      if (nodes.length !== 1) return false;
+      const outer = nodes[0];
+      if (outer.nodeType !== 1) return false;
+      if (!/^(P|DIV)$/i.test(outer.tagName || '')) {
+        if (!/^BR$/i.test(outer.tagName || '')) return false;
+      } else {
+        const children = outer.childNodes ? Array.from(outer.childNodes) : [];
+        if (children.length > 1) return false;
+        if (children.length === 1 &&
+          !(children[0].nodeType === 1 && /^BR$/i.test(children[0].tagName || '')))
+          return false;
+      }
+    }
     return rendered.replace(/\n/g, '').length === 0;
   }
   function fill(text){
