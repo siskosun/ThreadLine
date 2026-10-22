@@ -346,6 +346,9 @@ async function handleFF(payload, sender) {
     // The caller owns a stable operation ID for this deliberate create action.
     // A lost acknowledgement must not silently create a second experiment.
     return serialize(async () => {
+      // The enabled flag must be checked within the serialized critical
+      // section too. An earlier pre-queue read can become stale behind OFF.
+      if (!await ffEnabled()) throw new Error("Fork Beta is disabled");
       const operationId = payload.operationId;
       if (typeof operationId !== "string" ||
         !/^[a-zA-Z0-9_-]{6,100}$/.test(operationId))
@@ -392,6 +395,7 @@ async function handleFF(payload, sender) {
       Object.keys(payload.evidence).length > 0))
       throw new Error("P1 cannot accept webpage evidence");
     return serialize(async () => {
+      if (!await ffEnabled()) throw new Error("Fork Beta is disabled");
       const existing = await ThreadLineFFDB.read(payload.experimentId);
       if (!existing) throw new Error("experiment not found");
       await ThreadLineFFCore.verifyFrozen(existing.frozen);
