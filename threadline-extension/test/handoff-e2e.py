@@ -49,7 +49,12 @@ def run():
                 assert response["ok"], response
                 tid = response["data"]["tabId"]
                 page = created.value
-                page.wait_for_load_state("domcontentloaded", timeout=15000)
+                # Extension-created navigation in headless Chromium can bypass
+                # context routing and leave an empty ChatGPT document. Reopen
+                # the same tab through a page-local fully synthetic route.
+                # Handoff state stays in chrome.storage.session for this tab.
+                page.route("**/*", serve)
+                page.goto("https://chatgpt.com/", wait_until="domcontentloaded", timeout=15000)
                 if not page.url.startswith("https://chatgpt.com/"):
                     raise AssertionError("unexpected new tab URL: " + page.url +
                         " ; pages=" + repr([p.url for p in ctx.pages]))
