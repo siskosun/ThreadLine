@@ -66,7 +66,7 @@ def run():
 
             # Exercise actual execCommand for mixed Unicode, NBSP and code blocks.
             ticks=chr(96)*3
-            prefix="中文😀\n"+ticks+"js\nconst n = 1;\n"+ticks+"\nA\u00a0B\n\n"
+            prefix="中文😀\n"+ticks+"js\nconst n = 1;\n"+ticks+"\nA\u00a0B\n"
             text = prefix + ("x" * (23569 - len(prefix.encode("utf-8"))))
             assert len(text.encode("utf-8")) == 23569
             page, tid = open_with_draft(text)
@@ -95,6 +95,23 @@ def run():
             assert page.url == "https://chatgpt.com/"
             assert status_for(tid) is None, "ACK should follow exact readback only"
             page.close()
+
+            # Browser editing models can insert an extra blank line for adjacent
+            # newlines. Either full equality or an explicit NOT ACKed failure is
+            # correct; a prefix-length check would falsely report success.
+            current["draft"] = ""
+            blank_text = "第一行\n\n最后一行"
+            blank_page, blank_id = open_with_draft(blank_text)
+            expect(blank_page.locator("#tl-handoff-banner")).to_be_visible(timeout=24000)
+            blank_observed = blank_page.locator("#prompt-textarea").evaluate("(el)=>el.innerText")
+            if blank_observed == blank_text:
+                expect(blank_page.locator("#tl-handoff-banner")).to_contain_text("不会自动替你发送")
+                assert status_for(blank_id) is None
+            else:
+                expect(blank_page.locator("#tl-handoff-banner")).to_contain_text("与原文不一致")
+                assert status_for(blank_id) is not None
+            assert blank_page.evaluate("window.submissions") == 0
+            blank_page.close()
 
             # Whitespace-only draft remains user data, never overwritten.
             current["draft"] = "   "
