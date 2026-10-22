@@ -39,12 +39,16 @@ const ThreadLineSelectors = (() => {
     }
     // Generic prose (main p) or user bubbles alone don't prove a conversation
     // message's role, source, cardinality or completeness. Expose as candidate only.
-    if (!parts.conversation.available) {
-      const user = first(doc, ['main div.whitespace-pre-wrap']);
-      const assistant = first(doc, ['main p']);
-      if (user || assistant) {
+    // Unattributed page text is not a user or assistant message. In an
+    // empty chat, whitespace-pre-wrap may even be the welcome prompt.
+    const hasConversationRoute = /\\/c\\/[a-z0-9-]+/i.test(new URL(origin).pathname);
+    if (!parts.conversation.available && hasConversationRoute) {
+      const textBubble = first(doc, ['main div.whitespace-pre-wrap']);
+      const prose = first(doc, ['main p']);
+      if (textBubble || prose) {
         parts.conversation = {available:false, selector:null, candidate:true,
-          observed:{userText:!!user, assistantText:!!assistant}};
+          roleVerified:false, origin:'unattributed_dom',
+          observed:{whitespacePreWrap:!!textBubble, paragraph:!!prose}};
       }
     }
     const status = parts.composer.available ? 'basic_ready' : 'degraded';
@@ -52,7 +56,7 @@ const ThreadLineSelectors = (() => {
       ? '检测到输入框。采集分页和网页写入操作仍需单独真实验收。'
       : '未发现可识别输入框，可能尚未登录或页面结构已变化。';
     if (parts.conversation.candidate)
-      notes += ' 只找到消息文本候选，尚未确认角色归属和内容完整性。';
+      notes += ' 只找到无角色标记的页面文字（可能含欢迎语），无法判定用户消息或回复完整性。';
     return {status,parts,operations:{capture:'unverified',createProject:'unverified',
       move:'unverified',archive:'unverified',webAnalysis:'unverified'},notes};
   }

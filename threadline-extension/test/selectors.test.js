@@ -28,9 +28,10 @@ test('read-only canary detects a plain submit button only in the recognized comp
   assert.equal(r.parts.sendButton.method,'recognized_composer_form');
   assert.equal(r.parts.conversation.available,false);
   assert.equal(r.parts.conversation.candidate,true);
-  assert.equal(r.parts.conversation.observed.userText,true);
-  assert.equal(r.parts.conversation.observed.assistantText,true);
-  assert.match(r.notes,/尚未确认角色归属/);
+  assert.equal(r.parts.conversation.observed.whitespacePreWrap,true);
+  assert.equal(r.parts.conversation.roleVerified,false);
+  assert.equal(r.parts.conversation.observed.paragraph,true);
+  assert.match(r.notes,/无法判定用户消息/);
 });
 test('unrelated submit buttons and generic main prose must not be counted as verified conversation controls',()=>{
   const doc={querySelector(s){
@@ -42,8 +43,7 @@ test('unrelated submit buttons and generic main prose must not be counted as ver
   const r=Selector.probe(doc,'https://chatgpt.com/');
   assert.equal(r.parts.sendButton.available,false);
   assert.equal(r.parts.conversation.available,false);
-  assert.equal(r.parts.conversation.candidate,true);
-  assert.equal(r.parts.conversation.observed.userText,false);
+  assert.equal(r.parts.conversation.candidate,false);
 });
 test('hidden stop controls never count as active generation',()=>{
   const Page=require('../vendor/shadow-helpers.js');
@@ -55,4 +55,30 @@ test('hidden stop controls never count as active generation',()=>{
   const invisible={hidden:false,getAttribute:()=>null,closest:()=>null,getClientRects:()=>[{x:1}]};
   const hiddenDoc={querySelector(){return invisible;},defaultView:{getComputedStyle(){return {display:'none',visibility:'visible'};}}};
   assert.equal(Page.isStreaming(hiddenDoc),false);
+});
+
+
+test('an empty new-chat greeting in whitespace-pre-wrap must never count as user text',()=>{
+  const doc={querySelector(selector){
+    if(selector==='#prompt-textarea')return {closest(){return null;}};
+    if(selector==='main div.whitespace-pre-wrap')return {textContent:'我能帮你做些什么'};
+    return null;
+  }};
+  const r=Selector.probe(doc,'https://chatgpt.com/');
+  assert.equal(r.parts.conversation.available,false);
+  assert.equal(r.parts.conversation.candidate,undefined);
+});
+test('unattributed welcome and user bubbles inside /c/ remain unverified even if a probe text appears',()=>{
+  const doc={querySelector(selector){
+    if(selector==='#prompt-textarea')return {closest(){return null;}};
+    if(selector==='main div.whitespace-pre-wrap')return {textContent:'我能帮你做些什么'};
+    if(selector==='main p')return {textContent:'收到 S2-A'};
+    return null;
+  }};
+  const r=Selector.probe(doc,'https://chatgpt.com/c/abc-123');
+  assert.equal(r.parts.conversation.available,false);
+  assert.equal(r.parts.conversation.roleVerified,false);
+  assert.equal(r.parts.conversation.origin,'unattributed_dom');
+  assert.equal(r.parts.conversation.candidate,true);
+  assert.match(r.notes,/欢迎语/);
 });
