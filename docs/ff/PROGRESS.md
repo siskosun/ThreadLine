@@ -45,3 +45,23 @@
 - 合成浏览器用 Playwright 加载真实 MV3 扩展，后台调用原有 `NEW_CHAT` 创建标签页，`handoff.js` 经过 `execCommand('insertText')` 填入含中文、emoji、NBSP、Markdown 代码块与换行的 **23,569 UTF-8 字节**文本，并逐字回读相等；分别验证空白草稿及普通多行已有草稿不覆盖。连续空行场景允许等价结果被逐字核对后 ACK，或不一致时拒绝 ACK，且全部场景 0 次自动发送。
 - [Linux CI 39711053880](https://github.com/siskosun/ThreadLine/actions/runs/39711053880)、[Windows CI 39711053863](https://github.com/siskosun/ThreadLine/actions/runs/39711053863) 均成功：Node **112/112**、既有合成 Chromium MV3 集成、新增 `test/handoff-e2e.py` 通过。
 - 以上不代表登录的 Edge 网页已验证近 24KB 输入，也没有验证真实 Project/Temporary 拒绝、断网/限流、扩展层双会话身份持久化或最终回复数据可信结束。Z0-LIVE 继续 `blocked / unsigned`。PR 不合并、无 Release。
+
+## 2026-10-22 真机 Edge 无发送复测与 handoff 结构回读修复（未签署）
+- 代码提交：`03cd62850a27697edd2c3da9c45c48ec8077bfa1`（本地分支 `fix/ff-phase0-live-guards-20261022`，基于 PR #1 HEAD `1ba4465`）。改动文件：`handoff.js`、`selectors.js` 及对应测试；未改后台路由、课题 schema、备份格式或 Release。
+- 关键修复：
+  - 空 ProseMirror 的 `innerText` 是 `"\n"`，旧逻辑误判为已有草稿；现用 `textContent`、段落/换行结构和非换行渲染文本综合判定为空，同时继续保护空格、换行文本节点和多段空白草稿。
+  - ProseMirror 的 `innerText` 会在顶层段落之间加入视觉空行；现仅在多个块级节点（`P/PRE/LI/BLOCKQUOTE`）时按单换行连接块文本，单一包裹节点和普通编辑器仍回退 `innerText`。这使真实多行文本的结构化回读可逐字比较。
+  - 新增页面类型 guard：`plain_chat / project_chat / temporary_chat / unknown`；仅普通聊天 `forkAllowed=true`，未知页面默认拒绝；自检 note 显示类型与拒绝原因。
+  - `div.whitespace-pre-wrap` 只作为无角色候选，不提升为用户/助手消息；分页采集 429/503 重试一次后失败关闭；无角色欢迎语不进入采集。
+- 本机测试（Windows，Node v26.10.0，Python 3.12.10，Edge 155.0.4283.45）：
+  - 基线 PR #1 HEAD：`npm run verify` **112/112**；`npm run test:e2e` 原有合成 MV3 + 新增 handoff E2E 通过。
+  - 最终代码：`npm run verify` **119/119**；`npm run test:e2e` **2/2 PASS**（`extension-e2e.py`、`handoff-e2e.py`）。
+  - 最终 `handoff.js` SHA-256 `872c7b9609000b969fb0cebb0e19ca85fc5e404988de390503aa3b253adce9d8`；`selectors.js` `0bdeb077aacd8f508d5eb7fe0919900729700bd422cbb596db722862b2e29e5a`；已核对 Edge 加载目录与测试树逐字节一致。
+- 真实 Edge 无发送结果（人工预算仍为 **3/3 已用尽，0 新增发送**）：
+  - 普通新聊天：`plain_chat` / `forkAllowed=true`；Temporary Chat 与实际临时 URL：`temporary_chat` / `false`；Project 路径：`project_chat` / `false`。
+  - 小文本：实际与预期均为 15 字符 / 21 字节，SHA-256 `91484607d159a539b15769d8b681c09f43de40d76a19db24c469979acf0d27d7`，结构回读 exact，横幅逐字核对，ACK=true。
+  - 近 24KB 简单多行（CJK、emoji、NBSP、单反引号）：23,558 字符 / 23,569 字节，SHA-256 `f219a5280f1186317df007261906ae1b26d61ae117657ed7076c79b6b2ea44a7`，结构回读 exact，ACK=true，URL 仍为根路径，0 条角色消息。
+  - 近 24KB 综合载荷（代码围栏、CRLF、连续空行、首尾空白）：预期 23,558 字符 / 23,569 字节、SHA-256 `4b9abbfffa9542b5eb1fb9539b418cb63af25967d54d14eb8db29bf1d05defee`；实际结构回读 23,559 字符、SHA-256 `dfac2fd59fca008bc35d13bb21e2f5ca0aff7bacdde6197fd555718f0d7c22f3`，CRLF 被编辑器归一化为 LF 且代码围栏/空行多出空行；分类为 `differs`，横幅未确认，ACK=false，未发送。
+  - 已有草稿保护：ChatGPT 多次把先前测试草稿恢复到新聊天；扩展识别为 occupied，不覆盖、不 ACK、不发送，URL 保持根路径。随后由测试者清空测试草稿并刷新，handoff 重新读取记录后完成简单 24KB exact。
+  - 页面刷新、扩展重载后重新打开 panel 均未发送；未验证 Service Worker 单点暂停、旧监听器重复注入、同一标签关闭重开、真实断网/限流。
+- 证据边界：真实页面均未发送消息，测试标签由测试者创建并清理；未读取或上传真实会话正文、账号、Cookie、Token、扩展 ID 或会话 ID。`innerText` 的视觉空行不等于文档字节；结构回读只证明编辑器顶层块文本一致，不证明服务端上下文或最终回复完整性。Z0-LIVE 仍 `blocked / NOT SIGNED`；本轮不更新 `docs/PLAN.md` 状态。

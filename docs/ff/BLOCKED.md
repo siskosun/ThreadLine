@@ -25,3 +25,13 @@
 ### 2026-10-22 已减轻的风险（未解除 Z0-LIVE）
 - PR #1 已修复接续提示以 40 字符前缀误判成功的问题，并在合成 Chromium 完成 23,569 UTF-8 字节、带换行与 Unicode 的扩展原生填入/全文回读测试。Linux/Windows 112/112 Node 及两套合成 E2E 均通过；旧草稿（含纯空白）保护和零自动发送有测试。
 - **仍未解锁：** 在操作者已登录的 Edge 上，使用同一已核实版本执行近 24KB 扩展路径、已有草稿保护、异常恢复及 Project/Temporary 拒绝；可信消息来源/完整性、扩展层分支绑定和必要人工签署。不能把合成结果折算为 Z0-LIVE 的真实验收。
+
+### 2026-10-22 真机复测后的剩余阻塞（代码提交 03cd6285）
+- 已减轻：普通聊天页面类型、Temporary/Project 路径拒绝、空编辑器/空白草稿判定、简单多行近 24KB 结构回读 exact、重复测试草稿不覆盖、页面刷新与扩展重载后的无发送恢复，均已在真实 Edge 无发送场景复测。
+- 仍阻塞 Z0-LIVE：
+  - 含 Markdown 代码围栏、CRLF、连续空行或首尾空白的综合载荷，编辑器会归一化 CRLF 并增加空行；结构回读仍为 `differs`（预期 23,569 字节，实际 23,559 字符/对应字节不同，SHA-256 `dfac2fd5...`），扩展正确拒绝 ACK，未发送。该项不满足 24KB exact 门禁。
+  - 未执行：真实 Service Worker 单点暂停/恢复、旧监听器重复注入、标签关闭后按同一会话重开、真实断网/限流、可信角色标记与原始分页消息哈希、最终回复完整性、实际 Fork 端到端操作（P2 尚未实现）。
+  - 真实页面新聊天未出现 `data-message-author-role`（roles=0）；`div.whitespace-pre-wrap` 仍只能作为无角色候选，不能用于证明用户/助手身份。A/B 页面级配对和生成重叠窗口仍未机器复核。
+  - 人工签署仍缺失；`docs/PLAN.md` 的 Z0-LIVE 必须保持 `blocked`，不得由 Agent 改为 done。
+- 远程连接：本机 `PersonalDesktopMCP` 与 `tunnel-client` 进程在运行，`status` 为 `waiting_chatgpt`（`healthy=true`、`ready=true`）；`control_plane` 与 `mcp_discovery` 读数为 `unknown`（字段缺失），`chatgpt_verification` 未记录。未执行 repair，也未把本地健康或隧道进程存在当作 ChatGPT 端在线；该设备仍未完成授权连接访问验收。
+- 不新增发送：人工发送预算已用尽 3/3；本轮全部真实网页操作均为无发送预填/只读检查。

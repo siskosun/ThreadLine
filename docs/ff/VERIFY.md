@@ -62,3 +62,15 @@ PR-2/3 在用户签署此门禁通过前不得开展真实网页自动化集成�
 - `test/handoff.test.js` 验证前缀 40 字符假成功被拒绝；`test/handoff-e2e.py` 在真实 MV3 扩展 + 离线合成 ChatGPT 编辑器下验证 23,569 字节含 Unicode、NBSP、代码块及换行的 exact 预填/回读；已有草稿保持原状、自动发送为 0。
 - [Linux 39711053880](https://github.com/siskosun/ThreadLine/actions/runs/39711053880) 与 [Windows 39711053863](https://github.com/siskosun/ThreadLine/actions/runs/39711053863)：112/112 Node 与两项合成扩展 E2E 通过。没有真实用户账号操作。
 - Z0-LIVE 当前仍是 `blocked / NOT SIGNED`。操作者已经使用 3/3 人工发送测试预算，不增加发送；余下真实网页无发送验收和适用人工签署仍要完成。
+
+## 2026-10-22 真机 Edge 无发送复测（代码提交 03cd6285，未签署）
+- 代码：基于 PR #1 HEAD `1ba4465` 的 `03cd6285`；`handoff.js` SHA-256 `872c7b96...`，`selectors.js` `0bdeb077...`。Edge 加载目录与测试树逐字节一致；重载后自检返回新增 `pageType/forkAllowed` 字段，证明新 content script 生效。
+- 本机自动测试：`npm run verify` **119/119**；`npm run test:e2e` **2/2 PASS**（原 MV3 持久配置 + handoff 23,569 字节合成 E2E）。基线 1ba4465 为 112/112。Playwright 本机可用。
+- 真实 Edge 155.0.4283.45，全部操作无发送：
+  - 页面类型：普通新聊天 `plain_chat / forkAllowed=true`；Temporary Chat `temporary_chat / false`；Project 路径 `project_chat / false`；未知路径默认拒绝。
+  - 空 ProseMirror 的 `innerText="\n"` 不再被误判为已有草稿；空格、换行文本节点和多段空白仍不覆盖。
+  - 小文本结构回读 exact：15 字符 / 21 字节，SHA-256 `91484607...`，ACK=true。
+  - 近 24KB 简单多行结构回读 exact：23,558 字符 / 23,569 字节，SHA-256 `f219a528...`，ACK=true，URL 根路径，roles=0。
+  - 近 24KB 综合载荷（代码围栏、CRLF、连续空行、首尾空白）：预期 SHA-256 `4b9abbff...`；实际结构回读 23,559 字符、SHA-256 `dfac2fd5...`；CRLF 被归一化、代码围栏/空行产生额外空行；分类 `differs`，ACK=false，未发送。
+- 证据边界：`innerText` 是渲染文本，不能作为字节原文；结构回读使用多个顶层块级节点的文本按单换行连接，本次简单多行 exact 成立，但不证明服务端上下文、消息角色、最终回复完整性或并发重叠。`roles=0` 时不得用 `div.whitespace-pre-wrap` 推断用户/助手身份。
+- 仍未完成：Service Worker 单点暂停、旧监听器重复注入、标签关闭重开、真实断网/限流、可信分页消息/哈希、最终回复完整性、实际 Fork 端到端（P2）、远程设备在线和用户签署。Z0-LIVE 保持 `blocked / NOT SIGNED`，`docs/PLAN.md` 状态不变。
