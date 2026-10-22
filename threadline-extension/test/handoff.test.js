@@ -8,7 +8,8 @@ async function exercise(initial,insertion,expected='LONG USER CONTINUATION',opti
   const banner={style:{},children:[],replaceChildren(){this.children=[];},
     appendChild(x){this.children.push(x);},remove(){this.removed=true;}};
   const editor={innerText:initial,textContent:options.textContent??initial,
-    children:options.children??null,isContentEditable:true,focus(){},
+    children:options.children??null,childNodes:options.childNodes??null,
+    isContentEditable:true,focus(){},
     querySelectorAll(selector){
       if(selector==='p')return Array.from({length:options.paragraphs||0});
       if(selector==='br')return Array.from({length:options.breaks||0});
@@ -174,4 +175,33 @@ test('a non-placeholder P with a BR must not be erased by structural readback',a
  });
  assert.ok(!result.outgoing.includes('HANDOFF_ACK'),
    'two BR nodes are not a lone placeholder and must stay unverified');
+});
+
+test('non-text image inside an otherwise visually empty composer is owned by the user',async()=>{
+ const picture={nodeType:1,tagName:'IMG',childNodes:[]};
+ const paragraph={nodeType:1,tagName:'P',childNodes:[picture]};
+ const result=await exercise('\n','exact','SHOULD NEVER INSERT',{
+   textContent:'',paragraphs:1,breaks:0,childNodes:[paragraph]
+ });
+ assert.equal(result.editor.innerText,'\n','image attachment not overwritten');
+ assert.ok(!result.outgoing.includes('HANDOFF_ACK'));
+ assert.match(result.banner.children[0].textContent,/不会覆盖/);
+});
+test('noneditable inline attachment chip is never considered a blank placeholder',async()=>{
+ const chip={nodeType:1,tagName:'SPAN',childNodes:[],contentEditable:'false'};
+ const paragraph={nodeType:1,tagName:'P',childNodes:[chip]};
+ const result=await exercise('\n','exact','SHOULD NEVER INSERT',{
+   textContent:'',paragraphs:1,breaks:0,childNodes:[paragraph]
+ });
+ assert.equal(result.editor.innerText,'\n');
+ assert.ok(!result.outgoing.includes('HANDOFF_ACK'));
+ assert.match(result.banner.children[0].textContent,/不会覆盖/);
+});
+test('sole empty ProseMirror paragraph with placeholder BR is safe to fill',async()=>{
+ const br={nodeType:1,tagName:'BR',childNodes:[]};
+ const p={nodeType:1,tagName:'P',childNodes:[br]};
+ const result=await exercise('\n','exact','VALID DRAFT',{
+   textContent:'',paragraphs:1,breaks:1,childNodes:[p]
+ });
+ assert.ok(result.outgoing.includes('HANDOFF_ACK'));
 });
