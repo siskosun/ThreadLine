@@ -43,3 +43,12 @@ npm run test:e2e
 不要重复点击真实网页上的发送按钮。本阶段根本没有此按钮。开发实验遇到错误时保留错误消息、扩展版本和复现步骤，勿提交真实聊天文本、Token、Cookie 或账号数据到公开仓库。
 
 正式计划与完成判定只看 [docs/PLAN.md](../PLAN.md)，进度记录见 [PROGRESS.md](PROGRESS.md)。
+
+
+## 2026-10-22 单一活动尝试约束
+
+每个 A/B 分支可以保留多次执行的历史，但**同一时刻最多只有一个未完成的 attempt**。一次执行还处于 `pending` 时，后台不允许用另一个 attempt ID 开始新一轮，也不允许替换当前执行。原尝试进入 `failed` 或 `unknown` 后，用户明确选择新运行、提供新的 attempt ID，才允许下一次 `pending/created`。
+
+- 这只约束独立 Fork 状态和存储，不接管普通课题，不自动发送消息，也不提前实施 P2/Fork 网页自动化。
+- 新增单元与真实 MV3 合成集成负向检查。先提交测试 `3ee3299e`，[红灯 run 39786233409](https://github.com/siskosun/ThreadLine/actions/runs/39786233409)：123 项中 122 通过、1 项按预期失败；提交状态机修复 `520048a5`，[绿灯 run 39786365758](https://github.com/siskosun/ThreadLine/actions/runs/39786365758)：123/123；补充后台/IndexedDB E2E `73d4962b`，[完整 run 39786783682](https://github.com/siskosun/ThreadLine/actions/runs/39786783682)：123/123 Node、合成 Chromium MV3 成功。
+- 该自动结果不替代真实 Edge 测试、合并批准或人工签署。当前 GitHub `docs/PLAN.md` 仍登记 P1-CORE 为 `planned`，PR #3 为 Draft；尚未放行 P2/P3。
