@@ -117,7 +117,32 @@
       }
       if(!data)data=await send({type:'HANDOFF_GET'});
       if(!data?.text)return;
+      // A previous page/script may have inserted some or all of this draft.
+      // Uncertainty persists across reloads: show manual copy, never replay.
+      if(data.autoAttempted === true){
+        done=true;
+        banner('此标签已有一次预填尝试，结果待核实；已停止自动重试。可复制提示后手动检查。',true);
+        return;
+      }
       attempts++;
+      // Wait for a ready composer before consuming the one-shot allowance.
+      const readyEditor=editor();
+      if(!readyEditor){
+        if(attempts>=12){
+          done=true;banner('无法找到输入框。尚未尝试填入；可复制提示后手动粘贴。',true);
+        }
+        return;
+      }
+      if(!isEmptyEditor(readyEditor)){
+        done=true;banner('输入框已有草稿，研线不会覆盖或自动发送。可复制接续提示后自行处理。',true);
+        return;
+      }
+      const reserved=await send({type:'HANDOFF_BEGIN'});
+      if(!reserved?.autoFill){
+        done=true;
+        banner('此标签的预填机会已使用或无法确认；已停止自动重试。请使用复制提示人工恢复。',true);
+        return;
+      }
       const outcome=fill(data.text);
       if(outcome==='exact'){
         done=true;
@@ -139,7 +164,10 @@
           true);
         return;
       }
-      if(attempts>=12){banner('无法自动找到 ChatGPT 输入框。请点击下方按钮复制接续提示，手动粘贴。',true);done=true;}
+      // Reservation was consumed. A disappearing composer must not be
+      // retried by this script, by a replacement listener, or after a reload.
+      done=true;
+      banner('预填时输入框消失，操作结果未知；已停止自动重试，请手动检查。',true);
     }catch{}finally{working=false;}
   }
   chrome.runtime.onMessage.addListener((msg,sender,reply)=>{if(msg?.type==="TL_HANDOFF_READY"){tick();reply({ok:true});}});
