@@ -12,7 +12,7 @@ function system(){
     sidePanel:{setPanelBehavior:async()=>{},async close(args){calls.push(['close',args])}},
     storage:{local:{async get(k){return{[k]:local.get(k)}},async set(values){for(const [k,v]of Object.entries(values))local.set(k,v)}},session:{async get(k){if(k==null)return Object.fromEntries(session);return{[k]:session.get(k)}},async set(items){for(const[k,v]of Object.entries(items))session.set(k,v)},async remove(keys){for(const k of [keys].flat())session.delete(k)}}}
   };
-  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'..','background.js'),'utf8'),{importScripts:()=>{},ThreadLineCore:Core,ThreadLineCaptureCore:CaptureCore,ThreadLineCaptureDB:db,chrome,crypto:globalThis.crypto,console,Date,Promise});
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'..','background.js'),'utf8'),{importScripts:()=>{},ThreadLineCore:Core,ThreadLineCaptureCore:CaptureCore,ThreadLineCaptureDB:db,chrome,crypto:globalThis.crypto,console,Date,Promise,URL});
   function message(payload,sender={}){return new Promise((resolve,reject)=>{events.message(payload,sender,reply=>{if(reply.ok)resolve(reply.data);else reject(new Error(reply.error));});});}
   return{message,runs,pages,calls,session,local};
 }
@@ -29,8 +29,41 @@ test('new chat is created in same window, draft retained locally, sidepanel clos
   const s=system();const r=await s.message({type:'NEW_CHAT',handoff:'研究目标：继续检查',windowId:4});
   assert.equal(r.tabId,84);assert.ok(s.session.get('tl_handoff_84').text.includes('继续检查'));
   assert.ok(s.calls.some(c=>c[0]==='close' && c[1].windowId===4));
-  const draft=await s.message({type:'HANDOFF_GET'},{tab:{id:84,url:'https://chatgpt.com/'}});
+  const sender={url:'https://chatgpt.com/',tab:{id:84,url:'https://chatgpt.com/'}};
+  const draft=await s.message({type:'HANDOFF_GET'},sender);
   assert.match(draft.text,/继续检查/);
-  await s.message({type:'HANDOFF_ACK'},{tab:{id:84,url:'https://chatgpt.com/'}});
+  assert.equal(draft.autoAttempted,false);
+  const [a,b]=await Promise.all([
+    s.message({type:'HANDOFF_BEGIN'},sender),
+    s.message({type:'HANDOFF_BEGIN'},sender)
+  ]);
+  assert.equal([a.autoFill,b.autoFill].filter(Boolean).length,1,
+    'only one of two overlapping inserts may reserve a draft');
+  assert.equal((await s.message({type:'HANDOFF_GET'},sender)).autoAttempted,true);
+  await s.message({type:'HANDOFF_ACK'},sender);
   assert.equal(s.session.has('tl_handoff_84'),false);
+});
+
+test('handoff reservation refuses redirected and foreign documents',async()=>{
+ const s=system();
+ await s.message({type:'NEW_CHAT',handoff:'TEST INTENT',windowId:4});
+ for(const url of [
+   'https://chatgpt.com/c/saved',
+   'https://chatgpt.com/?temporary-chat=true',
+   'https://chatgpt.com/g/g-p-project',
+   'https://example.com/'
+ ]){
+   const sender={url,tab:{id:84,url}};
+   await assert.rejects(s.message({type:'HANDOFF_BEGIN'},sender),
+      /plain new ChatGPT/);
+ }
+ assert.equal(s.session.get('tl_handoff_84').attemptedAt,undefined,
+   'rejected documents must not consume the pending draft');
+});
+test('missing reservation cannot be acknowledged',async()=>{
+ const s=system();
+ await s.message({type:'NEW_CHAT',handoff:'TEST INTENT',windowId:4});
+ const sender={url:'https://chatgpt.com/',tab:{id:84,url:'https://chatgpt.com/'}};
+ await assert.rejects(s.message({type:'HANDOFF_ACK'},sender),/no reserved/);
+ assert.equal(s.session.get('tl_handoff_84').text,'TEST INTENT');
 });
