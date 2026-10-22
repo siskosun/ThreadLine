@@ -11,6 +11,19 @@ const ThreadLineFFCore = (() => {
   const canonical = value => value.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
   const compare = value => canonical(value).replace(/\u00a0/g, " ").trim();
   const byteLength = value => encoder.encode(value).byteLength;
+  // TextEncoder silently replaces lone UTF-16 surrogates with U+FFFD.
+  // Without validation, different frozen strings could share raw-byte hashes.
+  function wellFormed(value) {
+    for (let i=0;i<value.length;i++) {
+      const n=value.charCodeAt(i);
+      if (n>=0xD800 && n<=0xDBFF) {
+        const after=value.charCodeAt(++i);
+        if (!(after>=0xDC00 && after<=0xDFFF)) return false;
+      } else if (n>=0xDC00 && n<=0xDFFF) return false;
+    }
+    return true;
+  }
+
   function validId(value) {
     assert(typeof value === "string" && /^[a-zA-Z0-9_-]{6,100}$/.test(value), "invalid ID");
     return value;
@@ -21,11 +34,13 @@ const ThreadLineFFCore = (() => {
   }
   async function hash(value) {
     assert(typeof value === "string", "hash input must be text");
+    assert(wellFormed(value), "ill-formed Unicode cannot be hashed");
     const buffer = await crypto.subtle.digest("SHA-256", encoder.encode(value));
     return Array.from(new Uint8Array(buffer), b => b.toString(16).padStart(2, "0")).join("");
   }
   async function fingerprints(value) {
     assert(typeof value === "string", "fingerprint input must be text");
+    assert(wellFormed(value), "ill-formed Unicode cannot be fingerprinted");
     const [raw, frozen, comparison] = await Promise.all([
       hash(value), hash(canonical(value)), hash(compare(value))
     ]);
@@ -37,6 +52,7 @@ const ThreadLineFFCore = (() => {
   async function freeze(w0, p) {
     assert(typeof w0 === "string" && typeof p === "string" && p.trim().length > 0,
       "W0 and non-empty task instructions are required");
+    assert(wellFormed(w0) && wellFormed(p), "ill-formed Unicode cannot be frozen");
     const text = formatText(w0, p), bytes = byteLength(text);
     assert(bytes <= MAX_BYTES, "frozen input exceeds 24000 UTF-8 bytes");
     const [w0Hashes, pHashes, textHashes] = await Promise.all([
@@ -68,7 +84,8 @@ const ThreadLineFFCore = (() => {
   }
   async function classify(expected, observed, options={}) {
     assert(typeof expected === "string", "expected text must be a string");
-    if (!options.trusted || !options.complete || typeof observed !== "string")
+    if (!wellFormed(expected)) throw new Error("ill-formed expected Unicode");
+    if (!options.trusted || !options.complete || typeof observed !== "string" || !wellFormed(observed))
       return {level:"unverified", rule:RULE};
     const [a, b] = await Promise.all([fingerprints(expected), fingerprints(observed)]);
     const level = expected === observed ? "exact" :
@@ -163,7 +180,7 @@ const ThreadLineFFCore = (() => {
     return next;
   }
   return {MAX_BYTES, RULE, STATES, PHASES, CHECKS, canonical, compare, byteLength,
-    hash, fingerprints, formatText, freeze, verifyFrozen, classify, newExperiment, advance};
+    hash, wellFormed, fingerprints, formatText, freeze, verifyFrozen, classify, newExperiment, advance};
 })();
 if (typeof globalThis !== "undefined") globalThis.ThreadLineFFCore = ThreadLineFFCore;
 if (typeof module !== "undefined") module.exports = ThreadLineFFCore;
