@@ -5,7 +5,6 @@ import html
 import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from time import monotonic, sleep
 from playwright.sync_api import sync_playwright, expect
 
 EXT = Path(__file__).resolve().parents[1]
@@ -44,19 +43,17 @@ def run():
             panel.wait_for_selector("#manage-accordion", timeout=15000)
 
             def open_with_draft(payload):
-                response = panel.evaluate("""async text =>
-                    chrome.runtime.sendMessage({type:'NEW_CHAT',handoff:text})""", payload)
+                with ctx.expect_page(timeout=20000) as created:
+                    response = panel.evaluate("""async text =>
+                        chrome.runtime.sendMessage({type:'NEW_CHAT',handoff:text})""", payload)
                 assert response["ok"], response
                 tid = response["data"]["tabId"]
-                started = monotonic()
-                while monotonic()-started < 15:
-                    for page in ctx.pages:
-                        if page.url == "https://chatgpt.com/":
-                            if not getattr(page, "_threadline_claimed", False):
-                                setattr(page, "_threadline_claimed", True)
-                                return page, tid
-                    sleep(.1)
-                raise AssertionError("handoff tab not created")
+                page = created.value
+                page.wait_for_load_state("domcontentloaded", timeout=15000)
+                if not page.url.startswith("https://chatgpt.com/"):
+                    raise AssertionError("unexpected new tab URL: " + page.url +
+                        " ; pages=" + repr([p.url for p in ctx.pages]))
+                return page, tid
 
             def status_for(tid):
                 return panel.evaluate("""async id =>
