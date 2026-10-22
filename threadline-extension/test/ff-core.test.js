@@ -109,3 +109,18 @@ test("FF isolation settings default to unknown and legacy core is independent",a
  const legacy=require("../core.js");
  assert.equal(legacy.emptyState().schema,2);
 });
+
+
+test("FF refuses malformed UTF-16 instead of silently hashing replacement bytes",async()=>{
+ const bad="\uD800",replacement="\uFFFD";
+ assert.notEqual(bad,replacement);
+ assert.equal(F.wellFormed("中文😀"),true);
+ assert.equal(F.wellFormed(bad),false);
+ assert.equal(F.wellFormed("\uDC00"),false);
+ await assert.rejects(F.freeze(bad,"P"),/ill-formed Unicode/);
+ await assert.rejects(F.freeze("W",bad),/ill-formed Unicode/);
+ await assert.rejects(F.hash(bad),/ill-formed Unicode/);
+ const safe=await F.freeze("W","P");
+ assert.equal(await F.verifyFrozen(safe),true);
+ assert.equal((await F.classify(replacement,bad,{trusted:true,complete:true})).level,"unverified");
+});
