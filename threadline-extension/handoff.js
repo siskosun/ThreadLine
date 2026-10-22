@@ -12,16 +12,29 @@
     const close=document.createElement('button');close.textContent='关闭提示';close.style.cssText='padding:7px 9px;border-radius:8px;background:#f1f4f8;border:1px solid #e2e8f0;cursor:pointer';close.onclick=()=>host.remove();host.appendChild(close);
     if(error)host.style.borderColor='#deac92';
   }
+  function editorText(el) {
+    // innerText is the relevant displayed text in ProseMirror; textContent
+    // loses layout line breaks. Never trim or normalize a user's draft.
+    return el.isContentEditable ? String(el.innerText ?? '') : String(el.value ?? '');
+  }
   function fill(text){
-    const el=editor();if(!el)return false;
-    if((el.innerText||el.value||'').trim())return false; // Never overwrite anything the user has typed.
+    const el=editor();if(!el)return 'missing';
+    // Even an all-whitespace draft belongs to the user. Never overwrite it.
+    if(editorText(el).length)return 'occupied';
     try{
       el.focus();
       let ok=false;
       if(el.isContentEditable)ok=!!document.execCommand('insertText',false,text);
-      else if('value' in el){const setter=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value')?.set;if(setter)setter.call(el,text);else el.value=text;el.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:text}));ok=true;}
-      return ok && (el.innerText||el.value||'').trim().length>=Math.min(text.length,40);
-    }catch{return false;}
+      else if('value' in el){
+        const setter=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value')?.set;
+        if(setter)setter.call(el,text);else el.value=text;
+        el.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:text}));
+        ok=true;
+      }
+      // A truthy execCommand receipt or a 40-character prefix proves nothing:
+      // don't acknowledge incomplete, truncated or newline-damaged drafts.
+      return ok && editorText(el)===text ? 'exact' : 'mismatch';
+    }catch{return 'mismatch';}
   }
   async function tick(){
     if(done||working)return;working=true;
@@ -29,11 +42,23 @@
       if(!data)data=await send({type:'HANDOFF_GET'});
       if(!data?.text)return;
       attempts++;
-      if(fill(data.text)){
-        banner('研线已预填研究接续提示。检查内容后按发送；不会自动替你发送。');done=true;
+      const outcome=fill(data.text);
+      if(outcome==='exact'){
+        done=true;
+        banner('研线已逐字核对预填草稿。检查内容后按发送；不会自动替你发送。');
         await send({type:'HANDOFF_ACK'});return;
       }
-      if(attempts>=12){banner('无法自动填入 ChatGPT 输入框。请点击下方按钮复制接续提示，手动粘贴。',true);done=true;}
+      if(outcome==='occupied' || outcome==='mismatch'){
+        // Leave the draft untouched (including partial/whitespace text).
+        // Never retry insertion or ACK a partial result.
+        done=true;
+        banner(outcome==='occupied'
+          ? '输入框已有草稿，研线不会覆盖或自动发送。可复制接续提示后自行处理。'
+          : '草稿填入结果不完整或与原文不一致，未确认成功；请手动检查或复制接续提示。',
+          true);
+        return;
+      }
+      if(attempts>=12){banner('无法自动找到 ChatGPT 输入框。请点击下方按钮复制接续提示，手动粘贴。',true);done=true;}
     }catch{}finally{working=false;}
   }
   chrome.runtime.onMessage.addListener((msg,sender,reply)=>{if(msg?.type==="TL_HANDOFF_READY"){tick();reply({ok:true});}});
