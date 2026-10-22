@@ -82,3 +82,12 @@
 - [Linux run 39775655808](https://github.com/siskosun/ThreadLine/actions/runs/39775655808) 与 [Windows run 39775655955](https://github.com/siskosun/ThreadLine/actions/runs/39775655955) 已通过；Windows 原始日志记录 Node **125/125**、0 fail，原 MV3 持久配置和 handoff 合成 Chromium E2E 通过，0 自动发送。
 - 原 23,569 字节综合载荷未找回，因此**原样 T6 NOT RUN**。本地版本与 PR 代码曾不一致；真实已登录 Edge 必须在加载这次提交且文件指纹核对后，重测受影响用例。上次 T2–T6 正式预填均被 ChatGPT 恢复的自有测试草稿挡住（未覆盖、不发送），不可记为成功。
 - 本轮不变更 `docs/PLAN.md`、不签署 Z0-LIVE、不合并或发布。扩展层双分支与异常恢复等任务仍依正式计划门禁。
+
+
+## 2026-10-22 预填草稿保护与单次尝试恢复（合成环境已验证）
+
+- **非文字草稿防覆盖**：已有文字检测之外，`handoff.js` 对可编辑节点的真实子节点结构采取保守判断。纯空编辑器或单个 P/DIV + 占位 BR 可预填；图片、附件芯片、嵌入、未知结构等即使无文本也视为占用。测试先以 `4a0d1cb` 在 Linux/Windows 复现旧判断错误（红灯），随后 `8d61b86` 修正。边界：尚未取得真实登录 Edge 中外置于编辑器的附件布局证据。
+- **不明预填不自动重放**：背景新增 `HANDOFF_BEGIN`，以后台单写队列及 `chrome.storage.session` 的 `attemptedAt` 记录，在实际 `execCommand` 前独占一次自动预填机会。`HANDOFF_GET` 可读取待处理材料供用户手动复制；已尝试或无法确认状态不会自动再次插入。只有页面仍在普通新聊天根路径，且存在已登记的尝试时才允许 `HANDOFF_ACK` 清理。重载/重复监听器、失败回执无法改变此规则。
+- 新增后台测试：两次并发 `HANDOFF_BEGIN` 只有一次 `autoFill=true`，错误页面及未预留的 ACK 不得消费材料。真实 MV3 合成测试：编辑器故意不可写引发不确定预填，随后同标签重载为空编辑器，必须展示“停止自动重试”、仍保留人工复制入口且不再次插入、不发送。
+- 代码最新提交 `8863e638d7973ca85958bfce5b25d2bb78b88e7b`。[Linux CI 39779493270](https://github.com/siskosun/ThreadLine/actions/runs/39779493270) 与 [Windows CI 39779493156](https://github.com/siskosun/ThreadLine/actions/runs/39779493156)：`npm run verify` **132/132**，两套合成 Chromium MV3 E2E 全部通过，0 次自动发送。
+- **证据边界**：这证明合成页面的失败不重放与保护策略，不是用户已登录的 Edge 对同一提交的验收。远程 Windows `sunzc` 仍离线，真实 SW 暂停、旧监听器、页面异常、分页原文/最终回复证据及真人签署仍未完成。Z0-LIVE 继续 `blocked / unsigned`；`docs/PLAN.md`、main 与 PR 合并状态未变。

@@ -89,3 +89,11 @@ PR-2/3 在用户签署此门禁通过前不得开展真实网页自动化集成�
 - 修复：`handoff.js` 只对顶层多块结构中的 `P`、内含**唯一一个** `BR` 元素节点、无文本内容且 `innerText === "\\n"` 的占位段落做 `"\\n" → ""` 映射。真正的额外空 P、两个或更多 BR、PRE 和嵌套节点不能被这条逻辑吞掉。
 - 绿灯：[Linux CI 39775655808](https://github.com/siskosun/ThreadLine/actions/runs/39775655808) 和 [Windows CI 39775655955](https://github.com/siskosun/ThreadLine/actions/runs/39775655955) success；Windows 125/125 Node + 两套合成 Chromium E2E 通过，0 自动发送。
 - 不代表已在登录 Edge 验证这个提交。实际网页应先比对加载扩展文件 SHA-256 与 PR 提交中的内容，再重测最小样例和**重新生成的**综合样例；原历史 T6 原文不可找回，保持 NOT RUN。项目/临时聊天拒绝、草稿保护、重放安全、真实消息身份/最终回复完整性仍单独验收。
+
+
+## 2026-10-22 接续预填一次性尝试与非文字草稿保护（合成门禁）
+
+- `handoff.js` 只把已知空编辑器骨架视为可填；文本为空但具有图片、芯片、非编辑节点或未知结构时应保持 occupied，不覆盖。重载后的编辑器是否为空，不能使此前失败的预填自动重试。
+- `HANDOFF_BEGIN` 必须在真正填入前、经后台单写队列完成一次持久预留；两条并发请求至多一条获许可。`HANDOFF_GET` 允许只读/手动复制，已尝试返回 `autoAttempted=true`；`HANDOFF_ACK` 只有已登记的普通新聊天根路径可执行。
+- 回归覆盖：旧误覆盖负向用例红灯；非文字草稿保护；空 P 占位允许；并发预留互斥；错误文档源拒绝；空 ACK 拒绝；失效输入框引发失败后重载的自动填入次数为 0；实际发送次数始终为 0。
+- [Linux 39779493270](https://github.com/siskosun/ThreadLine/actions/runs/39779493270)、[Windows 39779493156](https://github.com/siskosun/ThreadLine/actions/runs/39779493156)：132/132 Node 与两套合成 MV3 E2E 通过。真实 Edge 尚须由用户在已登录的测试标签、加载准确 SHA 后复验，Z0-LIVE 不升级。
