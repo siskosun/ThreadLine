@@ -38,3 +38,11 @@
 - 独立 A/B 分支不得复用同一个 attempt ID，避免后续采集归属混淆。相关负向测试在 `test/ff-core.test.js`。
 - [GitHub CI 39710678989](https://github.com/siskosun/ThreadLine/actions/runs/39710678989) 完成，结论 success；本次验证没有真实登录 ChatGPT、没有发送或复制用户数据。
 - P1-CORE 依然是 PR 评审状态：依正式计划必须完成相应评审/合并及证据核验，不能仅凭 CI success 宣称 done。
+
+
+## 2026-10-22 P1 开关与排队写入竞态修复（待评审）
+
+- 发现 `FF_CREATE` 与 `FF_RECORD` 在进入串行写队列**之前**检查 `tl_ff_enabled_v1`；若关闭功能的操作已经排队并等待写入，后续请求可能读到旧的 enabled=true，等关闭写入完成后仍提交实验/状态更新。
+- 新增 `test/ff-background-toggle.test.js`：在关闭请求被模拟存储延迟阻塞期间，让 CREATE 与 RECORD 读取旧开启状态并加入队列；要求关闭完成后不得再写。反向测试提交 `2f1b7655` 复现问题，修复提交 `f8558952619fbddc2f29a1f2a644f28fd7a22cf2` 在串行临界区内再次检查开关。不是依靠取消队列或超时重放。
+- [GitHub CI 39779914170](https://github.com/siskosun/ThreadLine/actions/runs/39779914170) success：Node **122/122**，真实 MV3 扩展/IndexedDB 合成 E2E 通过；没有真实 ChatGPT 发送，也没有更改旧课题 schema。
+- P1-CORE 仍仅作为 PR #3 待评审源码，GitHub main 的正式任务状态保持 `planned`，无任何自动放行 P2/P3 的含义。
