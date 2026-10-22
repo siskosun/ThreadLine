@@ -94,6 +94,17 @@ def run():
             assert retry["ok"] and retry["data"]["revision"] == 2, retry
             assert retry["data"]["branches"]["A"]["attempts"][0]["status"] == "unknown"
 
+            # A new in-flight attempt ID must not replace the pending manual
+            # retry or create an ambiguous second active branch attempt.
+            second_active = message({"type":"FF_RECORD","experimentId":first,
+                "branch":"A","expectedRevision":2,"operationId":"op_illicitpend",
+                "attemptId":"att_illicitpend","status":"pending","phase":"created"})
+            assert not second_active["ok"], second_active
+            assert "another active attempt" in second_active["error"], second_active
+            still_current = message({"type":"FF_READ","id":first})
+            assert still_current["ok"] and still_current["data"]["revision"] == 2
+            assert len(still_current["data"]["branches"]["A"]["attempts"]) == 2
+
             concurrent = page.evaluate("""async id => Promise.all([
               chrome.runtime.sendMessage({type:'FF_RECORD',experimentId:id,branch:'B',
                 expectedRevision:2,operationId:'op_race111',attemptId:'att_race111',
