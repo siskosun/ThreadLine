@@ -1,7 +1,25 @@
 /* Prepare a ChatGPT draft for an explicitly user-requested research continuation. Never presses Send. */
 (()=>{
   if(globalThis.__TL_HANDOFF_V2__)return;globalThis.__TL_HANDOFF_V2__=true;
-  let data=null,attempts=0,working=false,done=false;
+  let data=null,attempts=0,working=false,done=false,mismatchMeta='';
+  // Only a freshly created plain-chat composer is eligible for this handoff.
+  // Fail closed on Project, Temporary, existing chat or unknown redirects.
+  function validNewChatPage(){
+    try{
+      const url=new URL(globalThis.location.href);
+      return url.protocol==='https:' &&
+        (url.hostname==='chatgpt.com'||url.hostname==='chat.openai.com') &&
+        url.pathname==='/' && !url.search && !url.hash;
+    }catch{return false;}
+  }
+  function draftDiff(expected,actual){
+    const normalize=s=>s.replace(/^\uFEFF/,'').replace(/\r\n?/g,'\n');
+    const length=s=>new TextEncoder().encode(s).byteLength;
+    const count=s=>(s.match(/\n/g)||[]).length;
+    const reason=normalize(expected)===normalize(actual)
+      ? '仅换行符编码发生变化' : '存在不能忽略的文本差异';
+    return `${reason}（原文 ${length(expected)} 字节 / ${count(expected)} 个 LF；回读 ${length(actual)} 字节 / ${count(actual)} 个 LF）`;
+  }
   function send(payload){return new Promise((resolve,reject)=>chrome.runtime.sendMessage(payload,r=>{if(chrome.runtime.lastError)return reject(new Error(chrome.runtime.lastError.message));if(!r?.ok)return reject(new Error(r?.error||"连接研线失败"));resolve(r.data);}));}
   function editor(){return document.querySelector('#prompt-textarea,div[contenteditable="true"][data-lexical-editor],div[contenteditable="true"][data-testid="composer-input"],form [contenteditable="true"]');}
   function banner(message,error=false){
@@ -37,6 +55,7 @@
     return rendered.replace(/\n/g, '').length === 0;
   }
   function fill(text){
+    if(!validNewChatPage())return 'ineligible';
     const el=editor();if(!el)return 'missing';
     // Even an all-whitespace draft belongs to the user. Never overwrite it.
     if(!isEmptyEditor(el))return 'occupied';
@@ -52,12 +71,20 @@
       }
       // A truthy execCommand receipt or a 40-character prefix proves nothing:
       // don't acknowledge incomplete, truncated or newline-damaged drafts.
-      return ok && editorText(el)===text ? 'exact' : 'mismatch';
+      const observed=editorText(el);
+      if(ok && observed===text)return 'exact';
+      mismatchMeta=draftDiff(text,observed);
+      return 'mismatch';
     }catch{return 'mismatch';}
   }
   async function tick(){
     if(done||working)return;working=true;
     try {
+      if(!validNewChatPage()){
+        done=true;
+        banner('当前不是全新的普通 ChatGPT 对话，已停止预填；不会覆盖草稿或自动发送。',true);
+        return;
+      }
       if(!data)data=await send({type:'HANDOFF_GET'});
       if(!data?.text)return;
       attempts++;
@@ -67,13 +94,18 @@
         banner('研线已逐字核对预填草稿。检查内容后按发送；不会自动替你发送。');
         await send({type:'HANDOFF_ACK'});return;
       }
+      if(outcome==='ineligible'){
+        done=true;
+        banner('页面已切换，接续预填已取消。请返回普通新聊天检查状态。',true);
+        return;
+      }
       if(outcome==='occupied' || outcome==='mismatch'){
         // Leave the draft untouched (including partial/whitespace text).
         // Never retry insertion or ACK a partial result.
         done=true;
         banner(outcome==='occupied'
           ? '输入框已有草稿，研线不会覆盖或自动发送。可复制接续提示后自行处理。'
-          : '草稿填入结果不完整或与原文不一致，未确认成功；请手动检查或复制接续提示。',
+          : '草稿填入结果不完整或与原文不一致，未确认成功；'+mismatchMeta+'。请手动检查或复制接续提示。',
           true);
         return;
       }

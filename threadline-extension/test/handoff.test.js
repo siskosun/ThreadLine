@@ -27,7 +27,8 @@ async function exercise(initial,insertion,expected='LONG USER CONTINUATION',opti
       return {style:{},textContent:'',appendChild(){},onclick:null};
     },
     execCommand(_op,_ui,content){
-      const inserted=insertion==='partial'?content.slice(0,40):content;
+      const original=insertion==='partial'?content.slice(0,40):content;
+      const inserted=options.transformInserted?options.transformInserted(original):original;
       editor.textContent=inserted;
       editor.innerText=options.structured?inserted.split('\n').join('\n\n'):inserted;
       if(options.structured)
@@ -36,7 +37,8 @@ async function exercise(initial,insertion,expected='LONG USER CONTINUATION',opti
     }
   };
   const env={
-    document:doc,navigator:{clipboard:{writeText:async()=>{}}},
+    document:doc,location:{href:options.url||'https://chatgpt.com/'},
+    TextEncoder,navigator:{clipboard:{writeText:async()=>{}}},
     HTMLTextAreaElement:function(){},InputEvent:class {},
     chrome:{runtime:{
       id:'extension',
@@ -98,4 +100,39 @@ test('structural ProseMirror readback ignores visual blank lines between paragra
  });
  assert.equal(result.editor.innerText,'第一行\n\n第二行\n\n第三行');
  assert.ok(result.outgoing.includes('HANDOFF_ACK'));
+});
+
+test('handoff refuses Project, Temporary, saved chat, unknown query and foreign pages',async()=>{
+ for(const url of [
+  'https://chatgpt.com/?temporary-chat=true',
+  'https://chatgpt.com/g/g-p-test-project',
+  'https://chatgpt.com/c/abc-123',
+  'https://chatgpt.com/?unreviewed=1',
+  'https://example.com/'
+ ]){
+  const result=await exercise('','exact','NEVER INSERT',{url});
+  assert.equal(result.editor.innerText,'',url);
+  assert.ok(!result.outgoing.includes('HANDOFF_GET'),url);
+  assert.ok(!result.outgoing.includes('HANDOFF_ACK'),url);
+  assert.match(result.banner.children[0].textContent,/已停止预填/,url);
+ }
+});
+test('CRLF-only normalization stays unacknowledged and gets a diagnostic',async()=>{
+ const original='第一行\r\n第二行\r\n第三行';
+ const result=await exercise('','exact',original,{
+  transformInserted:s=>s.replace(/\r\n?/g,'\n')
+ });
+ assert.ok(!result.outgoing.includes('HANDOFF_ACK'));
+ assert.match(result.banner.children[0].textContent,/仅换行符编码发生变化/);
+});
+test('extra blank lines in a code fence are not canonicalized or ACKed',async()=>{
+ const fence=String.fromCharCode(96).repeat(3);
+ const original='第一行\r\n'+fence+'\r\nconst a=1\r\n'+fence+'\r\n\r\n最后一行';
+ const result=await exercise('\n','exact',original,{
+  textContent:'',paragraphs:1,breaks:1,structured:true,
+  transformInserted:s=>s.replace(/\r\n?/g,'\n').replace(fence+'\n\n',fence+'\n\n\n')
+ });
+ assert.ok(!result.outgoing.includes('HANDOFF_ACK'));
+ assert.match(result.banner.children[0].textContent,/不能忽略的文本差异/);
+ assert.match(result.banner.children[0].textContent,/未确认成功/);
 });
