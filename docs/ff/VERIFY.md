@@ -81,3 +81,11 @@ PR-2/3 在用户签署此门禁通过前不得开展真实网页自动化集成�
 - 新增 Node 测试复现用户报告中的 CRLF 仅规范化、代码围栏与连续空行引入额外换行两类差异；只能列出安全的长度、换行数量和差异类别，不得把后者自动认定为 exact 或 canonical_equivalent。原有正常预填测试不得回归。
 - [Linux CI 39732527414](https://github.com/siskosun/ThreadLine/actions/runs/39732527414) 与 [Windows CI 39732527403](https://github.com/siskosun/ThreadLine/actions/runs/39732527403) 已通过：122/122 Node，原 MV3 及 handoff 合成 E2E 全绿。
 - **真实 Edge 组合格式依旧未通过。** 后续可在用户创建的无发送测试标签中收集去内容化 DOM 结构差异，并完成修复后全文/规范化哈希对比；不得直接删除额外空行、不可擅自添加新规范化规则或消耗已用尽的人工发送额度。人工签署仍缺失。
+
+
+## 2026-10-22 空 P 换行双计的自动化回归（非真人 Edge）
+
+- 红灯复现：[Linux CI 39775625769](https://github.com/siskosun/ThreadLine/actions/runs/39775625769)：125 Node 测试中唯一失败是空 ProseMirror 段落双计 LF 的新增测试，未改变旧断言。
+- 修复：`handoff.js` 只对顶层多块结构中的 `P`、内含**唯一一个** `BR` 元素节点、无文本内容且 `innerText === "\\n"` 的占位段落做 `"\\n" → ""` 映射。真正的额外空 P、两个或更多 BR、PRE 和嵌套节点不能被这条逻辑吞掉。
+- 绿灯：[Linux CI 39775655808](https://github.com/siskosun/ThreadLine/actions/runs/39775655808) 和 [Windows CI 39775655955](https://github.com/siskosun/ThreadLine/actions/runs/39775655955) success；Windows 125/125 Node + 两套合成 Chromium E2E 通过，0 自动发送。
+- 不代表已在登录 Edge 验证这个提交。实际网页应先比对加载扩展文件 SHA-256 与 PR 提交中的内容，再重测最小样例和**重新生成的**综合样例；原历史 T6 原文不可找回，保持 NOT RUN。项目/临时聊天拒绝、草稿保护、重放安全、真实消息身份/最终回复完整性仍单独验收。

@@ -73,3 +73,12 @@
 - 预填失败横幅现在只披露预计/回读字节数与换行数，并区分“仅 CRLF 等行尾编码变化”与“还有不能忽略的文本差异”；不显示原文内容、不自动 ACK。原有严格全文一致判定维持不变，既有合成 23,569 字节正常文本验收保留。
 - 功能提交 `78d6d6f9cca26a4e8af0d286059d5b81f1702b03`（包含修复测试沙箱 URL 构造器）；[Linux CI 39732527414](https://github.com/siskosun/ThreadLine/actions/runs/39732527414) 与 [Windows CI 39732527403](https://github.com/siskosun/ThreadLine/actions/runs/39732527403) 均成功，`npm run verify` **122/122 Node、0 fail**，原有 MV3 持久化与接续合成 E2E 通过（0 自动发送）。
 - 此提交解决的是**执行端页面类型拒绝和差异可诊断性**，未解决真实 Edge 综合格式的无损预填；真实环境尚需在无发送测试标签采集去内容化的编辑器块级节点结构、首个差异位置及变换前后 CR/LF 计数，才能决定是否需要改变填入实现。Z0-LIVE 保持 `blocked / unsigned`；`docs/PLAN.md` 不变，PR 不合并、不发布。
+
+
+## 2026-10-22 编辑器空段落双计修复（根据本机脱敏报告；CI 已复核）
+
+- 本机 Agent 新报告确认 ProseMirror 编辑器在空段落创建 `<p><br></p>`，该元素的 `innerText` 为一个 LF；原 `editorText()` 对每个顶层块再 `join("\\n")`，将每个占位空段落计算两次。最小用例 `A\\n\\nB` 原本错误回读 `A\\n\\n\\nB`；此观察来自用户本机加载的较早代码，不等于最新 PR 实机验收。
+- 独立负向测试先在 GitHub Linux [run 39775625769](https://github.com/siskosun/ThreadLine/actions/runs/39775625769) 复现失败（125 项中 124 通过，唯一失败为 `one ProseMirror trailing BR is an empty paragraph`）。随后 PR #1 提交 `9d23426dc2c149bc3e6c492a99d9485303ed930a`：仅把严格单 BR 占位的空 P 映射为空字符串，再交由顶层 `join("\\n")` 连接；不忽略两个 BR、PRE、嵌套节点或实际额外空段落。
+- [Linux run 39775655808](https://github.com/siskosun/ThreadLine/actions/runs/39775655808) 与 [Windows run 39775655955](https://github.com/siskosun/ThreadLine/actions/runs/39775655955) 已通过；Windows 原始日志记录 Node **125/125**、0 fail，原 MV3 持久配置和 handoff 合成 Chromium E2E 通过，0 自动发送。
+- 原 23,569 字节综合载荷未找回，因此**原样 T6 NOT RUN**。本地版本与 PR 代码曾不一致；真实已登录 Edge 必须在加载这次提交且文件指纹核对后，重测受影响用例。上次 T2–T6 正式预填均被 ChatGPT 恢复的自有测试草稿挡住（未覆盖、不发送），不可记为成功。
+- 本轮不变更 `docs/PLAN.md`、不签署 Z0-LIVE、不合并或发布。扩展层双分支与异常恢复等任务仍依正式计划门禁。
