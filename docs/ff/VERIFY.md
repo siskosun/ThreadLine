@@ -56,3 +56,9 @@ PR-2/3 在用户签署此门禁通过前不得开展真实网页自动化集成�
 - Edge 自带 Copilot 侧栏抢占显示时，可在单独标签打开扩展自身 `panel.html` 作为只读/操作面板的替代路径，但仍需确认它没有向 ChatGPT 自动发送。
 
 若后续各项通过，由用户将对应脱敏证据、具体 PR HEAD 和验收范围在 GitHub 留言签署；再按唯一 `docs/PLAN.md` 的证据门禁推进。
+
+## 2026-10-22 接续草稿无发送门禁的 CI 增补（合成，非真实账号）
+- `handoff.js` 的填入成功判定由原“长度达到前 40 字符”改为“编辑器完整原始文本与预填内容逐字相同”；遇到已有草稿（包括纯空白）、部分插入、连续空行变形均不得误报成功或 ACK，也不得自动发送。
+- `test/handoff.test.js` 验证前缀 40 字符假成功被拒绝；`test/handoff-e2e.py` 在真实 MV3 扩展 + 离线合成 ChatGPT 编辑器下验证 23,569 字节含 Unicode、NBSP、代码块及换行的 exact 预填/回读；已有草稿保持原状、自动发送为 0。
+- [Linux 39711053880](https://github.com/siskosun/ThreadLine/actions/runs/39711053880) 与 [Windows 39711053863](https://github.com/siskosun/ThreadLine/actions/runs/39711053863)：112/112 Node 与两项合成扩展 E2E 通过。没有真实用户账号操作。
+- Z0-LIVE 当前仍是 `blocked / NOT SIGNED`。操作者已经使用 3/3 人工发送测试预算，不增加发送；余下真实网页无发送验收和适用人工签署仍要完成。

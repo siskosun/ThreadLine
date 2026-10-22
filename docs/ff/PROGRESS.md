@@ -37,3 +37,11 @@
 - **证据边界：** 这些是操作者对两个页面的身份与内容配对检查；生成重叠窗口没有机器记录（第一次机器快照时两页已空闲）；角色来源未通过原始分页用户消息再做字节哈希验证；以上结束现象不能独立保证完整可信的终止信号。扩展层 A/B 与会话 ID 的持久绑定尚未实现，不能把页面级配对当作 P2 完成。
 - 新的选择器陷阱：`div.whitespace-pre-wrap` 在空态可能优先匹配欢迎语。**不可使用第一条、最后一条或仅按内容包含匹配就认定消息身份。** PR #1 的只读自检只提供未归属页面文本提示；源码层可靠配对仍需会话 ID、角色、未损全文与完成信号。
 - 本次 PR #1 补强了只读探针与回归，禁止从欢迎语类页面文字推断用户消息，测试结论以每个提交 SHA 对应的 GitHub CI 为准。Z0-LIVE 仍 `blocked / NOT SIGNED`，`docs/PLAN.md` 不变；不补发、不自动合并、不解锁 P2/P3。
+
+
+## 2026-10-22 接续草稿真实性与无发送保护（合成网页验证）
+- PR #1 的 `handoff.js` 删除原先“填入字符数达到 40 即算成功”的宽松确认。现通过实际编辑器 `innerText` / `value` **全文逐字回读相等**才发送 `HANDOFF_ACK`。任何部分插入、换行变形均显示未确认提示并保留原待处理记录；不会重复插入或自动发送。
+- 已有草稿连纯空白文本都视为用户数据，不清除、不覆盖；操作结束时提供复制提示。新增 Node 虚拟 DOM 测试模拟“只插入原文前 40 字符但 execCommand 返回 true”，要求不 ACK。
+- 合成浏览器用 Playwright 加载真实 MV3 扩展，后台调用原有 `NEW_CHAT` 创建标签页，`handoff.js` 经过 `execCommand('insertText')` 填入含中文、emoji、NBSP、Markdown 代码块与换行的 **23,569 UTF-8 字节**文本，并逐字回读相等；分别验证空白草稿及普通多行已有草稿不覆盖。连续空行场景允许等价结果被逐字核对后 ACK，或不一致时拒绝 ACK，且全部场景 0 次自动发送。
+- [Linux CI 39711053880](https://github.com/siskosun/ThreadLine/actions/runs/39711053880)、[Windows CI 39711053863](https://github.com/siskosun/ThreadLine/actions/runs/39711053863) 均成功：Node **112/112**、既有合成 Chromium MV3 集成、新增 `test/handoff-e2e.py` 通过。
+- 以上不代表登录的 Edge 网页已验证近 24KB 输入，也没有验证真实 Project/Temporary 拒绝、断网/限流、扩展层双会话身份持久化或最终回复数据可信结束。Z0-LIVE 继续 `blocked / unsigned`。PR 不合并、无 Release。
