@@ -4,13 +4,14 @@ const fs=require('node:fs');
 const vm=require('node:vm');
 const source=fs.readFileSync(require('node:path').join(__dirname,'..','capture-main.js'),'utf8');
 function response(payload,status=200){return {ok:status<400,status,async json(){return payload}};}
-async function simulate(api){
+async function simulate(api, options={}){
   const listeners=[],posted=[],requested=[],location={origin:'https://chatgpt.com',href:'https://chatgpt.com/g/g-p-123/c/abc-123',pathname:'/g/g-p-123/c/abc-123'};
   const window={location,addEventListener(type,cb){if(type==='message')listeners.push(cb);},postMessage(data,origin){posted.push(data);for(const cb of listeners)cb({source:window,origin,data});},async fetch(url,opts={}){requested.push({url:String(url),headers:new Headers(opts.headers||{})});return api(String(url),opts);}};
   vm.runInNewContext(source,{window,location,Headers,URL,URLSearchParams,AbortController,console,setTimeout,clearTimeout,structuredClone},{filename:'capture-main.js'});
   const id='cap-example';
   window.postMessage({channel:'threadline-capture-v2',direction:'extension-to-main',kind:'start',requestId:id,conversationId:'abc-123'},location.origin);
-  let elapsed=0;while(!posted.some(x=>x.kind==='done'||x.kind==='error')&&elapsed<600){await new Promise(r=>setTimeout(r,10));elapsed+=10;}
+  const maxWait=Number(options.maxWaitMs)||600;
+  let elapsed=0;while(!posted.some(x=>x.kind==='done'||x.kind==='error')&&elapsed<maxWait){await new Promise(r=>setTimeout(r,10));elapsed+=10;}
   return {posted,requested,window};
 }
 test('CGO-style pagination follows before cursor and assembles two pages without exposing credentials',async()=>{
@@ -37,6 +38,13 @@ test('if both endpoints fail, reports failure rather than full success',async()=
   const r=await simulate(async()=>response({},401));
   assert.equal(r.posted.find(x=>x.kind==='done'),undefined);
   assert.match(r.posted.find(x=>x.kind==='error')?.message||'',/401/);
+});
+test('rate-limit and service-unavailable responses retry once then fail closed',async()=>{
+  let requests=0;
+  const r=await simulate(async()=>{requests++;return response({},requests%2?429:503);},{maxWaitMs:6000});
+  assert.ok(requests>=4,'both pagination and legacy paths should each retry once');
+  assert.equal(r.posted.find(x=>x.kind==='done'),undefined);
+  assert.ok(r.posted.find(x=>x.kind==='error'));
 });
 test('current assistant hidden analysis messages are filtered from capture',async()=>{
   const r=await simulate(async()=>response({messages:[

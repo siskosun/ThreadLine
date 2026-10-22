@@ -95,6 +95,20 @@ def run():
       assert weak['ok'],weak
       assert not weak['data']['page']['parts']['conversation']['available'],weak
       assert weak['data']['page']['parts']['conversation']['candidate'],weak
+      def health_for(url):
+        tid=panel.evaluate('''async url => (await chrome.tabs.query({})).find(t=>t.url===url)?.id''',url)
+        assert isinstance(tid,int), f'missing test tab {url}'
+        observed=panel.evaluate('''async tabId => chrome.runtime.sendMessage({type:'HEALTH_CHECK',tabId})''',tid)
+        assert observed['ok'],observed
+        return observed['data']['page']
+      plain=health_for('https://chatgpt.com/c/demo-alpha')
+      assert plain['pageType']=='plain_chat' and plain['forkAllowed'] is True,plain
+      project=ctx.new_page();project.goto('https://chatgpt.com/g/g-p-123/c/demo-alpha',wait_until='domcontentloaded');project.wait_for_timeout(500)
+      project_health=health_for('https://chatgpt.com/g/g-p-123/c/demo-alpha')
+      assert project_health['pageType']=='project_chat' and project_health['forkAllowed'] is False,project_health
+      temporary=ctx.new_page();temporary.goto('https://chatgpt.com/?temporary-chat=true',wait_until='domcontentloaded');temporary.wait_for_timeout(500)
+      temporary_health=health_for('https://chatgpt.com/?temporary-chat=true')
+      assert temporary_health['pageType']=='temporary_chat' and temporary_health['forkAllowed'] is False,temporary_health
       backup=panel.evaluate('''async () => chrome.runtime.sendMessage({type:'BACKUP_EXPORT'})''')
       assert backup['ok'] and backup['data']['state']['projects'][0]['knowledgeVersion']==1
       panel.evaluate('''async () => {const db=await ThreadLineCaptureDB.getRun('not-exist');return db;}''')

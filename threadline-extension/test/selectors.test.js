@@ -82,3 +82,51 @@ test('unattributed welcome and user bubbles inside /c/ remain unverified even if
   assert.equal(r.parts.conversation.candidate,true);
   assert.match(r.notes,/欢迎语/);
 });
+
+test('page classification allows only plain chats and fails closed for project, temporary and unknown',()=>{
+  assert.equal(Selector.pageType('https://chatgpt.com/'),'plain_chat');
+  assert.equal(Selector.pageType('https://chatgpt.com/c/abc-123'),'plain_chat');
+  assert.equal(Selector.pageType('https://chatgpt.com/c/ABC-123/'),'plain_chat');
+  assert.equal(Selector.pageType('https://chatgpt.com/?model=auto'),'plain_chat');
+  assert.equal(Selector.pageType('https://chatgpt.com/?temporary-chat=false'),'plain_chat');
+  assert.equal(Selector.pageType('https://chatgpt.com/g/g-p-abc/c/abc-123'),'project_chat');
+  assert.equal(Selector.pageType('https://chatgpt.com/g/g-p-abc/project'),'project_chat');
+  assert.equal(Selector.pageType('https://chatgpt.com/?temporary-chat=true'),'temporary_chat');
+  assert.equal(Selector.pageType('https://chatgpt.com/?temporary_chat=true'),'temporary_chat');
+  assert.equal(Selector.pageType('https://chatgpt.com/?temporary-chat=1'),'unknown');
+  assert.equal(Selector.pageType('https://chatgpt.com/?foo=bar'),'unknown');
+  assert.equal(Selector.pageType('https://chatgpt.com/share/abc'),'unknown');
+  assert.equal(Selector.pageType('https://chatgpt.com/gpts'),'unknown');
+  assert.equal(Selector.pageType('https://chatgpt.com/c/'),'unknown');
+  assert.equal(Selector.pageType('not a url'),'unknown');
+  for (const url of ['https://chatgpt.com/','https://chatgpt.com/c/abc-123']) {
+    assert.deepEqual(Selector.forkEligibility(url).allowed,true,url);
+  }
+  for (const url of ['https://chatgpt.com/g/g-p-abc/c/abc-123',
+    'https://chatgpt.com/?temporary-chat=true','https://chatgpt.com/?foo=bar',
+    'https://chatgpt.com/share/abc','not a url']) {
+    assert.equal(Selector.forkEligibility(url).allowed,false,url);
+  }
+});
+
+test('probe exposes Fork eligibility and fails closed in the displayed notes',()=>{
+  const doc={querySelector(selector){
+    if(selector==='#prompt-textarea')return {closest(){return null;}};
+    return null;
+  }};
+  const plain=Selector.probe(doc,'https://chatgpt.com/c/abc-123');
+  assert.equal(plain.pageType,'plain_chat');
+  assert.equal(plain.forkAllowed,true);
+  assert.match(plain.notes,/页面类型：普通聊天；Fork 允许/);
+  for (const [url,type] of [
+    ['https://chatgpt.com/g/g-p-abc/c/abc-123','project_chat'],
+    ['https://chatgpt.com/?temporary-chat=true','temporary_chat'],
+    ['https://chatgpt.com/?foo=bar','unknown']
+  ]) {
+    const r=Selector.probe(doc,url);
+    assert.equal(r.pageType,type,url);
+    assert.equal(r.forkAllowed,false,url);
+    assert.match(r.notes,/Fork 拒绝/,url);
+    assert.match(r.notes,/不能进入 Fork/,url);
+  }
+});

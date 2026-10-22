@@ -3,10 +3,11 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
 const main=fs.readFileSync(path.join(__dirname,'..','capture-main.js'),'utf8');
 const isolated=fs.readFileSync(path.join(__dirname,'..','capture-page.js'),'utf8');
 function res(data,status=200){return{ok:status<400,status,async json(){return data}};}
-async function scenario(fail){
+async function scenario(fail, options={}){
   const listeners=[],actions=[],tabListeners=[],location={origin:'https://chatgpt.com',pathname:'/c/t1-123',href:'https://chatgpt.com/c/t1-123'};
   const window={location,addEventListener(type,fn){if(type==='message')listeners.push(fn)},postMessage(data,origin){for(const fn of listeners)fn({source:window,origin,data})},fetch:async()=>fail?res({},401):res({messages:[{id:'m1',author:{role:'user'},content:{parts:['a question']}}],page_info:{has_previous_page:false}})};
-  const document={querySelector(){return null},querySelectorAll(){return [{getAttribute(name){return name==='data-message-author-role'?'user':'dom1'},innerText:'visible question'}]}};
+  const rows=options.noRole?[]:[{getAttribute(name){return name==='data-message-author-role'?'user':'dom1'},innerText:'visible question'}];
+  const document={querySelector(){return null},querySelectorAll(){return rows}};
   const chrome={runtime:{id:'ext',lastError:null,sendMessage(payload,cb){actions.push(payload);Promise.resolve().then(()=>cb({ok:true,data:{}}))},onMessage:{addListener(fn){tabListeners.push(fn)}}}};
   vm.runInNewContext(main,{window,location,Headers,URL,URLSearchParams,AbortController,setTimeout,console},{filename:'main.js'});
   vm.runInNewContext(isolated,{window,location,document,chrome,console,Promise},{filename:'page.js'});
@@ -26,4 +27,16 @@ test('if API access fails, bridge uses visibly incomplete DOM fallback and reset
   assert.equal(actions.at(-1).complete,false);
   assert.equal(actions.at(-1).mode,'visible-dom');
   assert.match(actions.at(-1).notice,/不能当作完整/);
+});
+test('welcome text without a role marker never becomes a captured message',async()=>{
+  // The synthetic page may contain a welcome bubble in
+  // `div.whitespace-pre-wrap`; capture-page only trusts role-marked nodes.
+  const actions=await scenario(true,{noRole:true});
+  assert.equal(actions.some(m=>m.type==='CAPTURE_PAGE'),false);
+  const end=actions.at(-1);
+  assert.equal(end.type,'CAPTURE_END');
+  assert.equal(end.complete,false);
+  assert.equal(end.count,0);
+  assert.equal(end.mode,'visible-dom');
+  assert.match(end.notice,/不能当作完整/);
 });

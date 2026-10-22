@@ -15,6 +15,44 @@ const ThreadLineSelectors = (() => {
     }
     return null;
   }
+  function classifyPage(origin) {
+    let url;
+    try { url = new URL(origin); } catch { return {type:'unknown', reason:'invalid_url'}; }
+    if (!['chatgpt.com', 'chat.openai.com'].includes(url.hostname))
+      return {type:'unknown', reason:'unsupported_origin'};
+    const params = url.searchParams;
+    const temporary = params.get('temporary-chat') ?? params.get('temporary_chat');
+    if (temporary !== null) {
+      if (temporary === 'true') return {type:'temporary_chat', reason:'temporary_chat_parameter'};
+      if (temporary !== 'false') return {type:'unknown', reason:'unrecognized_temporary_chat_value'};
+    }
+    const path = url.pathname;
+    const segments = path.split('/').filter(Boolean);
+    if (segments[0] === 'g') {
+      return /^g-p-[a-z0-9_-]+$/i.test(segments[1] || '')
+        ? {type:'project_chat', reason:'project_scoped_path'}
+        : {type:'unknown', reason:'unrecognized_g_path'};
+    }
+    if (/^\/(share|auth|login)(\/|$)/i.test(path))
+      return {type:'unknown', reason:'non_chat_route'};
+    // Refuse to infer a plain chat from an unfamiliar query. A new ChatGPT
+    // parameter must be reviewed before it can qualify for Fork.
+    const allowedQuery = new Set(['model','reasoning','show','temporary-chat','temporary_chat']);
+    for (const key of params.keys()) {
+      if (!allowedQuery.has(key.toLowerCase()))
+        return {type:'unknown', reason:'unrecognized_query'};
+    }
+    if (path === '/' || path === '') return {type:'plain_chat', reason:'new_chat'};
+    if (/^\/c\/[a-z0-9-]+\/?$/i.test(path))
+      return {type:'plain_chat', reason:'saved_plain_chat'};
+    return {type:'unknown', reason:'unrecognized_path'};
+  }
+  function pageType(origin) { return classifyPage(origin).type; }
+  function forkEligibility(origin) {
+    const classified = classifyPage(origin);
+    return {allowed:classified.type === 'plain_chat', pageType:classified.type,
+      reason:classified.reason};
+  }
   function probe(doc, origin) {
     const host = new URL(origin).hostname;
     if (host !== 'chatgpt.com' && host !== 'chat.openai.com')
@@ -53,16 +91,24 @@ const ThreadLineSelectors = (() => {
           observed:{whitespacePreWrap:!!textBubble, paragraph:!!prose}};
       }
     }
+    const kind = pageType(origin);
+    const fork = forkEligibility(origin);
+    const pageLabel = {plain_chat:'普通聊天',project_chat:'Project Chat',
+      temporary_chat:'Temporary Chat',unknown:'无法可靠判断'}[kind] || '无法可靠判断';
     const status = parts.composer.available ? 'basic_ready' : 'degraded';
     let notes = parts.composer.available
       ? '检测到输入框。采集分页和网页写入操作仍需单独真实验收。'
       : '未发现可识别输入框，可能尚未登录或页面结构已变化。';
     if (parts.conversation.candidate)
       notes += ' 只找到无角色标记的页面文字（可能含欢迎语），无法判定用户消息或回复完整性。';
+    notes += ` 页面类型：${pageLabel}；Fork ${fork.allowed ? '允许' : '拒绝'}。`;
+    if (!fork.allowed)
+      notes += ' 第一期只允许经验证的普通聊天；当前页面或未知状态不能进入 Fork。';
     return {status,parts,operations:{capture:'unverified',createProject:'unverified',
-      move:'unverified',archive:'unverified',webAnalysis:'unverified'},notes};
+      move:'unverified',archive:'unverified',webAnalysis:'unverified'},notes,
+      pageType:kind,forkAllowed:fork.allowed,forkReason:fork.reason};
   }
-  return {RULES,probe};
+  return {RULES,probe,pageType,forkEligibility};
 })();
 if (typeof globalThis !== 'undefined') globalThis.ThreadLineSelectors = ThreadLineSelectors;
 if (typeof module !== 'undefined') module.exports = ThreadLineSelectors;

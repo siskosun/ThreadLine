@@ -13,14 +13,33 @@
     if(error)host.style.borderColor='#deac92';
   }
   function editorText(el) {
-    // innerText is the relevant displayed text in ProseMirror; textContent
-    // loses layout line breaks. Never trim or normalize a user's draft.
-    return el.isContentEditable ? String(el.innerText ?? '') : String(el.value ?? '');
+    if (!el.isContentEditable) return String(el.value ?? '');
+    const blocks = el.children ? [...el.children] : [];
+    // ProseMirror's innerText includes visual blank lines between block nodes.
+    // Only use the structural form when there are multiple block-level nodes;
+    // a single wrapper or a plain editor keeps its native innerText.
+    const blockLevel = blocks.length > 1 &&
+      blocks.every(child => /^(P|PRE|LI|BLOCKQUOTE)$/i.test(child.tagName || ''));
+    if (blockLevel)
+      return blocks.map(child => String(child.innerText ?? child.textContent ?? '')).join('\n');
+    return String(el.innerText ?? '');
+  }
+  function isEmptyEditor(el) {
+    if (!el.isContentEditable) return !String(el.value ?? '').length;
+    const rendered = String(el.innerText ?? '');
+    const content = String(el.textContent ?? '');
+    // ProseMirror renders an otherwise empty editor with one trailing break,
+    // which makes innerText look like "\n". A real draft has text nodes,
+    // spaces, additional paragraphs/breaks, or non-newline rendered text.
+    if (content.length) return false;
+    if ((el.querySelectorAll?.('p')?.length || 0) > 1) return false;
+    if ((el.querySelectorAll?.('br')?.length || 0) > 1) return false;
+    return rendered.replace(/\n/g, '').length === 0;
   }
   function fill(text){
     const el=editor();if(!el)return 'missing';
     // Even an all-whitespace draft belongs to the user. Never overwrite it.
-    if(editorText(el).length)return 'occupied';
+    if(!isEmptyEditor(el))return 'occupied';
     try{
       el.focus();
       let ok=false;
