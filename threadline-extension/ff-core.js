@@ -148,6 +148,12 @@ const ThreadLineFFCore = (() => {
         "terminal state cannot be replaced without explicit new attempt");
     } else {
       assert(!manualNewAttempt, "manual retry requires terminal failed/unknown state");
+      // A pending branch can have only one active attempt. Starting a new ID
+      // before the current attempt becomes failed/unknown would let late
+      // events from either ID overwrite the branch's single status.
+      const active = currentBranch.attempts.at(-1);
+      if (active) assert(prior === active && active.status === "pending",
+        "another active attempt is already pending");
       assert(!prior || prior.status === "pending", "terminal attempt immutable");
       if (prior) assert(PHASES.indexOf(phase) >= PHASES.indexOf(prior.phase),
         "attempt phase cannot move backwards");
