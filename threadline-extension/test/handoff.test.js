@@ -52,7 +52,10 @@ async function exercise(initial,insertion,expected='LONG USER CONTINUATION',opti
       sendMessage(payload,callback){
         outgoing.push(payload.type);
         callback(payload.type==='HANDOFF_GET'
-          ? {ok:true,data:{text:expected}} : {ok:true,data:{ok:true}});
+          ? {ok:true,data:{text:expected,autoAttempted:options.alreadyAttempted===true}} :
+          payload.type==='HANDOFF_BEGIN'
+          ? {ok:true,data:{autoFill:options.beginAllowed!==false}} :
+          {ok:true,data:{ok:true}});
       }
     }},
     setInterval(){return 1;},clearInterval(){},setTimeout(){},
@@ -204,4 +207,19 @@ test('sole empty ProseMirror paragraph with placeholder BR is safe to fill',asyn
    textContent:'',paragraphs:1,breaks:1,childNodes:[p]
  });
  assert.ok(result.outgoing.includes('HANDOFF_ACK'));
+});
+
+test('an already attempted handoff never re-inserts automatically on reload',async()=>{
+ const result=await exercise('','exact','NO REPLAY',{alreadyAttempted:true});
+ assert.equal(result.editor.innerText,'');
+ assert.ok(!result.outgoing.includes('HANDOFF_BEGIN'));
+ assert.ok(!result.outgoing.includes('HANDOFF_ACK'));
+ assert.match(result.banner.children[0].textContent,/停止自动重试/);
+});
+test('a denied reservation must not insert or acknowledge a draft',async()=>{
+ const result=await exercise('','exact','NO REPLAY',{beginAllowed:false});
+ assert.equal(result.editor.innerText,'');
+ assert.ok(result.outgoing.includes('HANDOFF_BEGIN'));
+ assert.ok(!result.outgoing.includes('HANDOFF_ACK'));
+ assert.match(result.banner.children[0].textContent,/停止自动重试/);
 });
