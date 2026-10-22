@@ -20,13 +20,13 @@ def run():
                     f"--disable-extensions-except={EXT}",
                     f"--load-extension={EXT}",
                 ])
-            current = {"draft": ""}
+            current = {"draft": "", "editable": "true"}
             def serve(route):
                 initial = html.escape(current["draft"])
                 route.fulfill(status=200, content_type="text/html; charset=utf-8",
                     body=f"""<!doctype html><html><title>Offline ChatGPT New Chat</title>
                     <form id="composer">
-                      <div id="prompt-textarea" contenteditable="true" style="white-space:pre-wrap">{initial}</div>
+                      <div id="prompt-textarea" contenteditable="{current['editable']}" style="white-space:pre-wrap">{initial}</div>
                       <button type="submit">Send</button>
                     </form>
                     <script>window.submissions=0;
@@ -128,6 +128,25 @@ def run():
             assert page3.locator("#prompt-textarea").evaluate("(el)=>el.innerText") == current["draft"]
             assert page3.evaluate("window.submissions") == 0
             assert status_for(tid3) is not None
+            page3.close()
+
+            # A one-shot reservation prevents another automatic attempt after
+            # an uncertain insertion, even when the tab reloads into a now
+            # writable empty composer. No user message is ever submitted.
+            current["draft"] = ""
+            current["editable"] = "false"
+            page4, tid4 = open_with_draft("RESERVATION MUST NOT REPLAY")
+            expect(page4.locator("#tl-handoff-banner")).to_contain_text("未确认成功", timeout=24000)
+            attempt = status_for(tid4)
+            assert attempt and attempt.get("attemptedAt"), attempt
+            assert page4.evaluate("window.submissions") == 0
+            current["editable"] = "true"
+            page4.reload(wait_until="domcontentloaded", timeout=15000)
+            expect(page4.locator("#tl-handoff-banner")).to_contain_text("停止自动重试", timeout=24000)
+            assert page4.locator("#prompt-textarea").evaluate("(el)=>el.innerText") == ""
+            assert status_for(tid4) is not None
+            assert page4.evaluate("window.submissions") == 0
+            page4.close()
             ctx.close()
     print("PASS: real MV3 handoff exact 23569-byte multiline readback; "
           "whitespace/normal drafts untouched; only exact ACK; 0 sends (synthetic only)")
