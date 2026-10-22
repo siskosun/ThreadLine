@@ -41,7 +41,9 @@ const ThreadLineSelectors = (() => {
     // message's role, source, cardinality or completeness. Expose as candidate only.
     // Unattributed page text is not a user or assistant message. In an
     // empty chat, whitespace-pre-wrap may even be the welcome prompt.
-    const hasConversationRoute = /\\/c\\/[a-z0-9-]+/i.test(new URL(origin).pathname);
+    const segments = new URL(origin).pathname.split('/').filter(Boolean);
+    const hasConversationRoute = segments.some((segment,i) =>
+      segment === 'c' && /^[a-z0-9-]+$/i.test(segments[i+1] || ''));
     if (!parts.conversation.available && hasConversationRoute) {
       const textBubble = first(doc, ['main div.whitespace-pre-wrap']);
       const prose = first(doc, ['main p']);
