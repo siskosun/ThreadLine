@@ -138,6 +138,9 @@ const ThreadLineFFCore = (() => {
     assert(Number.isSafeInteger(expectedRevision) && expectedRevision === exp.revision,
       "stale revision");
     const currentBranch = exp.branches[branch], prior = currentBranch.attempts.find(a => a.id === attemptId);
+    const counterpart = exp.branches[branch === "A" ? "B" : "A"];
+    assert(!counterpart.attempts.some(a => a.id === attemptId),
+      "attempt ID already belongs to another branch");
     const terminal = currentBranch.status !== "pending";
     if (terminal) {
       assert(manualNewAttempt === true && ["failed", "unknown"].includes(currentBranch.status) &&
