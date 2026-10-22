@@ -32,7 +32,11 @@ async function exercise(initial,insertion,expected='LONG USER CONTINUATION',opti
       editor.textContent=inserted;
       editor.innerText=options.structured?inserted.split('\n').join('\n\n'):inserted;
       if(options.structured)
-        editor.children=inserted.split('\n').map(line=>({tagName:'P',innerText:line,textContent:line}));
+        editor.children=(options.mapBlocks||((blocks)=>blocks))(
+          inserted.split('\n').map(line=>line
+          ? {tagName:'P',innerText:line,textContent:line}
+          : {tagName:'P',innerText:'\n',textContent:'',
+             childNodes:[{nodeType:1,tagName:'BR'}]}));
       return true;
     }
   };
@@ -135,4 +139,39 @@ test('extra blank lines in a code fence are not canonicalized or ACKed',async()=
  assert.ok(!result.outgoing.includes('HANDOFF_ACK'));
  assert.match(result.banner.children[0].textContent,/不能忽略的文本差异/);
  assert.match(result.banner.children[0].textContent,/未确认成功/);
+});
+
+
+test('one ProseMirror trailing BR is an empty paragraph, not an extra newline',async()=>{
+ const result=await exercise('\n','exact','A\n\nB',{
+   textContent:'',paragraphs:1,breaks:1,structured:true
+ });
+ assert.equal(result.editor.children.length,3);
+ assert.equal(result.editor.children[1].innerText,'\n');
+ assert.equal(result.editor.children[1].textContent,'');
+ assert.ok(result.outgoing.includes('HANDOFF_ACK'),
+   'A + empty P + B must round-trip as A LF LF B');
+ assert.match(result.banner.children[0].textContent,/逐字核对/);
+});
+test('a real additional blank paragraph remains a real difference, never ACKs',async()=>{
+ const expected='A\n\nB';
+ const result=await exercise('\n','exact',expected,{
+   textContent:'',paragraphs:1,breaks:1,structured:true,
+   transformInserted:s=>s.replace('A\n\nB','A\n\n\nB')
+ });
+ assert.equal(result.editor.children.length,4);
+ assert.ok(!result.outgoing.includes('HANDOFF_ACK'));
+ assert.match(result.banner.children[0].textContent,/未确认成功/);
+});
+test('a non-placeholder P with a BR must not be erased by structural readback',async()=>{
+ const expected='A\n\nB';
+ const result=await exercise('\n','exact',expected,{
+   textContent:'',paragraphs:1,breaks:1,structured:true,
+   mapBlocks:blocks=>blocks.map((block,index)=> index===1
+     ? {tagName:'P',innerText:'\n',textContent:'',
+        childNodes:[{nodeType:1,tagName:'BR'},{nodeType:1,tagName:'BR'}]}
+     : block)
+ });
+ assert.ok(!result.outgoing.includes('HANDOFF_ACK'),
+   'two BR nodes are not a lone placeholder and must stay unverified');
 });
