@@ -72,6 +72,7 @@ function runtime() {
     await hold.entered;
     const oldReads=reads;
     const op=promiseFactory();
+    op.catch(()=>{}); // Attach a rejection handler before releasing the queued write.
     // The request has checked the prior on-state and is waiting for
     // the serialize queue. This catches an off-check done only BEFORE enqueue.
     for(let i=0;i<60 && reads===oldReads;i++)
@@ -79,7 +80,7 @@ function runtime() {
     assert.ok(reads>oldReads,'operation must enter its admission check');
     hold.release();
     await off;
-    return op;
+    return {op};
   }
   return {message,records,queuedWhileEnabled};
 }
@@ -87,7 +88,7 @@ function runtime() {
 test('turning FF off before queued CREATE commits must reject the stale operation',async()=>{
  const env=runtime();
  await env.message({type:'FF_SET_ENABLED',enabled:true,ack:'local-only-no-send'});
- const op=await env.queuedWhileEnabled(()=>env.message({
+ const {op}=await env.queuedWhileEnabled(()=>env.message({
    type:'FF_CREATE',operationId:'off_race001',w0:'W',p:'P'
  }));
  await assert.rejects(op,/disabled/);
@@ -98,7 +99,7 @@ test('turning FF off before queued RECORD commits must reject the stale operatio
  const env=runtime();
  await env.message({type:'FF_SET_ENABLED',enabled:true,ack:'local-only-no-send'});
  const first=await env.message({type:'FF_CREATE',operationId:'off_seed001',w0:'W',p:'P'});
- const op=await env.queuedWhileEnabled(()=>env.message({
+ const {op}=await env.queuedWhileEnabled(()=>env.message({
    type:'FF_RECORD',experimentId:first.id,branch:'A',expectedRevision:0,
    operationId:'off_race002',attemptId:'att_race002',status:'pending',phase:'created'
  }));
