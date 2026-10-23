@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>研线 · Fork 双分支实验</title>
+  <style>
+    :root{color-scheme:light;font-family:system-ui,-apple-system,"Microsoft YaHei",sans-serif;color:#243247;background:#f5f7fa}
+    *{box-sizing:border-box}body{max-width:960px;margin:32px auto;padding:0 18px 50px}
+    header{margin-bottom:20px}h1{font-size:25px;line-height:1.4;margin:0 0 6px}h2{font-size:17px;margin:0 0 12px}
+    p{line-height:1.65}.subtle{color:#5e6e83;font-size:13px}.surface{background:white;border:1px solid #dce3ed;border-radius:14px;padding:22px;margin:14px 0;box-shadow:0 3px 16px #182a4d06}
+    .line{display:flex;gap:14px;flex-wrap:wrap;align-items:center}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    textarea{font:14px/1.5 ui-monospace,Consolas,monospace;resize:vertical;width:100%;min-height:170px;background:#fff;border:1px solid #cbd6e4;border-radius:9px;padding:12px}
+    textarea:focus,button:focus-visible,input:focus-visible{outline:3px solid #b6d3f9}
+    label{font-weight:600;display:block;margin-bottom:8px}input[type=checkbox]{accent-color:#2868a5;width:18px;height:18px}
+    button{background:#215e9b;border:0;color:white;border-radius:8px;padding:10px 15px;font-size:14px;cursor:pointer}
+    button[disabled]{opacity:.4;cursor:not-allowed}button.secondary{background:#eaf0f7;color:#25384f}
+    #ff-notice{min-height:1.5em}#ff-notice[data-error=true]{color:#b43826}
+    #ff-list{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+    #ff-list button{max-width:100%;overflow-wrap:anywhere}
+    #ff-text{white-space:pre-wrap;overflow-wrap:anywhere;max-height:320px;overflow-y:auto;border:1px solid #dce3ed;border-radius:8px;background:#f8fafc;padding:14px;font:13px/1.55 ui-monospace,Consolas,monospace}
+    .mono{font:13px ui-monospace,Consolas,monospace;overflow-wrap:anywhere}
+    @media(max-width:620px){.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <header><h1>Fork 双分支对照 · 基础开发版</h1>
+    <p class="subtle">独立于原有课题。当前阶段只冻结材料并保存本地实验，不会新建网页会话、操作草稿或自动发送。</p>
+  </header>
+  <section class="surface" aria-label="功能开关">
+    <label class="line" for="ff-enable"><input type="checkbox" id="ff-enable"/>启用本地 Fork 实验存储</label>
+    <p class="subtle">功能默认关闭。启用只允许保存实验和查看哈希；不会访问 ChatGPT 页面。原有课题与备份不受影响。</p>
+    <p id="ff-notice" role="status" aria-live="polite">正在检查本地状态…</p>
+  </section>
+  <div id="ff-local" hidden>
+    <section class="surface" aria-label="新建冻结实验">
+      <h2>冻结共同材料与指令</h2>
+      <form id="ff-create">
+        <div class="grid">
+          <div><label for="ff-w0">共同材料 W₀</label><textarea id="ff-w0" spellcheck="false" placeholder="两条未来分支共同使用的背景资料"></textarea></div>
+          <div><label for="ff-p">任务指令 P</label><textarea id="ff-p" required spellcheck="false" placeholder="写下两条分支要执行的同一任务"></textarea></div>
+        </div>
+        <p id="ff-bytes" class="subtle" aria-live="polite">最终发送文本：0 / 24,000 UTF-8 字节</p>
+        <button id="ff-save" type="submit">冻结并保存在本地</button>
+      </form>
+    </section>
+    <section class="surface" aria-label="实验列表"><h2>已冻结的实验</h2>
+      <p class="subtle">本地持久化，无法从本阶段恢复为 ChatGPT 会话；后续阶段再进行人工发送。</p>
+      <button class="secondary" id="ff-refresh" type="button">刷新列表</button>
+      <div id="ff-list"></div>
+    </section>
+    <section class="surface" id="ff-detail" hidden aria-label="冻结结果">
+      <h2>冻结内容及校验值</h2>
+      <p id="ff-meta" class="mono"></p>
+      <p id="ff-sha" class="mono"></p>
+      <pre id="ff-text"></pre>
+      <p class="subtle">此阶段没有对照、导入、发送或自动恢复功能。</p>
+    </section>
+  </div>
+  <script src="ff-core.js"></script><script src="ff-page.js"></script>
+</body>
+</html>
