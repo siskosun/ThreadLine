@@ -165,7 +165,7 @@ def run():
             patched = reopened.evaluate("""() => {
               const original = chrome.runtime.sendMessage.bind(chrome.runtime);
               window.__ffCreateLostAck = null;
-              chrome.runtime.sendMessage = function(payload, cb) {
+              const wrapper = function(payload, cb) {
                 if (payload?.type === 'FF_CREATE') {
                   window.__ffCreateLostAck = payload.operationId;
                   return original(payload, response => {
@@ -175,7 +175,8 @@ def run():
                 }
                 return original(payload, cb);
               };
-              return chrome.runtime.sendMessage !== original;
+              chrome.runtime.sendMessage = wrapper;
+              return chrome.runtime.sendMessage === wrapper;
             }""")
             assert patched, "cannot inject a one-off lost ACK into the extension UI"
             reopened.locator("#ff-save").click()
