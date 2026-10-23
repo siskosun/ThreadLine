@@ -7,18 +7,28 @@ const ThreadLineFFDB = (() => {
   function open() {
     return new Promise((resolve, reject) => {
       const req = indexedDB.open(NAME, VERSION);
+      let abandoned = false;
       req.onupgradeneeded = () => {
+        // A blocked request may become writable after the caller already
+        // received a failure. Do not commit an abandoned schema upgrade.
+        if (abandoned) { try {req.transaction?.abort();} catch {} return; }
         const db = req.result;
         if (!db.objectStoreNames.contains(STORE))
           db.createObjectStore(STORE, {keyPath:"id"});
       };
       req.onsuccess = () => {
         const db = req.result;
+        // onblocked rejects our Promise, but the browser may still emit
+        // onsuccess later. Close that otherwise orphaned connection.
+        if (abandoned) { db.close(); return; }
         db.onversionchange = () => db.close();
         resolve(db);
       };
       req.onerror = () => reject(req.error || new Error("Fork database unavailable"));
-      req.onblocked = () => reject(new Error("Fork database upgrade blocked by another page"));
+      req.onblocked = () => {
+        abandoned = true;
+        reject(new Error("Fork database upgrade blocked by another page"));
+      };
     });
   }
   async function transaction(mode, action) {
