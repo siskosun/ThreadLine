@@ -84,12 +84,18 @@ const ThreadLineFFDB = (() => {
         try {
           const previous = req.result;
           if (!previous) throw new Error("experiment not found");
+          // Reducers receive the persisted object for compatibility, but may not
+          // mutate it: every validation below must use this pre-reducer baseline.
+          const serializedPrevious = JSON.stringify(previous);
+          const baseline = JSON.parse(serializedPrevious);
           const next = reducer(previous);
+          if (JSON.stringify(previous) !== serializedPrevious)
+            throw new Error("reducer must not mutate previous");
           if (next === previous) {result(previous); return;} // Idempotent replay.
-          if (previous.revision !== expectedRevision) throw new Error("stale revision");
-          if (!next || next.id !== id || next.revision !== previous.revision + 1)
+          if (baseline.revision !== expectedRevision) throw new Error("stale revision");
+          if (!next || next.id !== baseline.id || next.revision !== baseline.revision + 1)
             throw new Error("invalid revision");
-          if (JSON.stringify(next.frozen) !== JSON.stringify(previous.frozen))
+          if (JSON.stringify(next.frozen) !== JSON.stringify(baseline.frozen))
             throw new Error("frozen input is immutable");
           store.put(next);
           result(next);
