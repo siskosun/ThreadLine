@@ -7,7 +7,8 @@
 - 核对 main `f3109ebb6e5e76f4c34670b10654bd0127471bea`：治理 PR [#2](https://github.com/siskosun/ThreadLine/pull/2) 已合并且 merge 提交 verify success；开放 Draft [#1](https://github.com/siskosun/ThreadLine/pull/1)、[#3](https://github.com/siskosun/ThreadLine/pull/3)、[#5](https://github.com/siskosun/ThreadLine/pull/5)、[#6](https://github.com/siskosun/ThreadLine/pull/6)、[#7](https://github.com/siskosun/ThreadLine/pull/7)、[#8](https://github.com/siskosun/ThreadLine/pull/8)、[#9](https://github.com/siskosun/ThreadLine/pull/9) 均仍 Draft。
 - 以 [#9](https://github.com/siskosun/ThreadLine/pull/9) 为最强 main 目标集成候选（含 #1/#3/#5/#6/#7/#8 血统）。续作分支 `cursor/p1-core-acceptance-54b2`：`ff-db.js` 拒绝篡改 `createOperationId` / `createdAt`；新增 `test/ff-db.test.js` 回归。
 - 计划表纠偏：R-REUSE → `done` + [evidence/R-REUSE.json](evidence/R-REUSE.json)；Z0-BASE 保持 `in_review`/PR#1；Z0-LIVE 保持 `blocked`；P1-CORE 保持 `in_review`/[PR#10](https://github.com/siskosun/ThreadLine/pull/10)（未合并，不写 done）。未启动 P2/P3/P4。
-- 本机 `cd threadline-extension && npm run verify`：**190/190 Node PASS**（含新建 create-identity 回归与更新后的 plan-governance）。合成 Chromium E2E **未在本 VM 执行**：`python3` 无 `playwright` 模块；不以 PR #9 既有 CI 冒充本次 HEAD。GitHub Actions 应对本分支再跑 Linux/Windows verify + e2e。
+- 本机 `cd threadline-extension && npm run verify`：**190/190 Node PASS**。本 VM 无 Python `playwright`，合成 E2E 未在本机跑。
+- 准确 HEAD `8f46aee14581ba64d09bfc97609ab3bca138e442` 的 GitHub CI 已完成：[Linux checks](https://github.com/siskosun/ThreadLine/actions/runs/39987223477) 与 [Windows baseline](https://github.com/siskosun/ThreadLine/actions/runs/39987223315) 均为 success。两边 Node **190/190**；三套合成 MV3（原扩展、handoff 23,569 字节零发送、Fork P1 IndexedDB）均 PASS。线上计划门禁：`8 tasks, 2 linked review PRs, 1 externally verified done`（R-REUSE）。Release 作业 skipped。这不是 Z0-LIVE 或 P1 `done`。
 - **明确未通过：** 所有者 Windows `MANUAL_ACCEPT Z0-BASE`、完整真实登录 ChatGPT Z0-LIVE 签署、P1 合并后的 `P1-CORE.json`。
 
 ## 2026-10-23 PR7 实际 Tabbit 零发送证据归档
