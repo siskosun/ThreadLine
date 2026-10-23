@@ -1,6 +1,57 @@
 const test=require("node:test");
 const assert=require("node:assert/strict");
 const F=require("../ff-core.js");
+
+test("FF binds one session identity across all transitions of an attempt",async()=>{
+ const initial=F.newExperiment(await F.freeze("W","P"),"exp_bound001");
+ const base={branch:"A",attemptId:"att_bound001",status:"pending",phase:"generating"};
+ const first=F.advance(initial,{...base,expectedRevision:0,operationId:"op_bound001",
+   evidence:{sessionId:"chat-original"}});
+ for(const status of ["pending","failed","unknown","done"]){
+   assert.throws(()=>F.advance(first,{...base,status,phase:"capturing",expectedRevision:1,
+     operationId:"op_conflict01",evidence:{sessionId:"chat-other",inputLevel:"exact",
+       taskCount:1,captureComplete:true,reply:"ok",endSignals:["stable","final"],persisted:true}}),
+     /session identity/);
+ }
+ const middle=F.advance(first,{...base,expectedRevision:1,operationId:"op_bound002",evidence:{}});
+ assert.equal(middle.branches.A.attempts[0].evidence.sessionId,"chat-original");
+ assert.throws(()=>F.advance(middle,{...base,expectedRevision:2,operationId:"op_conflict02",
+   evidence:{sessionId:"chat-other"}}),/session identity/);
+ const event={...base,expectedRevision:2,operationId:"op_bound003",status:"done",phase:"capturing",
+   evidence:{sessionId:"chat-original",inputLevel:"exact",taskCount:1,captureComplete:true,
+     reply:"ok",endSignals:["stable","final"],persisted:true}};
+ const done=F.advance(middle,event);
+ assert.equal(done.branches.A.status,"done");
+ assert.equal(F.advance(done,event),done);
+ assert.equal(first.branches.A.attempts[0].evidence.sessionId,"chat-original");
+ const failed=F.advance(middle,{...base,expectedRevision:2,operationId:"op_bound004",
+   status:"failed",phase:"capturing",evidence:{}});
+ const retry=F.advance(failed,{branch:"A",expectedRevision:3,operationId:"op_bound005",
+   attemptId:"att_bound002",status:"pending",phase:"created",manualNewAttempt:true,
+   evidence:{sessionId:"chat-new-attempt"}});
+ assert.equal(retry.branches.A.attempts[0].evidence.sessionId,"chat-original");
+ assert.equal(retry.branches.A.attempts[1].evidence.sessionId,"chat-new-attempt");
+});
+
+test("FF rejects malformed session identity even before completion",async()=>{
+ const initial=F.newExperiment(await F.freeze("W","P"),"exp_badid001");
+ for(const sessionId of [null,12,"",{},"abc"])
+   assert.throws(()=>F.advance(initial,{branch:"A",attemptId:"att_badid001",status:"pending",
+     phase:"generating",expectedRevision:0,operationId:"op_badid001",evidence:{sessionId}}),/session identity/);
+});
+
+test("FF completion requires distinct recognized string signal kinds",async()=>{
+ const initial=F.newExperiment(await F.freeze("W","P"),"exp_signal01");
+ const event={branch:"A",attemptId:"att_signal01",status:"done",phase:"capturing",
+   expectedRevision:0,operationId:"op_signal01"};
+ const evidence={sessionId:"chat-signal",inputLevel:"exact",taskCount:1,captureComplete:true,
+   reply:"ok",persisted:true};
+ for(const endSignals of [[null,false],["stable","typo"],["stable","stable"],
+   [{type:"stable",ms:5000},{type:"stable",ms:5000}],["stable",{}],"stable,final",[]])
+   assert.throws(()=>F.advance(initial,{...event,evidence:{...evidence,endSignals}}),/completion signals/);
+ for(const endSignals of [["stable","final"],["generation","stable"],["generation","final"]])
+   assert.equal(F.advance(initial,{...event,evidence:{...evidence,endSignals}}).branches.A.status,"done");
+});
 test("FF frozen input preserves BOM, CRLF, trailing spaces, CJK, emoji and code blocks",async()=>{
  const w="\uFEFF中文\r\n\`\`\`js\r\nlet x = '😀';  \r\n\`\`\` ",p="A\u00a0 B \rC";
  const f=await F.freeze(w,p);

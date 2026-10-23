@@ -4,7 +4,8 @@
   const $ = id => document.getElementById(id);
   const inputs = ["ff-w0","ff-p"];
   let pendingCreate = null; // In-memory lease while this page stays open.
-  // One unacknowledged create intent survives THIS TAB's page/worker reload.
+  let createBusy = false;
+  // A create intent survives THIS TAB's reload until its saved result is displayed.
   // Store only its SHA-256 and operation ID, never W0/P content in sessionStorage.
   const CREATE_INTENT_KEY = "tl_ff_create_intent_v1";
   function storedCreateIntent() {
@@ -50,7 +51,7 @@
     const size = ThreadLineFFCore.byteLength(value);
     $("ff-bytes").textContent = "最终发送文本：" + size.toLocaleString() +
       " / 24,000 UTF-8 字节" + (size>24000?"（超出限制）":"");
-    $("ff-save").disabled = size > 24000 || !$("ff-p").value.trim();
+    $("ff-save").disabled = createBusy || size > 24000 || !$("ff-p").value.trim();
   }
   async function read(id) {
     const value = await send({type:"FF_READ",id});
@@ -108,6 +109,9 @@
   });
   $("ff-create").addEventListener("submit", async event => {
     event.preventDefault();
+    if (createBusy) return;
+    createBusy = true;
+    let saved = false;
     $("ff-save").disabled = true;
     try {
       const w0 = $("ff-w0").value, p = $("ff-p").value;
@@ -115,15 +119,18 @@
         pendingCreate = await createIntent(w0,p);
       const intent = pendingCreate;
       const created = await send({type:"FF_CREATE",...intent});
-      // An accepted ACK proves this intent was persisted by the worker. Clear
-      // its lease; a lost ACK leaves the same ID available after page reload.
-      acknowledgeIntent(intent.operationId);
-      if (pendingCreate?.operationId === intent.operationId) pendingCreate = null;
+      saved = true;
       await list();
       await read(created.id);
+      // Display errors must not turn an unchanged-input manual retry into a
+      // new create. Keep the same durable ID until the result is visible.
+      acknowledgeIntent(intent.operationId);
+      if (pendingCreate?.operationId === intent.operationId) pendingCreate = null;
       notice("已冻结并保存到独立本地数据库；没有打开或发送网页消息。");
-    } catch (error) {notice(error.message,true);}
-    finally {bytes();}
+    } catch (error) {
+      notice(saved ? "实验已保存，显示刷新失败。保留相同输入再次点击保存可恢复本次结果：" + error.message
+        : error.message,true);
+    } finally {createBusy = false; bytes();}
   });
   $("ff-refresh").addEventListener("click", () =>
     list().catch(error => notice(error.message,true)));

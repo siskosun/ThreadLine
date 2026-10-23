@@ -217,6 +217,57 @@ def run():
                 "() => sessionStorage.getItem('tl_ff_create_intent_v1')") is None, (
                 "acknowledged create intent was not cleared")
 
+            # A real successful CREATE receipt followed by a display error is
+            # still the same intent, including after reloading this tab.
+            expected_rows = 3
+            for failed_type in ["FF_LIST", "FF_READ"]:
+                for reload_before_retry in [False, True]:
+                    reopened.reload(wait_until="domcontentloaded")
+                    expect(reopened.locator("#ff-notice")).to_contain_text("已启用")
+                    material = f"Fictional {failed_type} recovery {reload_before_retry}"
+                    task = "Display the same saved experiment"
+                    reopened.locator("#ff-w0").fill(material)
+                    reopened.locator("#ff-p").fill(task)
+                    assert reopened.evaluate("""failedType => {
+                      const original=chrome.runtime.sendMessage.bind(chrome.runtime);
+                      let armed=false, injected=false;
+                      const wrapper=(payload,cb)=>{
+                        if(payload.type==='FF_CREATE')return original(payload,response=>{
+                          armed=response?.ok===true;cb(response);
+                        });
+                        if(armed&&!injected&&payload.type===failedType){
+                          injected=true;
+                          return cb({ok:false,error:'SIMULATED_DISPLAY_FAILURE'});
+                        }
+                        return original(payload,cb);
+                      };
+                      chrome.runtime.sendMessage=wrapper;
+                      return chrome.runtime.sendMessage===wrapper;
+                    }""", failed_type)
+                    reopened.locator("#ff-save").click()
+                    expect(reopened.locator("#ff-notice")).to_contain_text("SIMULATED_DISPLAY_FAILURE")
+                    expect(reopened.locator("#ff-notice")).to_contain_text("实验已保存")
+                    expected_rows += 1
+                    rows = reopened.evaluate("() => chrome.runtime.sendMessage({type:'FF_LIST'})")
+                    assert rows["ok"] and len(rows["data"]) == expected_rows
+                    saved_ids = sorted(row["id"] for row in rows["data"])
+                    lease = reopened.evaluate("sessionStorage.getItem('tl_ff_create_intent_v1')")
+                    assert lease and material not in lease and task not in lease
+                    if reload_before_retry:
+                        reopened.reload(wait_until="domcontentloaded")
+                        expect(reopened.locator("#ff-notice")).to_contain_text("已启用")
+                        assert reopened.evaluate("sessionStorage.getItem('tl_ff_create_intent_v1')") == lease
+                        reopened.locator("#ff-w0").fill(material)
+                        reopened.locator("#ff-p").fill(task)
+                    reopened.locator("#ff-save").click()
+                    expect(reopened.locator("#ff-notice")).to_contain_text("已冻结并保存")
+                    rows = reopened.evaluate("() => chrome.runtime.sendMessage({type:'FF_LIST'})")
+                    assert rows["ok"] and sorted(row["id"] for row in rows["data"]) == saved_ids, (
+                        "display recovery created another experiment", failed_type, reload_before_retry)
+                    assert reopened.evaluate("sessionStorage.getItem('tl_ff_create_intent_v1')") is None
+
+            assert expected_rows == 7
+
             # An unreadable lease is an UNKNOWN create result, never a reason
             # to allocate another random ID and silently duplicate the record.
             reopened.evaluate("""() => sessionStorage.setItem(
@@ -228,12 +279,49 @@ def run():
                 "待确认创建记录无法验证", timeout=10000)
             after_corruption = reopened.evaluate(
                 "() => chrome.runtime.sendMessage({type:'FF_LIST'})")
-            assert after_corruption["ok"] and len(after_corruption["data"]) == 3
+            assert after_corruption["ok"] and len(after_corruption["data"]) == expected_rows
             assert len(ctx2.pages) == tabs_before_retry, (
                 "Fork P1 create retry must not open or send ChatGPT tabs")
+
+            # Exercise internal DB guards on real transactions, without going
+            # through the safe current reducer or weakening the FF message gate.
+            worker = ctx2.service_workers[0]
+            guards = worker.evaluate("""async () => {
+              const frozen=await ThreadLineFFCore.freeze('Fictional original','Task');
+              const replacement=await ThreadLineFFCore.freeze('Fictional replacement','Task');
+              const results=[];
+              for(const kind of ['frozen','revision','noop']){
+                const id='ff_guard_'+kind;
+                await ThreadLineFFDB.create(ThreadLineFFCore.newExperiment(frozen,id));
+                if(kind==='revision')for(let i=0;i<7;i++)
+                  await ThreadLineFFDB.update(id,i,prev=>({...prev,revision:i+1}));
+                const before=await ThreadLineFFDB.read(id);
+                let rejected=false;
+                try{
+                  await ThreadLineFFDB.update(id,0,prev=>{
+                    if(kind==='frozen')prev.frozen=replacement;
+                    if(kind==='revision')prev.revision=0;
+                    if(kind==='noop'){prev.frozen=replacement;return prev;}
+                    return {...prev,revision:prev.revision+1};
+                  });
+                }catch{rejected=true;}
+                const after=await ThreadLineFFDB.read(id);
+                results.push({kind,rejected,unchanged:JSON.stringify(before)===JSON.stringify(after)});
+              }
+              const id='ff_guard_positive';
+              await ThreadLineFFDB.create(ThreadLineFFCore.newExperiment(frozen,id));
+              const event={branch:'A',expectedRevision:0,operationId:'op_guard001',
+                attemptId:'att_guard001',status:'unknown',phase:'awaiting_send'};
+              const first=await ThreadLineFFDB.update(id,0,prev=>ThreadLineFFCore.advance(prev,event));
+              const replay=await ThreadLineFFDB.update(id,0,prev=>ThreadLineFFCore.advance(prev,event));
+              return {results,valid:first.revision===1&&JSON.stringify(first)===JSON.stringify(replay)};
+            }""")
+            assert guards["valid"], guards
+            assert all(row["rejected"] and row["unchanged"] for row in guards["results"]), guards
             ctx2.close()
     print("PASS: Fork P1 default-off, permission-bound messages, 24KB input, "
-          "atomic IDB/CAS, replay-safe attempts, XSS, legacy isolation and restart (synthetic-only)")
+          "atomic IDB/CAS and reducer guards, replay-safe attempts, post-ACK display recovery, "
+          "XSS, legacy isolation and restart (synthetic-only)")
 
 
 if __name__ == "__main__":

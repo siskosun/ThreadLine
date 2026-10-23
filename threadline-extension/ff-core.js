@@ -4,6 +4,8 @@ const ThreadLineFFCore = (() => {
   const MAX_BYTES = 24000, RULE = "canonicalization-v1";
   const STATES = Object.freeze(["pending", "done", "failed", "unknown"]);
   const PHASES = Object.freeze(["created", "draft_ready", "awaiting_send", "generating", "capturing"]);
+  // Attested signal kinds, not arbitrary values or caller-defined objects.
+  const END_SIGNALS = Object.freeze(["generation", "stable", "final"]);
   const CHECKS = Object.freeze(["memory", "referenceHistory", "customInstructions", "model",
     "thinkingEffort", "tools", "project"]);
   const encoder = new TextEncoder();
@@ -138,6 +140,15 @@ const ThreadLineFFCore = (() => {
     assert(Number.isSafeInteger(expectedRevision) && expectedRevision === exp.revision,
       "stale revision");
     const currentBranch = exp.branches[branch], prior = currentBranch.attempts.find(a => a.id === attemptId);
+    const boundSession = prior?.evidence?.sessionId;
+    for (const session of [boundSession, evidence.sessionId])
+      if (session !== undefined)
+        assert(typeof session === "string" && session.length >= 4, "invalid session identity");
+    assert(boundSession === undefined || evidence.sessionId === undefined ||
+      boundSession === evidence.sessionId, "attempt session identity cannot change");
+    // Evidence updates may omit identity, but may never erase a binding and
+    // then replace it in a later event. Keep the existing serialized shape.
+    const nextEvidence = boundSession === undefined ? evidence : {...evidence,sessionId:boundSession};
     const counterpart = exp.branches[branch === "A" ? "B" : "A"];
     assert(!counterpart.attempts.some(a => a.id === attemptId),
       "attempt ID already belongs to another branch");
@@ -161,25 +172,27 @@ const ThreadLineFFCore = (() => {
     if (status === "done") {
       assert(phase === "capturing" && ["exact", "canonical_equivalent"].includes(evidence.inputLevel),
         "input unverified");
-      assert(typeof evidence.sessionId === "string" && evidence.sessionId.length >= 4,
+      assert(typeof nextEvidence.sessionId === "string" && nextEvidence.sessionId.length >= 4,
         "missing session identity");
       assert(evidence.taskCount === 1 && evidence.captureComplete === true &&
         typeof evidence.reply === "string" && evidence.reply.length > 0,
         "response incomplete");
-      assert(Array.isArray(evidence.endSignals) && new Set(evidence.endSignals).size >= 2,
+      assert(Array.isArray(evidence.endSignals) &&
+        evidence.endSignals.every(signal => typeof signal === "string" && END_SIGNALS.includes(signal)) &&
+        new Set(evidence.endSignals).size >= 2,
         "insufficient completion signals");
       assert(evidence.persisted === true, "response not persisted");
       const other = exp.branches[branch === "A" ? "B" : "A"];
-      assert(!other.attempts.some(a => a.evidence?.sessionId === evidence.sessionId),
+      assert(!other.attempts.some(a => a.evidence?.sessionId === nextEvidence.sessionId),
         "same session assigned to both branches");
     }
     const now = Date.now(), next = structuredClone(exp), b = next.branches[branch];
     const found = b.attempts.find(a => a.id === attemptId);
     if (found) {
-      Object.assign(found, {status, phase, updatedAt:now, evidence:structuredClone(evidence)});
+      Object.assign(found, {status, phase, updatedAt:now, evidence:structuredClone(nextEvidence)});
     } else {
       b.attempts.push({id:attemptId, status, phase, createdAt:now,
-        updatedAt:now, evidence:structuredClone(evidence)});
+        updatedAt:now, evidence:structuredClone(nextEvidence)});
     }
     b.status = status;
     b.phase = phase;
