@@ -2,6 +2,15 @@
 
 任务定义和正式状态唯一来源：[docs/PLAN.md](../PLAN.md)。本文件只记录发生过的事件与证据，不自行认定任务完成。
 
+## 2026-10-23 原生附件草稿保护修复（待真人验收）
+
+- 本次实时核对 main `f3109ebb6e5e76f4c34670b10654bd0127471bea`、Draft PR #1 HEAD `93199fbee134f74ff45fc21df86674025f833be0`；本机初始无未提交修改。独立修复分支基于 PR #1，不推 main、不合并、不发布。
+- 既有真实失败记录明确为 **FAIL**：空 contenteditable 外、同一 form 内已有虚构 TXT 原生附件，旧版仍插入并 ACK；附件虽未删除，草稿已被修改，发送 0 次。不覆盖该历史记录。
+- 先新增回归：旧生产代码运行定向 Node 测试为 **17 PASS / 4 FAIL**（附件、外部预览、迟到附件、未知范围）；原基线为 **132/132**。修复为检查整个所属 form，并在登记后及 focus 后再次检查；文件选择、媒体/芯片/移除控件、未知附件标记拒绝，空上传控件允许。
+- 独立本地审查另发现 focus 转移会使 document.execCommand 写入另一草稿；ROOT 红灯复现为 **21 PASS / 1 FAIL**，随后增加焦点和折叠选区归属检查。该审查不是外部 Gate；两道外部 Gate 由用户明确豁免。
+- Windows Node v26.10.0 / Python 3.12.10 / Playwright 1.64.0：在实际 extension 目录运行 `npm run verify` **138/138 PASS**；`npm run test:e2e` **2/2 PASS**，含真实 MV3、23,569 字节 exact、空段落保护、附件/选中文件/焦点竞态、未选上传控件、一次登记后刷新不重放；**0 自动发送**。
+- 完整证据及失败夹具调整原因见 [脱敏记录](evidence/NATIVE_ATTACHMENT_20261023.md)。真实登录 Edge 复测 **BLOCKED / NOT RUN**，当前规则要求用户操作 ChatGPT Web；合成结果不等于 Edge PASS。Z0-LIVE 仍 `blocked / NOT SIGNED`，Beta 未完成，正式计划不改。
+
 ## 2026-10-21 基线与复用
 - main：`d40d13f2918c33961ced333a9884af9c853157ad`；应用 v0.6.1。
 - Windows 跨平台路径修复和第零步验收清单：Draft PR [#1](https://github.com/siskosun/ThreadLine/pull/1)，自动 CI 成功，真实 Windows/ChatGPT 登录流程未完成。

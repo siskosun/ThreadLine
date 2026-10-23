@@ -84,13 +84,52 @@
     }
     return rendered.replace(/\n/g, '').length === 0;
   }
+  function isEmptyComposer(el){
+    try{
+      if(!isEmptyEditor(el))return false;
+      // Native uploads can be siblings of the editor. Never infer ownership
+      // from a global form or from textContent alone; unknown scope is unsafe.
+      const form=el.closest('form');
+      if(!form || !form.contains(el))return false;
+      for(const node of form.querySelectorAll('*')){
+        const attr=name=>node.getAttribute(name);
+        const tag=String(node.tagName||'').toUpperCase();
+        if(tag==='INPUT' && String(attr('type')).toLowerCase()==='file'){
+          if(!node.files || node.files.length!==0)return false;
+        }
+        if(/^(IMG|VIDEO|AUDIO|CANVAS|IFRAME|OBJECT|EMBED)$/.test(tag) ||
+          attr('contenteditable')==='false' || attr('role')==='progressbar')return false;
+        if(attr('data-file-id')!==null || attr('data-attachment-id')!==null)return false;
+        const marker=attr('data-testid')||'';
+        // Empty upload controls are not selected attachments. Other file /
+        // attachment markers (including unknown new variants) fail closed.
+        const uploadControl=(tag==='BUTTON'||tag==='INPUT') &&
+          /^(upload|attach|add)[-_](file|attachment)s?([-_]button)?$/i.test(marker);
+        if(/(^|[-_])(file|attachment|upload)s?($|[-_])/i.test(marker) && !uploadControl)return false;
+        if(tag==='BUTTON'||attr('role')==='button'){
+          const label=[attr('aria-label'),attr('title')].filter(Boolean).join(' ');
+          if(/\b(remove|delete)\b|移除|删除/i.test(label))return false;
+        }
+      }
+      return true;
+    }catch{return false;}
+  }
   function fill(text){
     if(!validNewChatPage())return 'ineligible';
     const el=editor();if(!el)return 'missing';
     // Even an all-whitespace draft belongs to the user. Never overwrite it.
-    if(!isEmptyEditor(el))return 'occupied';
+    if(!isEmptyComposer(el))return 'occupied';
     try{
       el.focus();
+      // Reservation and focus can run page code. Recheck the current editor
+      // and its entire form immediately before the synchronous write.
+      if(editor()!==el || !validNewChatPage() || !isEmptyComposer(el))return 'occupied';
+      if(document.activeElement!==el)return 'occupied';
+      if(el.isContentEditable){
+        const selection=globalThis.getSelection();
+        if(!selection || selection.rangeCount!==1 || !selection.isCollapsed ||
+          !el.contains(selection.anchorNode) || !el.contains(selection.focusNode))return 'occupied';
+      }
       let ok=false;
       if(el.isContentEditable)ok=!!document.execCommand('insertText',false,text);
       else if('value' in el){
@@ -133,7 +172,7 @@
         }
         return;
       }
-      if(!isEmptyEditor(readyEditor)){
+      if(!isEmptyComposer(readyEditor)){
         done=true;banner('输入框已有草稿，研线不会覆盖或自动发送。可复制接续提示后自行处理。',true);
         return;
       }

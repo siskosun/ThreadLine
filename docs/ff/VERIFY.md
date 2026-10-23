@@ -3,6 +3,14 @@
 本分支原始工作为修复 Windows 上 check-syntax.mjs 的 file: URL 路径处理与异目录回归；2026-10-22 追加只读网页选择器兼容、隐藏停止按钮修复与合成回归。
 CI 是合成 ChatGPT 页面，不是已登录网页。
 
+## 2026-10-23 原生附件草稿保护回归
+
+- 基线：PR #1 `93199fbee134f74ff45fc21df86674025f833be0`，Windows `npm run verify` 132/132。新附件用例先在未修改的生产代码上运行：21 个定向测试，17 通过、4 失败，失败均为不应插入却插入。未放宽保护断言。
+- 最终：`npm run verify` 138/138，40 个 JS 语法检查、版本与正式计划检查通过；`npm run test:e2e` 两套合成 MV3 PASS。新增附件/预览/选中文件及迟到附件测试明确要求零写入、无 ACK；初检已有附件要求无 HANDOFF_BEGIN。空 file input 与普通上传按钮继续可预填。
+- 保留原有全文 exact/23,569 字节、空段落、不丢真实额外换行、已有文字/空白/非文字、BEGIN 并发登记、未知状态刷新不重放、Project/Temporary/旧会话拒绝测试。实际浏览器选区转移的合成回归额外要求另一草稿保持 `USER DRAFT`。
+- 旧 E2E 故障注入采用 contenteditable=false；新代码正确在登记前拒绝该节点，首次完整 E2E 因原预期“未确认成功”失败。保留失败日志，改用隐藏但可编辑的输入框模拟登记后无法取得焦点，仍严格要求 attemptedAt、无 ACK、刷新后零写入且停止重试。不是删除原安全断言。
+- 真实 Edge 新版本验证 BLOCKED / NOT RUN；Z0-LIVE `blocked / NOT SIGNED`。详见 [源码指纹与脱敏证据](evidence/NATIVE_ATTACHMENT_20261023.md)。
+
 ## 真实网页门禁
 状态：BLOCKED / PARTIAL / NOT SIGNED。2026-10-21 尚未执行真实网页登录；2026-10-22 已收到 S1 和后续 A/B 双标签页面级核对（按来源归属的文字比较、无跨页标记）；但原始日志/截图、生成重叠窗口、可信原始角色与消息哈希及异常门禁未全部复核或完成。远程设备 sunzc 离线。**严禁把本项标记为通过。**
 待用户参与的检查：新建普通会话；短文本及近 24 KB 的 Unicode/Markdown 草稿回读；人工发送后实际用户消息准确性（exact、canonical_equivalent、unverified、differs）；生成结束双信号；结果身份绑定；双标签交错完成；Project/Temporary 拒绝；限流/断网/重启；非文本回复保守 unknown。

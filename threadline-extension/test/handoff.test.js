@@ -9,13 +9,19 @@ async function exercise(initial,insertion,expected='LONG USER CONTINUATION',opti
     appendChild(x){this.children.push(x);},remove(){this.removed=true;}};
   const editor={innerText:initial,textContent:options.textContent??initial,
     children:options.children??null,childNodes:options.childNodes??null,
-    isContentEditable:true,focus(){},
+    isContentEditable:true,focus(){doc.activeElement=options.redirectFocus?otherDraft:editor;options.onFocus?.(nodes);},
+    contains:node=>node===editor,
+    closest(){return options.noForm?null:form;},
     querySelectorAll(selector){
       if(selector==='p')return Array.from({length:options.paragraphs||0});
       if(selector==='br')return Array.from({length:options.breaks||0});
       return [];
     }};
+  const nodes=[...(options.composerNodes||[])];
+  const otherDraft={textContent:'USER DRAFT'};
+  const form={contains:el=>el===editor,querySelectorAll:()=>nodes};
   const outgoing=[];
+  let insertions=0;
   const doc={
     body:{appendChild(){}},
     querySelector(s){
@@ -28,6 +34,8 @@ async function exercise(initial,insertion,expected='LONG USER CONTINUATION',opti
       return {style:{},textContent:'',appendChild(){},onclick:null};
     },
     execCommand(_op,_ui,content){
+      insertions++;
+      if(options.redirectFocus){otherDraft.textContent=content;return true;}
       const original=insertion==='partial'?content.slice(0,40):content;
       const inserted=options.transformInserted?options.transformInserted(original):original;
       editor.textContent=inserted;
@@ -44,6 +52,7 @@ async function exercise(initial,insertion,expected='LONG USER CONTINUATION',opti
   const env={
     document:doc,location:{href:options.url||'https://chatgpt.com/'},
     URL,TextEncoder,navigator:{clipboard:{writeText:async()=>{}}},
+    getSelection:()=>({rangeCount:1,isCollapsed:true,anchorNode:editor,focusNode:editor}),
     HTMLTextAreaElement:function(){},InputEvent:class {},
     chrome:{runtime:{
       id:'extension',
@@ -51,6 +60,7 @@ async function exercise(initial,insertion,expected='LONG USER CONTINUATION',opti
       onMessage:{addListener(){}},
       sendMessage(payload,callback){
         outgoing.push(payload.type);
+        if(payload.type==='HANDOFF_BEGIN')options.onBegin?.(nodes);
         callback(payload.type==='HANDOFF_GET'
           ? {ok:true,data:{text:expected,autoAttempted:options.alreadyAttempted===true}} :
           payload.type==='HANDOFF_BEGIN'
@@ -63,7 +73,7 @@ async function exercise(initial,insertion,expected='LONG USER CONTINUATION',opti
   };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname,'..','handoff.js'),'utf8'),env);
   await new Promise(setImmediate);
-  return {editor,outgoing,banner};
+  return {editor,outgoing,banner,insertions,otherDraft};
 }
 test('ACK only for exact full continuation draft, no prefix-only success',async()=>{
  const ok=await exercise('','exact');
@@ -222,4 +232,55 @@ test('a denied reservation must not insert or acknowledge a draft',async()=>{
  assert.ok(result.outgoing.includes('HANDOFF_BEGIN'));
  assert.ok(!result.outgoing.includes('HANDOFF_ACK'));
  assert.match(result.banner.children[0].textContent,/停止自动重试/);
+});
+
+function fixtureNode(tagName,attrs={},files){
+ return {tagName,files,getAttribute:name=>attrs[name]??null};
+}
+function protectedDraft(result,begin=false){
+ assert.equal(result.insertions,0,'must not invoke the insertion command');
+ assert.equal(result.editor.innerText,'','attachment draft must remain untouched');
+ assert.equal(result.outgoing.includes('HANDOFF_BEGIN'),begin,'reservation boundary');
+ assert.ok(!result.outgoing.includes('HANDOFF_ACK'),'occupied draft must never ACK');
+}
+test('external native attachment remove control protects the entire form',async()=>{
+ protectedDraft(await exercise('','exact','MUST NOT INSERT',{composerNodes:[
+  fixtureNode('BUTTON',{'aria-label':'移除 fictional-test.txt'})
+ ]}));
+});
+test('external previews, file identifiers and removal controls prohibit prefill',async()=>{
+ for(const node of [fixtureNode('IMG'),fixtureNode('DIV',{'data-testid':'file-preview'}),
+  fixtureNode('DIV',{'data-file-id':'fictional'}),
+  fixtureNode('BUTTON',{'aria-label':'Remove attachment fictional.txt'}),
+  fixtureNode('DIV',{'contenteditable':'false'}),fixtureNode('DIV',{role:'progressbar'}),
+  fixtureNode('INPUT',{type:'file'},[{name:'fictional.txt'}])]){
+  protectedDraft(await exercise('','exact','MUST NOT INSERT',{composerNodes:[node]}));
+ }
+});
+test('ordinary upload controls without selected files permit prefill',async()=>{
+ const result=await exercise('','exact','SAFE',{composerNodes:[
+  fixtureNode('INPUT',{type:'file',hidden:''},[]),
+  fixtureNode('BUTTON',{'aria-label':'Upload files','data-testid':'upload-file-button'})
+  ,fixtureNode('BUTTON',{'data-testid':'profile-button'})
+ ]});
+ assert.equal(result.editor.innerText,'SAFE');
+ assert.ok(result.outgoing.includes('HANDOFF_ACK'));
+});
+test('attachment arriving during reservation or focus blocks the final insertion',async()=>{
+ for(const hook of ['onBegin','onFocus']){
+  protectedDraft(await exercise('','exact','MUST NOT INSERT',{
+   [hook]:nodes=>nodes.push(fixtureNode('BUTTON',{'aria-label':'Remove fictional.txt'}))
+  }),true);
+ }
+});
+test('missing form or unreadable selected-file state fails closed',async()=>{
+ protectedDraft(await exercise('','exact','MUST NOT INSERT',{noForm:true}));
+ protectedDraft(await exercise('','exact','MUST NOT INSERT',{
+  composerNodes:[fixtureNode('INPUT',{type:'file'})]
+ }));
+});
+test('redirected focus never invokes document-wide insertion into another draft',async()=>{
+ const result=await exercise('','exact','MUST NOT INSERT',{redirectFocus:true});
+ protectedDraft(result,true);
+ assert.equal(result.otherDraft.textContent,'USER DRAFT');
 });

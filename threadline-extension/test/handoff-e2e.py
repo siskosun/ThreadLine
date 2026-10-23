@@ -20,16 +20,32 @@ def run():
                     f"--disable-extensions-except={EXT}",
                     f"--load-extension={EXT}",
                 ])
-            current = {"draft": "", "editable": "true"}
+            current = {"draft": "", "editable": "true", "attachment": ""}
             def serve(route):
                 initial = html.escape(current["draft"])
+                attachment = {
+                    "chip": '<button type="button" aria-label="移除 fictional.txt">fictional.txt</button>',
+                    "preview": '<div data-testid="file-preview">fictional.txt</div>',
+                    "selected": '<input type="file" id="upload" hidden>',
+                    "controls": '<input type="file" hidden><button type="button" data-testid="upload-file-button">Upload files</button>',
+                    "focus": '',
+                }.get(current["attachment"], '')
+                setup = ''
+                if current["attachment"] == "selected":
+                    setup = "const dt=new DataTransfer();dt.items.add(new File(['fake'],'fictional.txt'));document.querySelector('#upload').files=dt.files;"
+                if current["attachment"] == "focus":
+                    setup = "document.querySelector('#prompt-textarea').addEventListener('focus',()=>{const b=document.createElement('button');b.type='button';b.setAttribute('aria-label','Remove fictional.txt');document.querySelector('form').append(b);},{once:true});"
+                if current["attachment"] == "redirect":
+                    setup = "const other=document.createElement('div');other.id='other-draft';other.contentEditable='true';other.textContent='USER DRAFT';document.body.append(other);document.querySelector('#prompt-textarea').addEventListener('focus',()=>{other.focus();const r=document.createRange();r.selectNodeContents(other);const s=getSelection();s.removeAllRanges();s.addRange(r);},{once:true});"
                 route.fulfill(status=200, content_type="text/html; charset=utf-8",
                     body=f"""<!doctype html><html><title>Offline ChatGPT New Chat</title>
                     <form id="composer">
-                      <div id="prompt-textarea" contenteditable="{current['editable']}" style="white-space:pre-wrap">{initial}</div>
+                      <div id="prompt-textarea" contenteditable="true" style="white-space:pre-wrap;{'display:none' if current['editable']=='false' else ''}">{initial}</div>
+                      {attachment}
                       <button type="submit">Send</button>
                     </form>
                     <script>window.submissions=0;
+                      {setup}
                       document.querySelector('form').addEventListener('submit',e=>{{
                         e.preventDefault();window.submissions++;
                       }});
@@ -130,13 +146,44 @@ def run():
             assert status_for(tid3) is not None
             page3.close()
 
+            # Actual extension + browser DOM, but fully synthetic: never live
+            # ChatGPT acceptance. External native-style attachments remain owned.
+            current["draft"] = ""
+            for mode in ["chip", "preview", "selected", "focus", "redirect"]:
+                current["attachment"] = mode
+                occupied, occupied_id = open_with_draft("ATTACHMENT MUST NOT PREFILL")
+                expect(occupied.locator("#tl-handoff-banner")).to_contain_text("不会覆盖", timeout=24000)
+                assert occupied.locator("#prompt-textarea").evaluate("el=>el.innerText") == "", mode
+                record = status_for(occupied_id)
+                assert record is not None, "occupied drafts must not ACK"
+                assert bool(record.get("attemptedAt")) == (mode in ["focus", "redirect"]), record
+                if mode == "redirect":
+                    assert occupied.locator("#other-draft").inner_text() == "USER DRAFT"
+                if mode in ["chip", "preview"]:
+                    assert occupied.get_by_text("fictional.txt", exact=True).count() == 1
+                if mode == "selected":
+                    assert occupied.locator("#upload").evaluate("el=>el.files.length") == 1
+                assert occupied.evaluate("window.submissions") == 0
+                occupied.close()
+            current["attachment"] = "controls"
+            controls, controls_id = open_with_draft("EMPTY UPLOAD CONTROLS ARE SAFE")
+            expect(controls.locator("#tl-handoff-banner")).to_contain_text("逐字核对", timeout=24000)
+            assert controls.locator("#prompt-textarea").evaluate("el=>el.innerText") == "EMPTY UPLOAD CONTROLS ARE SAFE"
+            assert status_for(controls_id) is None
+            assert controls.evaluate("window.submissions") == 0
+            controls.close()
+            current["attachment"] = ""
+
             # A one-shot reservation prevents another automatic attempt after
             # an uncertain insertion, even when the tab reloads into a now
             # writable empty composer. No user message is ever submitted.
             current["draft"] = ""
+            # A hidden editor cannot receive focus/execCommand insertion. A
+            # contenteditable=false node now correctly fails BEFORE reservation,
+            # so use an otherwise empty but unfocusable editor for this fault.
             current["editable"] = "false"
             page4, tid4 = open_with_draft("RESERVATION MUST NOT REPLAY")
-            expect(page4.locator("#tl-handoff-banner")).to_contain_text("未确认成功", timeout=24000)
+            expect(page4.locator("#tl-handoff-banner")).to_contain_text("不会覆盖", timeout=24000)
             attempt = status_for(tid4)
             assert attempt and attempt.get("attemptedAt"), attempt
             assert page4.evaluate("window.submissions") == 0
@@ -149,7 +196,8 @@ def run():
             page4.close()
             ctx.close()
     print("PASS: real MV3 handoff exact 23569-byte multiline readback; "
-          "whitespace/normal drafts untouched; only exact ACK; 0 sends (synthetic only)")
+          "whitespace/normal/native-style attachment drafts untouched; focus race refused; "
+          "empty upload controls accepted; only exact ACK; 0 sends (synthetic only)")
 
 
 if __name__ == "__main__":
