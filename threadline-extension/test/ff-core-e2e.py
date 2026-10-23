@@ -153,6 +153,55 @@ def run():
             assert after["ok"] and after["data"]["revision"] == 3, after
             assert after["data"]["branches"]["A"]["attempts"][0]["status"] == "unknown"
             assert reopened.evaluate("() => chrome.storage.local.get('threadline_state_v1')")["threadline_state_v1"] == old
+
+            # Simulate the critical MV3 edge: the background commits FF_CREATE
+            # but its success ACK is lost on the way to this page. A human
+            # explicitly retries AFTER the page reloads. This must reuse the
+            # pending operation ID rather than silently creating experiment #4.
+            missing_ack_w0 = "Unacknowledged create: 中文😀 \\n code"
+            missing_ack_p = "one frozen experiment only"
+            reopened.locator("#ff-w0").fill(missing_ack_w0)
+            reopened.locator("#ff-p").fill(missing_ack_p)
+            patched = reopened.evaluate("""() => {
+              const original = chrome.runtime.sendMessage.bind(chrome.runtime);
+              window.__ffCreateLostAck = null;
+              chrome.runtime.sendMessage = function(payload, cb) {
+                if (payload?.type === 'FF_CREATE') {
+                  window.__ffCreateLostAck = payload.operationId;
+                  return original(payload, response => {
+                    if (typeof cb === 'function')
+                      cb({ok:false,error:'SIMULATED_CREATE_ACK_LOSS'});
+                  });
+                }
+                return original(payload, cb);
+              };
+              return chrome.runtime.sendMessage !== original;
+            }""")
+            assert patched, "cannot inject a one-off lost ACK into the extension UI"
+            reopened.locator("#ff-save").click()
+            expect(reopened.locator("#ff-notice")).to_contain_text(
+                "SIMULATED_CREATE_ACK_LOSS", timeout=10000)
+            lost_op = reopened.evaluate("window.__ffCreateLostAck")
+            assert lost_op and len(lost_op) >= 6
+            saved_once = reopened.evaluate(
+                "() => chrome.runtime.sendMessage({type:'FF_LIST'})")
+            assert saved_once["ok"] and len(saved_once["data"]) == 3, saved_once
+            prior_ids = sorted(x["id"] for x in saved_once["data"])
+            assert "ff_" + lost_op in prior_ids
+
+            reopened.reload(wait_until="domcontentloaded")
+            reopened.locator("#ff-w0").fill(missing_ack_w0)
+            reopened.locator("#ff-p").fill(missing_ack_p)
+            reopened.locator("#ff-save").click()
+            expect(reopened.locator("#ff-notice")).to_contain_text(
+                "已冻结并保存", timeout=10000)
+            after_retry = reopened.evaluate(
+                "() => chrome.runtime.sendMessage({type:'FF_LIST'})")
+            assert after_retry["ok"] and len(after_retry["data"]) == 3, (
+                "same manual retry after lost ACK created a duplicate",
+                after_retry)
+            assert sorted(x["id"] for x in after_retry["data"]) == prior_ids
+            assert chat.evaluate("window.submitCount") == 0
             ctx2.close()
     print("PASS: Fork P1 default-off, permission-bound messages, 24KB input, "
           "atomic IDB/CAS, replay-safe attempts, XSS, legacy isolation and restart (synthetic-only)")
