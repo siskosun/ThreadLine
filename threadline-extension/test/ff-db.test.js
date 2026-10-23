@@ -33,3 +33,20 @@ test("FF rejects non-transactional or invalid revision updates",async()=>{
   const db=withFailedOpen("failed");
   await assert.rejects(db.update("id",-1,()=>({})),/invalid expected revision/);
 });
+
+
+test("FF late success after an IndexedDB blocked event closes the abandoned handle",async()=>{
+ let req, closeCount=0;
+ const dbHandle={close(){closeCount++;},onversionchange:null};
+ const env={Promise,Error,module:{exports:{}},indexedDB:{
+   open(){req={error:null};queueMicrotask(()=>req.onblocked?.());return req;}
+ }};
+ vm.createContext(env);
+ vm.runInContext(fs.readFileSync(path.join(__dirname,"../ff-db.js"),"utf8"),env);
+ await assert.rejects(env.module.exports.read("id_123456"),/blocked/);
+ // Chrome may unblock the original open after the caller has already received
+ // its rejection; nobody else will own the eventual database connection.
+ req.result=dbHandle;
+ req.onsuccess?.();
+ assert.equal(closeCount,1,"late successful IndexedDB handle must be closed");
+});
