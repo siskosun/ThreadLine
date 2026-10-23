@@ -10,6 +10,8 @@ This is regression evidence, NOT Z0-LIVE signoff or Beta completion.
 - Only production change: `threadline-extension/handoff.js`. No data/schema/background/selectors/permission/plan changes.
 - External Plan/Final Gates explicitly waived by user for this task; review is local only.
 
+Implementation commit: [`1cba735154658391ecd5cd1a8e134fedbc236987`](https://github.com/siskosun/ThreadLine/commit/1cba735154658391ecd5cd1a8e134fedbc236987). Delivery: stacked [Draft PR #5](https://github.com/siskosun/ThreadLine/pull/5), base PR #1 branch. Verified CI for that implementation snapshot: [Linux 39918631630](https://github.com/siskosun/ThreadLine/actions/runs/39918631630) and [Windows 39918631633](https://github.com/siskosun/ThreadLine/actions/runs/39918631633), both success with 138/138 Node and both MV3 E2E suites PASS. Release skipped. Subsequent documentation-only evidence linking does not change the tested source/test files; current HEAD checks are visible in PR #5.
+
 ## Original failure (FAIL, retained)
 
 Previously observed using a fictional TXT attachment: editor text empty, attachment chip outside the editor but inside the same form. Baseline handoff inserted the fictional continuation, reported exact success and ACKed. The attachment survived, but the existing draft was modified. Send count: 0. This is a failure, never a PASS. Raw local logs are retained outside public evidence; account, conversation identifiers, real content, screenshots and local user paths are not copied here.

@@ -4,6 +4,8 @@
 
 ## 2026-10-23 原生附件草稿保护修复（待真人验收）
 
+- 交付：修复提交 [`1cba735154658391ecd5cd1a8e134fedbc236987`](https://github.com/siskosun/ThreadLine/commit/1cba735154658391ecd5cd1a8e134fedbc236987)，独立 stacked [Draft PR #5](https://github.com/siskosun/ThreadLine/pull/5)（base 为 PR #1 分支）。该源码快照 [Linux CI](https://github.com/siskosun/ThreadLine/actions/runs/39918631630) 与 [Windows CI](https://github.com/siskosun/ThreadLine/actions/runs/39918631633) 均 success：138/138 Node + 2 套 MV3 E2E；Release skipped。后续证据链接补记不改变已测源码/测试。
+
 - 本次实时核对 main `f3109ebb6e5e76f4c34670b10654bd0127471bea`、Draft PR #1 HEAD `93199fbee134f74ff45fc21df86674025f833be0`；本机初始无未提交修改。独立修复分支基于 PR #1，不推 main、不合并、不发布。
 - 既有真实失败记录明确为 **FAIL**：空 contenteditable 外、同一 form 内已有虚构 TXT 原生附件，旧版仍插入并 ACK；附件虽未删除，草稿已被修改，发送 0 次。不覆盖该历史记录。
 - 先新增回归：旧生产代码运行定向 Node 测试为 **17 PASS / 4 FAIL**（附件、外部预览、迟到附件、未知范围）；原基线为 **132/132**。修复为检查整个所属 form，并在登记后及 focus 后再次检查；文件选择、媒体/芯片/移除控件、未知附件标记拒绝，空上传控件允许。
