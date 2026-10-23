@@ -77,7 +77,7 @@ test('marking done without an evidence JSON fails, even if the agent says it pas
   withFixture(dir=>{
     // P1-CORE is a code task still in_review; claiming done without JSON must fail.
     edit(dir,'docs/PLAN.md',s=>rowChange(s,'P1-CORE',
-      line=>line.replace(' | in_review | ',' | done | ').replace(' | PR#9 | no |',' | docs/ff/evidence/P1-CORE.json | no |')));
+      line=>line.replace(' | in_review | ',' | done | ').replace(' | PR#10 | no |',' | docs/ff/evidence/P1-CORE.json | no |')));
     assert.throws(()=>validatePlan(dir),/missing evidence file/);
   });
   withFixture(dir=>{

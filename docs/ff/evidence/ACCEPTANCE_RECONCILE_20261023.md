@@ -21,4 +21,4 @@ Independent GitHub check against main and open Draft PRs. Does not claim Z0-LIVE
 
 ## This continuation
 
-Branch `cursor/p1-core-acceptance-54b2` continues PR #9: protect `createOperationId`/`createdAt` in `threadline_ff_v1` updates; reconcile PLAN/PROGRESS/BLOCKED; do not start P2/P3/P4.
+Draft [PR #10](https://github.com/siskosun/ThreadLine/pull/10) (`cursor/p1-core-acceptance-54b2`) continues PR #9: protect `createOperationId`/`createdAt` in `threadline_ff_v1` updates; reconcile PLAN/PROGRESS/BLOCKED; do not start P2/P3/P4. P1-CORE evidence pointer is PR#10 while in_review.
