@@ -55,3 +55,15 @@
 - 修复 `520048a5e261b9bede1983dd8e81185ff77dc682`：同分支已经存在活动 attempt 时只准用它原有 ID 推进；人工重试必须在前次 `unknown/failed` 终止后、用新 ID 和显式 `manualNewAttempt`。对已经成功终止的 attempt 保持不可改写。
 - 后续 `73d4962b6f3a291156d377663aa87accaf0bc9ad` 增加 MV3/IndexedDB 接口级反向验证；[GitHub run 39786783682](https://github.com/siskosun/ThreadLine/actions/runs/39786783682) success：123/123 Node，合成 Fork P1 E2E 通过。未使用真实 ChatGPT、未发送消息或修改旧课题数据。
 - 仍未完成：PR #3 人工评审与授权合并、合并后准确 SHA 的正式验证，且 P2 仍依赖 Z0-LIVE 已签署。保持 PR Draft，正式 `docs/PLAN.md` 未修改。
+
+
+
+## 2026-10-23 P1-CORE 独立审查与恢复安全修复（仍待正式验收）
+
+- 来源：GitHub main 唯一计划 `docs/PLAN.md`、根 `AGENTS.md` 和最新 PR #3。审查 `ff-core.js`、`ff-db.js`、`ff-page.js`、后台 FF 门禁、Node/合成 MV3 回归。未修改 main、正式计划、旧课题 schema、浏览器权限；不启动 P2/P3、不自动发送。
+- **问题 1：丢回执后手动重试重复创建。** 原 UI 仅在内存保留 `pendingCreate`，后台实际保存成功但回执丢失，刷新同一标签再手动用同一输入点击保存会产生新 UUID 和第二条实验。[旧代码 run 39947872853](https://github.com/siskosun/ThreadLine/actions/runs/39947872853) 的真实 MV3/合成页面中直接观察到重复记录（测试按预期红灯）。新 `ff-page.js` 把同标签未确认创建意图的原文 SHA-256 和操作 ID 存 `sessionStorage`，后续人工操作对同样 W₀/P 复用 ID；收到真实成功回执才清除，不保存 W₀/P 副本、不自动重试。[修复绿色 run 39948497591](https://github.com/siskosun/ThreadLine/actions/runs/39948497591) 123/123 Node、合成 Fork E2E PASS。
+- **问题 2：IndexedDB onblocked 以后晚到 onsuccess 的无主连接泄漏。** 新测试旧源码 [run 39948659902](https://github.com/siskosun/ThreadLine/actions/runs/39948659902) 123/124，通过其余用例但该项 FAIL（预期 closeCount=1，实际=0）。`ff-db.js` 现在对已拒绝的打开请求关闭晚到的 DB handle，并在晚到升级事件中取消升级事务。[绿灯 run 39948779597](https://github.com/siskosun/ThreadLine/actions/runs/39948779597) 124/124 Node，合成 Fork E2E PASS。
+- **最终保护复核：** `test/ff-core-e2e.py` 额外验证未确认 ID 经页面重载保留、成功 ACK 后删除、`sessionStorage` 不含明文 W₀/P、损坏的意图拒绝新建、旧课题与网页发送均未受影响。[最终代码 run 39949015216](https://github.com/siskosun/ThreadLine/actions/runs/39949015216) success：**124/124 Node**，实际 MV3 + IndexedDB/持久浏览器环境中的合成 Fork 核心 E2E PASS、Release skipped。
+- **修复范围：** `threadline-extension/ff-page.js`、`ff-db.js`、`test/ff-core-e2e.py`、`test/ff-db.test.js`；此前持续通过的 SHA、24KB 限制、单写者/版本、单活动尝试、XSS、默认关闭、独立 DB、旧数据回归均保留。
+- **差异与门禁：** main `docs/PLAN.md` 仍将 P1-CORE 记为 `planned`；PR #3 有待审源码和自动证据，但**不满足 `done` 所需合并 PR/正式证据及适用人工批准**。不擅自修改状态。Z0-LIVE 仍 `blocked/NOT SIGNED`，本轮所有网页仅为无账号合成，不涉及实际 ChatGPT 发送。
+- 具体边界与独立取证索引：`docs/ff/evidence/P1_CORE_REVIEW_20261023.md`。

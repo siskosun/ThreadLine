@@ -52,3 +52,17 @@ npm run test:e2e
 - 这只约束独立 Fork 状态和存储，不接管普通课题，不自动发送消息，也不提前实施 P2/Fork 网页自动化。
 - 新增单元与真实 MV3 合成集成负向检查。先提交测试 `3ee3299e`，[红灯 run 39786233409](https://github.com/siskosun/ThreadLine/actions/runs/39786233409)：123 项中 122 通过、1 项按预期失败；提交状态机修复 `520048a5`，[绿灯 run 39786365758](https://github.com/siskosun/ThreadLine/actions/runs/39786365758)：123/123；补充后台/IndexedDB E2E `73d4962b`，[完整 run 39786783682](https://github.com/siskosun/ThreadLine/actions/runs/39786783682)：123/123 Node、合成 Chromium MV3 成功。
 - 该自动结果不替代真实 Edge 测试、合并批准或人工签署。当前 GitHub `docs/PLAN.md` 仍登记 P1-CORE 为 `planned`，PR #3 为 Draft；尚未放行 P2/P3。
+
+
+
+## 2026-10-23 P1 审查：回执丢失后的手动恢复
+
+创建实验是**本地保存**，不是发送 ChatGPT 消息。如果点击保存时后台已写入 IndexedDB、但扩展页面没有收到成功回执，请保留同一 `ff.html` 标签。该标签刷新后，可重新填入**完全相同**的 W₀ 和 P，再由用户明确点击一次保存；系统复用上一次操作 ID，返回已保存记录，而不是创建第二条。**不会自动重试。**
+
+- 这个“未确认创建意图”仅在同一浏览器标签页的 `sessionStorage` 中保存 SHA-256 摘要和操作 ID，不保存 W₀/P 正文；收到真实成功回执后删除临时意图。
+- 若标签已关闭、新开另一个标签、会话存储丢失或被清空，无法保证自动找回原操作 ID。请**先核对已有实验列表**，不要把同样输入重新点击保存视为安全恢复。
+- 若本标签的临时记录损坏或无法读取，系统拒绝新建以避免无意重复；需人工核对历史实验，而不是绕过保护。
+- IndexedDB 因升级阻塞而拒绝时，即使浏览器稍后交付打开成功，也会关闭无主数据库句柄，并阻止已放弃的升级操作继续提交。无自动重新尝试。
+- 验证：[旧代码合成红灯](https://github.com/siskosun/ThreadLine/actions/runs/39947872853)、[恢复修复绿灯](https://github.com/siskosun/ThreadLine/actions/runs/39948497591)；[数据库资源泄漏红灯](https://github.com/siskosun/ThreadLine/actions/runs/39948659902)、[修复绿灯](https://github.com/siskosun/ThreadLine/actions/runs/39948779597)；[最终新增防损坏测试绿灯](https://github.com/siskosun/ThreadLine/actions/runs/39949015216)：124/124 Node，合成 Chromium MV3 成功。
+
+这仍是独立 Draft PR #3，未合并，不代表真实 Windows 用户环境或 Z0-LIVE 通过；GitHub main 的唯一正式计划未改。
