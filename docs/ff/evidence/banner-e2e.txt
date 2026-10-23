@@ -1,0 +1,7 @@
+Derived diagnostic log; local paths redacted and trailing display whitespace removed. Original SHA-256: f7048b03c907073179b8d6b0fcd658e2ba211e7637f30d6eb4921c4d70f6e3bd
+
+npm notice run threadline-extension@0.6.1 test:e2e
+npm notice run python test/extension-e2e.py && python test/handoff-e2e.py && python test/ff-core-e2e.py
+PASS: MV3 persistent Chromium + real panel context + child-frame NEW_CHAT denied before tab creation + real storage.local + real IndexedDB + UI + readonly selector probe + backup + restart
+PASS: real MV3 handoff exact 23569-byte multiline readback; whitespace/normal/native-style attachment drafts untouched; focus race refused; empty upload controls accepted; only exact ACK; removed unknown banner recovered, explicit dismissal respected; 0 sends (synthetic only)
+PASS: Fork P1 default-off, permission-bound messages, 24KB input, atomic IDB/CAS and reducer guards, replay-safe attempts, post-ACK display recovery, XSS, legacy isolation and restart (synthetic-only)

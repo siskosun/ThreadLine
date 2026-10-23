@@ -1,0 +1,27 @@
+Derived diagnostic log; local paths redacted and trailing display whitespace removed. Original SHA-256: 630e6688288a9c229ba63203cdf5dc0e490a0d2209910a871b4b44da831ab68a
+
+Traceback (most recent call last):
+  File "<REPOSITORY>\threadline-extension\test\handoff-e2e.py", line 242, in <module>
+    run()
+  File "<REPOSITORY>\threadline-extension\test\handoff-e2e.py", line 220, in run
+    expect(page4.locator("#tl-handoff-banner")).to_contain_text("ֹͣ�Զ�����", timeout=3000)
+  File "<PYTHON_RUNTIME>\Lib\site-packages\playwright\sync_api\_generated.py", line 14961, in to_contain_text
+    self._sync(
+  File "<PYTHON_RUNTIME>\Lib\site-packages\playwright\_impl\_sync_base.py", line 111, in _sync
+    return task.result()
+           ^^^^^^^^^^^^^
+  File "<PYTHON_RUNTIME>\Lib\site-packages\playwright\_impl\_assertions.py", line 303, in to_contain_text
+    await self._expect_impl(
+  File "<PYTHON_RUNTIME>\Lib\site-packages\playwright\_impl\_assertions.py", line 128, in _expect_impl
+    _record_soft_or_raise(
+  File "<PYTHON_RUNTIME>\Lib\site-packages\playwright\_impl\_assertions.py", line 60, in _record_soft_or_raise
+    raise error
+AssertionError: Locator expected to contain text 'ֹͣ�Զ�����'
+Actual value: None
+Error: element(s) not found
+Call log:
+  - Expect "to_contain_text" locator("#tl-handoff-banner") with timeout 3000ms
+  - waiting for locator("#tl-handoff-banner")
+
+Aria snapshot:
+- button "Send"

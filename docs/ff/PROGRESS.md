@@ -177,3 +177,11 @@
 - 修复保存成功后显示失败导致再次保存重复创建、attempt 会话身份可变、无效结束信号充数、reducer 修改旧记录绕过数据库校验四项问题。均有先红后绿证据，原失败记录保留。
 - Windows 本次 `npm run verify`：183/183，`npm run test:e2e`：3/3。真实 MV3/IndexedDB 仍使用合成页面，0 实际发送。源码指纹、红绿日志哈希、精确命令和 L3 人工待确认项见 `evidence/P1_RECOVERY_20261023.md`。
 - 当前提交的准确 SHA、独立本地审查和 Linux/Windows 最终 CI 结果以本次 Draft PR 为准；本机结果不能替代准确提交的 CI、真实 Edge 或人工批准。Z0-LIVE BLOCKED / NOT SIGNED，P2/P3 未启动。
+
+## 2026-10-23 实测驱动的接续提示恢复修复（Draft PR8）
+
+- 本轮真实 Tabbit 纯空白/多行草稿保护通过；真实登记后中断、刷新不自动重放，预留/ACK 保持 1/0、编辑器空、消息 0。但观察到未知提示于 1722 ms 插入、1905 ms 被移除，手动恢复提示丢失，明确记 FAIL。
+- [PR8](https://github.com/siskosun/ThreadLine/pull/8) 基于 PR7，修复提示节点被移除后的有限恢复；最多 3 次，显式关闭不复活，恢复不进入预填/ACK/发送路径。原源码新增测试先红：Node 3 项新断言失败、合成 MV3 找不到恢复提示。修复后 Windows 189/189 Node、3/3 合成套件 PASS；独立只读本地审查无实质问题。
+- 代码提交 `1f7578f73ca184f464f96c9542cd458842170682` 的 [Linux](https://github.com/siskosun/ThreadLine/actions/runs/39978366347) / [Windows](https://github.com/siskosun/ThreadLine/actions/runs/39978366339) CI 均通过；随后证据/测试加强提交以 PR 最新 HEAD 检查为准。
+- 修复版真实复测 BLOCKED：原生检查器激活失败，Tabbit 禁止扩展页面导航。只确认磁盘候选更新，未假称扩展已重载。未重放未知意图、未改权限；关闭新建空白页，保留四个测试页和历史失败日志。完整脱敏记录/红绿日志见 [证据](evidence/HANDOFF_NOTICE_RECOVERY_20261023.md)。
+- 本轮遵照最新用户指令对 429 暂停 30 秒后先检查状态，不覆盖此前记录。0 新增发送、0 合并、0 发布。PLAN 只增加实际进度，状态表及依赖保持不变；Z0-LIVE BLOCKED / NOT SIGNED。

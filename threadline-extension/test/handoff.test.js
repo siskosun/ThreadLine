@@ -27,9 +27,10 @@ async function exercise(initial,insertion,expected='LONG USER CONTINUATION',opti
   const form={contains:el=>el===editor,querySelectorAll:()=>nodes};
   const outgoing=[];
   let insertions=0;
+  let bodyAppends=0;
   const doc={
     documentElement:{},
-    body:{appendChild(node){node.isConnected=true;mutate();}},
+    body:{appendChild(node){bodyAppends++;node.isConnected=true;mutate();}},
     querySelector(s){
       if(s==='#tl-handoff-banner')return banner.isConnected?banner:null;
       if(s.startsWith('#prompt-textarea,'))return editor;
@@ -84,7 +85,8 @@ async function exercise(initial,insertion,expected='LONG USER CONTINUATION',opti
   };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname,'..','handoff.js'),'utf8'),env);
   await new Promise(setImmediate);
-  return {editor,outgoing,banner,get insertions(){return insertions;},otherDraft,observers,doc};
+  return {editor,outgoing,banner,get insertions(){return insertions;},
+    get bodyAppends(){return bodyAppends;},otherDraft,observers,doc};
 }
 
 test('removed unknown-state banner recovers without another handoff operation',async()=>{
@@ -118,10 +120,12 @@ test('copy completion cannot resurrect an explicitly dismissed notice',async()=>
  });
  const copying=result.banner.children.find(x=>x.textContent==='复制接续提示').onclick();
  result.banner.children.find(x=>x.textContent==='关闭提示').onclick();
+ const appendsAtClose=result.bodyAppends;
  finishCopy();
  await copying;
  await new Promise(setImmediate);
  assert.equal(result.banner.isConnected,false);
+ assert.equal(result.bodyAppends,appendsAtClose,'late receipt must not append any replacement host');
  assert.equal(result.observers.size,0);
  assert.deepEqual(result.outgoing,['HANDOFF_GET']);
 });
