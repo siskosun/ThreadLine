@@ -2,6 +2,8 @@
 
 This is code/regression evidence, not live acceptance or authority to merge.
 
+Delivery: stacked [Draft PR #6](https://github.com/siskosun/ThreadLine/pull/6), base PR5, implementation commit [`c10dc1134b29ef6d274aa2795b1a8daea6f09e00`](https://github.com/siskosun/ThreadLine/commit/c10dc1134b29ef6d274aa2795b1a8daea6f09e00). Snapshot-bound CI: [Linux39936910564](https://github.com/siskosun/ThreadLine/actions/runs/39936910564), [Windows39936910447](https://github.com/siskosun/ThreadLine/actions/runs/39936910447); inspect each run for its actual conclusion, not this document's local test counts. Subsequent evidence-link-only changes leave source/tests unchanged; final HEAD checks are on PR6.
+
 ## Snapshot and observed evidence
 
 - main `f3109ebb6e5e76f4c34670b10654bd0127471bea`; Draft PR1 HEAD `93199fbee134f74ff45fc21df86674025f833be0`; Draft PR5 HEAD and local baseline `93a88d834f74ebf486a8f4572b42a5d87b008fc7`. No tracked local changes at start; existing local `.ai/` logs preserved.

@@ -4,6 +4,8 @@
 
 ## 2026-10-23 NEW_CHAT 面板来源兼容与授权收紧（独立修复，待人工风险确认）
 
+- 交付快照：[`c10dc1134b29ef6d274aa2795b1a8daea6f09e00`](https://github.com/siskosun/ThreadLine/commit/c10dc1134b29ef6d274aa2795b1a8daea6f09e00)，stacked [Draft PR #6](https://github.com/siskosun/ThreadLine/pull/6)。该提交关联 [Linux CI](https://github.com/siskosun/ThreadLine/actions/runs/39936910564) 与 [Windows CI](https://github.com/siskosun/ThreadLine/actions/runs/39936910447)，远程结果以运行页为准；后续仅补记证据链接，不改变已测源码/测试。最终 HEAD 检查见 PR #6。
+
 - 以 PR #5 `93a88d834f74ebf486a8f4572b42a5d87b008fc7` 为基线，独立分支 `codex/fix-panel-source-20261023`；PR #1/#5 仍 Draft、未合并，main 仍 `f3109ebb6e5e76f4c34670b10654bd0127471bea`。不改原附件修复、正式计划或浏览器权限。
 - 用户报告：三个文件指纹与 PR #5 一致，面板运行上下文检查 true，但两次 `NEW_CHAT` 均被来源校验拒绝。**没有实际后台 MessageSender 字段**，故具体现场不匹配项仍未确定；未继续重试真实 NEW_CHAT、未发送真实消息。
 - 先写新增来源回归：原代码 **4 PASS / 7 FAIL**。确认旧规则对无 tab 来源无条件放行，并对浏览器独立证明的同一面板文档仍按容器 URL 拒绝。后者仅为合成候选兼容模式，不能写成现场根因。
