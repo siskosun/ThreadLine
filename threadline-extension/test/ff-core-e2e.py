@@ -189,6 +189,11 @@ def run():
             assert saved_once["ok"] and len(saved_once["data"]) == 3, saved_once
             prior_ids = sorted(x["id"] for x in saved_once["data"])
             assert "ff_" + lost_op in prior_ids
+            pending_id = reopened.evaluate("""() => {
+              const raw=sessionStorage.getItem('tl_ff_create_intent_v1');
+              return raw && JSON.parse(raw).operationId;
+            }""")
+            assert pending_id == lost_op, "unacknowledged ID not retained in this tab"
 
             reopened.reload(wait_until="domcontentloaded")
             reopened.locator("#ff-w0").fill(missing_ack_w0)
@@ -202,7 +207,10 @@ def run():
                 "same manual retry after lost ACK created a duplicate",
                 after_retry)
             assert sorted(x["id"] for x in after_retry["data"]) == prior_ids
-            assert chat.evaluate("window.submitCount") == 0
+            assert reopened.evaluate(
+                "() => sessionStorage.getItem('tl_ff_create_intent_v1')") is None, (
+                "acknowledged create intent was not cleared")
+            assert len(ctx2.pages) == 1, "Fork P1 must not create or send ChatGPT tabs"
             ctx2.close()
     print("PASS: Fork P1 default-off, permission-bound messages, 24KB input, "
           "atomic IDB/CAS, replay-safe attempts, XSS, legacy isolation and restart (synthetic-only)")
