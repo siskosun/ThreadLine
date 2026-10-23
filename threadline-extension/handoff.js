@@ -2,6 +2,7 @@
 (()=>{
   if(globalThis.__TL_HANDOFF_V2__)return;globalThis.__TL_HANDOFF_V2__=true;
   let data=null,attempts=0,working=false,done=false,mismatchMeta='';
+  let bannerHost=null,bannerObserver=null,bannerRestores=0,bannerDismissed=false;
   // Only a freshly created plain-chat composer is eligible for this handoff.
   // Fail closed on Project, Temporary, existing chat or unknown redirects.
   function validNewChatPage(){
@@ -23,11 +24,26 @@
   function send(payload){return new Promise((resolve,reject)=>chrome.runtime.sendMessage(payload,r=>{if(chrome.runtime.lastError)return reject(new Error(chrome.runtime.lastError.message));if(!r?.ok)return reject(new Error(r?.error||"连接研线失败"));resolve(r.data);}));}
   function editor(){return document.querySelector('#prompt-textarea,div[contenteditable="true"][data-lexical-editor],div[contenteditable="true"][data-testid="composer-input"],form [contenteditable="true"]');}
   function banner(message,error=false){
-    let host=document.querySelector('#tl-handoff-banner');
+    if(bannerDismissed)return;
+    let host=bannerHost||document.querySelector('#tl-handoff-banner');
     if(!host){host=document.createElement('div');host.id='tl-handoff-banner';host.style.cssText='position:fixed;right:20px;bottom:84px;z-index:2147483646;max-width:320px;padding:14px;background:white;border:1px solid #cbd9e9;box-shadow:0 8px 28px #172c4533;border-radius:13px;font:12px/1.6 system-ui,"Microsoft Yahei",sans-serif;color:#29435c;';document.body.appendChild(host);}
+    bannerHost=host;
+    if(!bannerObserver){
+      // Page hydration can remove our notice after the one-shot handoff ends.
+      // Reattach only this node: never call tick/fill or consume another intent.
+      // Bound recovery so a hostile/changing page cannot cause an endless fight.
+      bannerObserver=new MutationObserver(()=>{
+        if(bannerDismissed || host.isConnected || !document.body)return;
+        if(bannerRestores>=3){bannerObserver.disconnect();return;}
+        bannerRestores++;
+        document.body.appendChild(host);
+        if(bannerRestores>=3)bannerObserver.disconnect();
+      });
+      bannerObserver.observe(document.documentElement,{childList:true,subtree:true});
+    }
     host.replaceChildren();const text=document.createElement('div');text.textContent=message;host.appendChild(text);
     if(data){const btn=document.createElement('button');btn.textContent='复制接续提示';btn.style.cssText='margin:9px 8px 0 0;padding:7px 10px;border-radius:8px;background:#294d75;color:#fff;border:0;cursor:pointer';btn.onclick=async()=>{try{await navigator.clipboard.writeText(data.text);banner('已复制接续提示。请粘贴到输入框并检查后发送。');}catch{banner('复制失败，请重新点击扩展图标使用接续功能。',true);}};host.appendChild(btn);}
-    const close=document.createElement('button');close.textContent='关闭提示';close.style.cssText='padding:7px 9px;border-radius:8px;background:#f1f4f8;border:1px solid #e2e8f0;cursor:pointer';close.onclick=()=>host.remove();host.appendChild(close);
+    const close=document.createElement('button');close.textContent='关闭提示';close.style.cssText='padding:7px 9px;border-radius:8px;background:#f1f4f8;border:1px solid #e2e8f0;cursor:pointer';close.onclick=()=>{bannerDismissed=true;bannerObserver.disconnect();host.remove();};host.appendChild(close);
     if(error)host.style.borderColor='#deac92';
   }
   function editorText(el) {

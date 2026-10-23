@@ -5,8 +5,13 @@ const vm=require('node:vm');
 const path=require('node:path');
 
 async function exercise(initial,insertion,expected='LONG USER CONTINUATION',options={}){
+  const observers=new Set();
+  const mutate=()=>queueMicrotask(()=>{
+    for(const observer of [...observers])observer.callback();
+  });
   const banner={style:{},children:[],replaceChildren(){this.children=[];},
-    appendChild(x){this.children.push(x);},remove(){this.removed=true;}};
+    isConnected:false,
+    appendChild(x){this.children.push(x);},remove(){this.isConnected=false;mutate();}};
   const editor={innerText:initial,textContent:options.textContent??initial,
     children:options.children??null,childNodes:options.childNodes??null,
     isContentEditable:true,focus(){doc.activeElement=options.redirectFocus?otherDraft:editor;options.onFocus?.(nodes);},
@@ -23,9 +28,10 @@ async function exercise(initial,insertion,expected='LONG USER CONTINUATION',opti
   const outgoing=[];
   let insertions=0;
   const doc={
-    body:{appendChild(){}},
+    documentElement:{},
+    body:{appendChild(node){node.isConnected=true;mutate();}},
     querySelector(s){
-      if(s==='#tl-handoff-banner')return banner.created?banner:null;
+      if(s==='#tl-handoff-banner')return banner.isConnected?banner:null;
       if(s.startsWith('#prompt-textarea,'))return editor;
       return null;
     },
@@ -51,7 +57,12 @@ async function exercise(initial,insertion,expected='LONG USER CONTINUATION',opti
   };
   const env={
     document:doc,location:{href:options.url||'https://chatgpt.com/'},
-    URL,TextEncoder,navigator:{clipboard:{writeText:async()=>{}}},
+    URL,TextEncoder,navigator:{clipboard:{writeText:options.copyText|| (async()=>{})}},
+    MutationObserver:class {
+      constructor(callback){this.callback=callback;}
+      observe(){observers.add(this);}
+      disconnect(){observers.delete(this);}
+    },
     getSelection:()=>({rangeCount:1,isCollapsed:true,anchorNode:editor,focusNode:editor}),
     HTMLTextAreaElement:function(){},InputEvent:class {},
     chrome:{runtime:{
@@ -73,8 +84,83 @@ async function exercise(initial,insertion,expected='LONG USER CONTINUATION',opti
   };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname,'..','handoff.js'),'utf8'),env);
   await new Promise(setImmediate);
-  return {editor,outgoing,banner,insertions,otherDraft};
+  return {editor,outgoing,banner,get insertions(){return insertions;},otherDraft,observers,doc};
 }
+
+test('removed unknown-state banner recovers without another handoff operation',async()=>{
+ const result=await exercise('','exact','NO REPLAY',{alreadyAttempted:true});
+ const originalChildren=[...result.banner.children];
+ result.banner.remove();
+ await new Promise(setImmediate);
+ assert.equal(result.banner.isConnected,true,'external page removal must not lose the recovery warning');
+ assert.deepEqual(result.banner.children,originalChildren,'restore the same controls, not a new operation');
+ assert.match(result.banner.children[0].textContent,/停止自动重试/);
+ assert.equal(result.editor.innerText,'');
+ assert.equal(result.insertions,0);
+ assert.deepEqual(result.outgoing,['HANDOFF_GET']);
+});
+
+test('explicitly dismissed banner stays dismissed after unrelated page mutations',async()=>{
+ const result=await exercise('','exact','NO REPLAY',{alreadyAttempted:true});
+ result.banner.children.find(x=>x.textContent==='关闭提示').onclick();
+ result.doc.body.appendChild({});
+ await new Promise(setImmediate);
+ assert.equal(result.banner.isConnected,false);
+ assert.equal(result.observers.size,0,'dismissal must disconnect the recovery observer');
+ assert.deepEqual(result.outgoing,['HANDOFF_GET']);
+ assert.equal(result.insertions,0);
+});
+
+test('copy completion cannot resurrect an explicitly dismissed notice',async()=>{
+ let finishCopy;
+ const result=await exercise('','exact','NO REPLAY',{
+   alreadyAttempted:true,copyText:()=>new Promise(resolve=>{finishCopy=resolve;})
+ });
+ const copying=result.banner.children.find(x=>x.textContent==='复制接续提示').onclick();
+ result.banner.children.find(x=>x.textContent==='关闭提示').onclick();
+ finishCopy();
+ await copying;
+ await new Promise(setImmediate);
+ assert.equal(result.banner.isConnected,false);
+ assert.equal(result.observers.size,0);
+ assert.deepEqual(result.outgoing,['HANDOFF_GET']);
+});
+
+test('restoration targets the current body after a page replaces it',async()=>{
+ const result=await exercise('','exact','NO REPLAY',{alreadyAttempted:true});
+ let attached=null;
+ result.doc.body={appendChild(node){attached=node;node.isConnected=true;}};
+ result.banner.remove();
+ await new Promise(setImmediate);
+ assert.equal(attached,result.banner);
+ assert.equal(result.insertions,0);
+ assert.deepEqual(result.outgoing,['HANDOFF_GET']);
+});
+
+test('banner restoration is capped at three removals and never retries a handoff',async()=>{
+ const result=await exercise('','exact','NO REPLAY',{alreadyAttempted:true});
+ for(let i=0;i<3;i++){
+   result.banner.remove();
+   await new Promise(setImmediate);
+   assert.equal(result.banner.isConnected,true,`restoration ${i+1}`);
+ }
+ result.banner.remove();
+ await new Promise(setImmediate);
+ assert.equal(result.banner.isConnected,false,'do not fight an indefinitely removing page');
+ assert.equal(result.observers.size,0);
+ assert.deepEqual(result.outgoing,['HANDOFF_GET']);
+ assert.equal(result.insertions,0);
+});
+
+test('an exact-success banner can recover without repeated insertion or ACK',async()=>{
+ const result=await exercise('','exact','EXACT ONCE');
+ result.banner.remove();
+ await new Promise(setImmediate);
+ assert.equal(result.banner.isConnected,true);
+ assert.equal(result.editor.innerText,'EXACT ONCE');
+ assert.equal(result.insertions,1);
+ assert.deepEqual(result.outgoing,['HANDOFF_GET','HANDOFF_BEGIN','HANDOFF_ACK']);
+});
 test('ACK only for exact full continuation draft, no prefix-only success',async()=>{
  const ok=await exercise('','exact');
  assert.equal(ok.editor.innerText,'LONG USER CONTINUATION');

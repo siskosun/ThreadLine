@@ -208,11 +208,34 @@ def run():
             assert page4.locator("#prompt-textarea").evaluate("(el)=>el.innerText") == ""
             assert status_for(tid4) is not None
             assert page4.evaluate("window.submissions") == 0
+            # Regression from a live page removing the unknown-state notice.
+            # A DOM-only restoration must not replay the one-shot reservation.
+            stored_attempt = status_for(tid4)
+            page4.evaluate("""() => {
+              window.bannerOriginal = document.querySelector('#tl-handoff-banner');
+              window.editorInputs = 0;
+              document.querySelector('#prompt-textarea').addEventListener('input',()=>window.editorInputs++);
+              window.bannerOriginal.remove();
+            }""")
+            expect(page4.locator("#tl-handoff-banner")).to_contain_text("停止自动重试", timeout=3000)
+            assert page4.evaluate("document.querySelector('#tl-handoff-banner') === window.bannerOriginal")
+            assert status_for(tid4) == stored_attempt
+            assert page4.evaluate("window.editorInputs") == 0
+            assert page4.locator("#prompt-textarea").inner_text() == ""
+            assert page4.evaluate("window.submissions") == 0
+            page4.get_by_role("button", name="关闭提示", exact=True).click()
+            page4.evaluate("document.body.appendChild(document.createElement('div'))")
+            page4.wait_for_timeout(150)
+            expect(page4.locator("#tl-handoff-banner")).to_have_count(0)
+            assert status_for(tid4) == stored_attempt
+            assert page4.evaluate("window.editorInputs") == 0
+            assert page4.evaluate("window.submissions") == 0
             page4.close()
             ctx.close()
     print("PASS: real MV3 handoff exact 23569-byte multiline readback; "
           "whitespace/normal/native-style attachment drafts untouched; focus race refused; "
-          "empty upload controls accepted; only exact ACK; 0 sends (synthetic only)")
+          "empty upload controls accepted; only exact ACK; removed unknown banner recovered, "
+          "explicit dismissal respected; 0 sends (synthetic only)")
 
 
 if __name__ == "__main__":
