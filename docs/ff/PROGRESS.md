@@ -162,3 +162,10 @@
 - **修复范围：** `threadline-extension/ff-page.js`、`ff-db.js`、`test/ff-core-e2e.py`、`test/ff-db.test.js`；此前持续通过的 SHA、24KB 限制、单写者/版本、单活动尝试、XSS、默认关闭、独立 DB、旧数据回归均保留。
 - **差异与门禁：** main `docs/PLAN.md` 仍将 P1-CORE 记为 `planned`；PR #3 有待审源码和自动证据，但**不满足 `done` 所需合并 PR/正式证据及适用人工批准**。不擅自修改状态。Z0-LIVE 仍 `blocked/NOT SIGNED`，本轮所有网页仅为无账号合成，不涉及实际 ChatGPT 发送。
 - 具体边界与独立取证索引：`docs/ff/evidence/P1_CORE_REVIEW_20261023.md`。
+
+## 2026-10-23 P1 四项修复与当前安全分支组合候选
+
+- 复用 PR #3 `b8b73e7` 和 PR #6 `cee3e58`（包含 #1/#5），形成独立候选，不修改原 PR、不合并 main。正式 PLAN 与 main 相同。
+- 修复保存成功后显示失败导致再次保存重复创建、attempt 会话身份可变、无效结束信号充数、reducer 修改旧记录绕过数据库校验四项问题。均有先红后绿证据，原失败记录保留。
+- Windows 本次 `npm run verify`：183/183，`npm run test:e2e`：3/3。真实 MV3/IndexedDB 仍使用合成页面，0 实际发送。源码指纹、红绿日志哈希、精确命令和 L3 人工待确认项见 `evidence/P1_RECOVERY_20261023.md`。
+- 当前提交的准确 SHA、独立本地审查和 Linux/Windows 最终 CI 结果以本次 Draft PR 为准；本机结果不能替代准确提交的 CI、真实 Edge 或人工批准。Z0-LIVE BLOCKED / NOT SIGNED，P2/P3 未启动。

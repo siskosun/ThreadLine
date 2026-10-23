@@ -123,7 +123,7 @@ test("FF update rejects reducers that mutate frozen input before returning a clo
 test("FF update rejects reducers that reset the previous revision to bypass CAS",async()=>{
  const previous={id:"ff_test123",revision:3,frozen:{prompt:"original"},state:"pending"};
  const {db,records}=withMemoryDB({[previous.id]:previous});
- await assert.rejects(db.update(previous.id,3,current=>{
+ await assert.rejects(db.update(previous.id,0,current=>{
    current.revision=0;
    return {...current,revision:1};
  }),/reducer must not mutate previous/);

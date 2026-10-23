@@ -113,3 +113,9 @@ PR-2/3 在用户签署此门禁通过前不得开展真实网页自动化集成�
 - `HANDOFF_BEGIN` 必须在真正填入前、经后台单写队列完成一次持久预留；两条并发请求至多一条获许可。`HANDOFF_GET` 允许只读/手动复制，已尝试返回 `autoAttempted=true`；`HANDOFF_ACK` 只有已登记的普通新聊天根路径可执行。
 - 回归覆盖：旧误覆盖负向用例红灯；非文字草稿保护；空 P 占位允许；并发预留互斥；错误文档源拒绝；空 ACK 拒绝；失效输入框引发失败后重载的自动填入次数为 0；实际发送次数始终为 0。
 - [Linux 39779493270](https://github.com/siskosun/ThreadLine/actions/runs/39779493270)、[Windows 39779493156](https://github.com/siskosun/ThreadLine/actions/runs/39779493156)：132/132 Node 与两套合成 MV3 E2E 通过。真实 Edge 尚须由用户在已登录的测试标签、加载准确 SHA 后复验，Z0-LIVE 不升级。
+
+## 2026-10-23 当前安全分支 + P1 修复组合
+
+- 本机 Windows：`npm run verify` 183/183；`npm run test:e2e` 三套全通过，包含原 MV3、handoff 和 ff-core。0 实际发送。
+- 新增负向验证覆盖成功保存后的列表/详情错误及刷新恢复、身份替换/省略后替换、非法结束信号、真实 IDB reducer 修改冻结字段/revision/伪装幂等返回。负向断言在原代码上失败，修复后原样保留。
+- [本次脱敏证据](evidence/P1_RECOVERY_20261023.md) 区分本机通过、准确 HEAD 的 CI、真实 Edge 和人工风险接受；旧失败日志保留。真实网页不在此次执行范围，Z0-LIVE 仍未签署。
