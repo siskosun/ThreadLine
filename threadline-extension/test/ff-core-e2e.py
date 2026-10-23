@@ -153,6 +153,7 @@ def run():
             assert after["ok"] and after["data"]["revision"] == 3, after
             assert after["data"]["branches"]["A"]["attempts"][0]["status"] == "unknown"
             assert reopened.evaluate("() => chrome.storage.local.get('threadline_state_v1')")["threadline_state_v1"] == old
+            tabs_before_retry = len(ctx2.pages)  # Persistent Chromium may open a blank startup tab.
 
             # Simulate the critical MV3 edge: the background commits FF_CREATE
             # but its success ACK is lost on the way to this page. A human
@@ -210,7 +211,8 @@ def run():
             assert reopened.evaluate(
                 "() => sessionStorage.getItem('tl_ff_create_intent_v1')") is None, (
                 "acknowledged create intent was not cleared")
-            assert len(ctx2.pages) == 1, "Fork P1 must not create or send ChatGPT tabs"
+            assert len(ctx2.pages) == tabs_before_retry, (
+                "Fork P1 create retry must not open or send ChatGPT tabs")
             ctx2.close()
     print("PASS: Fork P1 default-off, permission-bound messages, 24KB input, "
           "atomic IDB/CAS, replay-safe attempts, XSS, legacy isolation and restart (synthetic-only)")
