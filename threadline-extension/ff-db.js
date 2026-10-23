@@ -97,6 +97,11 @@ const ThreadLineFFDB = (() => {
             throw new Error("invalid revision");
           if (JSON.stringify(next.frozen) !== JSON.stringify(baseline.frozen))
             throw new Error("frozen input is immutable");
+          // Create provenance is part of the experiment identity. A reducer must
+          // not rewrite who created the record or when, even if revision advances.
+          if (next.createOperationId !== baseline.createOperationId ||
+            next.createdAt !== baseline.createdAt)
+            throw new Error("create identity is immutable");
           store.put(next);
           result(next);
         } catch (error) {fail(error);}

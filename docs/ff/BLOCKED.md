@@ -2,6 +2,13 @@
 
 该文件登记事实及解除条件，不是第二份计划。官方任务状态见 [docs/PLAN.md](../PLAN.md)。
 
+## 2026-10-23 验收对账后仍阻塞项
+
+- **Z0-LIVE**：仍 **BLOCKED / NOT SIGNED**。部分 Edge/Tabbit 零发送脱敏证据不等于完整计划门禁；无仓库所有者绑定 HEAD 的 `MANUAL_ACCEPT Z0-LIVE <sha>`。影响：不得执行或评审 P2-FORK / P3-REPORT。
+- **Z0-BASE 人工门禁**：Draft PR #1 与集成候选含 Windows CI 绿，但缺少所有者 `MANUAL_ACCEPT Z0-BASE <PR_HEAD_SHA>`；不能标 done。
+- **P1-CORE**：代码与自动测试在 Draft PR #9 血统可审，但未合并 main、无 `docs/ff/evidence/P1-CORE.json`；保持 in_review，不是 done。
+- R-REUSE 已因合并 PR #2 + canonical JSON 解除“未合并”状态；不解除上述真人/合并门禁。
+
 ## 2026-10-23 最新剩余门禁（PR7 实测证据已补）
 
 - 已解除的局部证据缺口：准确候选资源指纹、实际面板 NEW_CHAT 成功创建、普通短/23,569 字节长文本预填、外置原生附件拒绝及成功预留/ACK 0/0、移除后的显式恢复 1/1，均有真实 Tabbit 记录。见 [本次证据](evidence/TABBIT_ZERO_SEND_20261023.md)。下方历史 NOT RUN/BLOCKED 记录保留其原日期含义，不再代表这些具体 Tabbit 用例的最新结果。

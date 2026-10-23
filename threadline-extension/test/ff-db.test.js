@@ -120,6 +120,19 @@ test("FF update rejects reducers that mutate frozen input before returning a clo
  }),/reducer must not mutate previous/);
  assert.equal(records.get(previous.id).frozen.prompt,"original");
 });
+test("FF update rejects tampering with createOperationId or createdAt",async()=>{
+ const previous={id:"ff_test123",revision:0,createOperationId:"op_create01",
+   createdAt:1700000000000,frozen:{prompt:"original"},state:"pending"};
+ const {db,records}=withMemoryDB({[previous.id]:previous});
+ await assert.rejects(db.update(previous.id,0,current=>({
+   ...current,revision:1,createOperationId:"op_other01"
+ })),/create identity is immutable/);
+ await assert.rejects(db.update(previous.id,0,current=>({
+   ...current,revision:1,createdAt:1700000000999
+ })),/create identity is immutable/);
+ assert.equal(records.get(previous.id).createOperationId,"op_create01");
+ assert.equal(records.get(previous.id).createdAt,1700000000000);
+});
 test("FF update rejects reducers that reset the previous revision to bypass CAS",async()=>{
  const previous={id:"ff_test123",revision:3,frozen:{prompt:"original"},state:"pending"};
  const {db,records}=withMemoryDB({[previous.id]:previous});
