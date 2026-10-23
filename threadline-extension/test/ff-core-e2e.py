@@ -190,6 +190,11 @@ def run():
             assert saved_once["ok"] and len(saved_once["data"]) == 3, saved_once
             prior_ids = sorted(x["id"] for x in saved_once["data"])
             assert "ff_" + lost_op in prior_ids
+            stored_lease = reopened.evaluate(
+                "() => sessionStorage.getItem('tl_ff_create_intent_v1')")
+            assert stored_lease and missing_ack_w0 not in stored_lease
+            assert missing_ack_p not in stored_lease, (
+                "create lease must not store the plaintext W0/P")
             pending_id = reopened.evaluate("""() => {
               const raw=sessionStorage.getItem('tl_ff_create_intent_v1');
               return raw && JSON.parse(raw).operationId;
@@ -211,6 +216,19 @@ def run():
             assert reopened.evaluate(
                 "() => sessionStorage.getItem('tl_ff_create_intent_v1')") is None, (
                 "acknowledged create intent was not cleared")
+
+            # An unreadable lease is an UNKNOWN create result, never a reason
+            # to allocate another random ID and silently duplicate the record.
+            reopened.evaluate("""() => sessionStorage.setItem(
+              'tl_ff_create_intent_v1','INVALID_LEASE_JSON')""")
+            reopened.locator("#ff-w0").fill("Unsafe new intent")
+            reopened.locator("#ff-p").fill("must not persist")
+            reopened.locator("#ff-save").click()
+            expect(reopened.locator("#ff-notice")).to_contain_text(
+                "待确认创建记录无法验证", timeout=10000)
+            after_corruption = reopened.evaluate(
+                "() => chrome.runtime.sendMessage({type:'FF_LIST'})")
+            assert after_corruption["ok"] and len(after_corruption["data"]) == 3
             assert len(ctx2.pages) == tabs_before_retry, (
                 "Fork P1 create retry must not open or send ChatGPT tabs")
             ctx2.close()
