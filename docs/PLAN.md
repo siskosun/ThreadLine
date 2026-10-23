@@ -42,6 +42,14 @@
 
 ## 二、已核实的当前进展
 
+### 2026-10-23 开发接续核对（证据更新，任务状态未放行）
+
+- GitHub 本次核对：main `f3109ebb6e5e76f4c34670b10654bd0127471bea`；PR #1/#3/#5/#6/#7 均仍 Draft/open、未合并。下方 2026-10-21 表格是历史快照，不代表最新 PR 开发情况。
+- PR #7 代码候选 `07b37731326517fa8c70fca3c7676eaaac526edd` 已组合 P1 核心与来源/草稿保护修复；对应 Windows 本机 183/183 Node、3/3 合成 Chromium E2E 通过。准确提交的 [Linux CI](https://github.com/siskosun/ThreadLine/actions/runs/39957077821) 与 [Windows CI](https://github.com/siskosun/ThreadLine/actions/runs/39957077788) 均通过。这些结果不替代正式合并或真人验收。
+- 实际 Tabbit 对该代码的六个资源指纹、普通预填、外置原生附件保护及移除后显式恢复已有脱敏证据。长文本 23,569 字节逐字/哈希一致，附件拒绝预留/ACK 为 0/0，恢复成功为 1/1；新增发送 0 次。详见 [本次实测与剩余门禁](ff/evidence/TABBIT_ZERO_SEND_20261023.md)。Edge 当前候选 NOT RUN，Z0-LIVE 仍 BLOCKED / NOT SIGNED。
+- 本阶段只归档证据和更新进度，未新增 P2/P3 代码。此文档提交的回归与 CI 以 [PR #7](https://github.com/siskosun/ThreadLine/pull/7) 最终 HEAD 检查为准；旧代码提交的测试不会冒充新 HEAD 验证。
+- 下一步：完成剩余真实验收及用户最终风险确认，明确授权集成/合并并收集合并 SHA 证据；在 Z0-LIVE 和 P1-CORE 满足正式完成契约前，P2-FORK 不启动，P3-REPORT 继续依赖 P2-FORK。状态表、依赖、签署与发布规则均未修改。本计划新增的事实记录须随 PR 人工复核。
+
 截至 2026-10-21 本次检查：
 
 | 项目 | 状态 | 证据 |

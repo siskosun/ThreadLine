@@ -2,6 +2,14 @@
 
 任务定义和正式状态唯一来源：[docs/PLAN.md](../PLAN.md)。本文件只记录发生过的事件与证据，不自行认定任务完成。
 
+## 2026-10-23 PR7 实际 Tabbit 零发送证据归档
+
+- 实测绑定 PR #7 `07b37731326517fa8c70fca3c7676eaaac526edd`；真实扩展面板六个资源指纹与 Windows 候选匹配。实际 NEW_CHAT 建立普通测试标签，已知文字草稿得到保护；原始来源拒绝的具体接收端原因仍未定位。
+- 实际原生附件位于编辑器外、同一 form 内时拒绝预填；修正后的 attemptedAt 观察器记录成功预留/ACK 为 **0/0**。移除虚构附件、确认未尝试后显式刷新，记录 **1/1**；23,569 UTF-8 字节和 2,139 个 LF 逐字/哈希一致，0 发送。正常 93 字符多行预填亦通过。
+- [脱敏证据及剩余验收](evidence/TABBIT_ZERO_SEND_20261023.md) 保留早期错误计数字段、一次 429 后多执行虚构上传的操作偏差及后续纠正记录。最后一次 429 后停止站点操作；本次归档没有重试网页。
+- 本增量仅发布文档，不改变源码或已安装候选。根据用户新增进度管理要求，在正式 PLAN 追加事实、验证范围和下一步；状态表/依赖/签署契约不变，该治理文档增量随 PR 人工复核。PR #7 的文档提交需重新执行 Windows 回归及准确 HEAD 双平台 CI；最终结果见 PR 检查，不能用旧 CI 冒充新提交验证。
+- 真实 Tabbit 局部 PASS 不等于 Edge 或完整 Z0-LIVE；P1 合并/最终风险确认与 Z0-LIVE 人工项仍待完成，P2/P3 依赖门禁未解除。
+
 ## 2026-10-23 NEW_CHAT 面板来源兼容与授权收紧（独立修复，待人工风险确认）
 
 - 交付快照：[`c10dc1134b29ef6d274aa2795b1a8daea6f09e00`](https://github.com/siskosun/ThreadLine/commit/c10dc1134b29ef6d274aa2795b1a8daea6f09e00)，stacked [Draft PR #6](https://github.com/siskosun/ThreadLine/pull/6)。该提交关联 [Linux CI](https://github.com/siskosun/ThreadLine/actions/runs/39936910564) 与 [Windows CI](https://github.com/siskosun/ThreadLine/actions/runs/39936910447)，远程结果以运行页为准；后续仅补记证据链接，不改变已测源码/测试。最终 HEAD 检查见 PR #6。
