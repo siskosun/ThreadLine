@@ -30,6 +30,29 @@ def run():
       chat=ctx.new_page();chat.goto('https://chatgpt.com/c/demo-alpha',wait_until='domcontentloaded')
       panel=ctx.new_page();panel.goto(f'chrome-extension://{eid}/panel.html',wait_until='domcontentloaded')
       panel.wait_for_selector('#backup-export',state='attached',timeout=15000)
+      # Real browser metadata, not a forged MessageSender fixture: top-level
+      # panel stays authorized, the same URL inside a child frame must not be.
+      contexts=panel.evaluate("""async () => chrome.runtime.getContexts({
+        contextTypes:['TAB'],documentUrls:[chrome.runtime.getURL('panel.html')]
+      })""")
+      assert len(contexts)==1 and contexts[0]['documentId'], contexts
+      assert contexts[0]['frameId']==0, contexts
+      assert contexts[0]['documentOrigin']==f'chrome-extension://{eid}', contexts
+      panel.evaluate("""() => {const f=document.createElement('iframe');
+        f.id='sender-test-frame';f.src=chrome.runtime.getURL('panel.html');document.body.append(f);}""")
+      frame=panel.frame_locator('#sender-test-frame')
+      frame.locator('#backup-export').wait_for(state='attached',timeout=15000)
+      child=next(f for f in panel.frames if f.parent_frame==panel.main_frame)
+      before_pages=len(ctx.pages)
+      rejected=child.evaluate("""async () => chrome.runtime.sendMessage({
+        type:'NEW_CHAT',handoff:'CHILD FRAME MUST NOT OPEN CHAT'
+      })""")
+      assert rejected['ok'] is False and rejected['code']=='PANEL_SOURCE_REJECTED', rejected
+      assert rejected['sourceCheck']['reason']=='FRAME_MISMATCH', rejected
+      assert len(ctx.pages)==before_pages, 'unauthorized child created a tab'
+      assert '://' not in str(rejected), 'diagnostic leaked a URL'
+      panel.locator('#sender-test-frame').evaluate('(f)=>f.remove()')
+      assert chat.evaluate('window.submitCount')==0
       panel.locator('#manage-accordion').evaluate('(node)=>node.open=true')
       panel.locator('#topic-name').fill('真实扩展模拟验收')
       panel.locator('#create-form button[type=submit]').click()
@@ -111,6 +134,7 @@ def run():
       assert temporary_health['pageType']=='temporary_chat' and temporary_health['forkAllowed'] is False,temporary_health
       backup=panel.evaluate('''async () => chrome.runtime.sendMessage({type:'BACKUP_EXPORT'})''')
       assert backup['ok'] and backup['data']['state']['projects'][0]['knowledgeVersion']==1
+      assert chat.evaluate('window.submitCount')==0
       panel.evaluate('''async () => {const db=await ThreadLineCaptureDB.getRun('not-exist');return db;}''')
       ctx.close()
       ctx2,eid2=launch()
@@ -123,6 +147,6 @@ def run():
       saved=panel2.evaluate('''async ()=>ThreadLineCaptureDB.getRun('e2e-run')''')
       assert saved['id']=='e2e-run'
       ctx2.close()
-    print('PASS: MV3 persistent Chromium + real storage.local + real IndexedDB + UI + readonly selector probe + backup + restart')
+    print('PASS: MV3 persistent Chromium + real panel context + child-frame NEW_CHAT denied before tab creation + real storage.local + real IndexedDB + UI + readonly selector probe + backup + restart')
 
 if __name__=='__main__':run()

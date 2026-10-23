@@ -5,6 +5,7 @@ import html
 import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from time import monotonic, sleep
 from playwright.sync_api import sync_playwright, expect
 
 EXT = Path(__file__).resolve().parents[1]
@@ -80,6 +81,17 @@ def run():
                 return panel.evaluate("""async id =>
                   (await chrome.storage.session.get('tl_handoff_'+id))['tl_handoff_'+id] || null""", tid)
 
+            def wait_for_ack(tid):
+                # The visible exact banner precedes the awaited ACK message in
+                # handoff.js. Wait for its real storage receipt, never infer ACK
+                # from the banner and never retry insertion or send a message.
+                deadline = monotonic() + 5
+                while monotonic() < deadline:
+                    if status_for(tid) is None:
+                        return
+                    sleep(0.05)
+                raise AssertionError('exact handoff did not ACK within 5 seconds')
+
             # Exercise actual execCommand for mixed Unicode, NBSP and code blocks.
             ticks=chr(96)*3
             prefix="中文😀\n"+ticks+"js\nconst n = 1;\n"+ticks+"\nA\u00a0B\n"
@@ -109,6 +121,7 @@ def run():
             expect(page.locator("#tl-handoff-banner")).to_contain_text("不会自动替你发送")
             assert page.evaluate("window.submissions") == 0
             assert page.url == "https://chatgpt.com/"
+            wait_for_ack(tid)
             assert status_for(tid) is None, "ACK should follow exact readback only"
             page.close()
 
@@ -122,6 +135,7 @@ def run():
             blank_observed = blank_page.locator("#prompt-textarea").evaluate("(el)=>el.innerText")
             if blank_observed == blank_text:
                 expect(blank_page.locator("#tl-handoff-banner")).to_contain_text("不会自动替你发送")
+                wait_for_ack(blank_id)
                 assert status_for(blank_id) is None
             else:
                 expect(blank_page.locator("#tl-handoff-banner")).to_contain_text("与原文不一致")
@@ -169,6 +183,7 @@ def run():
             controls, controls_id = open_with_draft("EMPTY UPLOAD CONTROLS ARE SAFE")
             expect(controls.locator("#tl-handoff-banner")).to_contain_text("逐字核对", timeout=24000)
             assert controls.locator("#prompt-textarea").evaluate("el=>el.innerText") == "EMPTY UPLOAD CONTROLS ARE SAFE"
+            wait_for_ack(controls_id)
             assert status_for(controls_id) is None
             assert controls.evaluate("window.submissions") == 0
             controls.close()

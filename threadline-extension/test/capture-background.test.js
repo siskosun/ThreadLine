@@ -6,14 +6,14 @@ function system(){
   const runs=new Map(),pages=new Map(),local=new Map(),session=new Map(),events={},calls=[];
   const db={async putRun(r){runs.set(r.id,r)},async getRun(id){return runs.get(id)},async modifyRun(id,p){let r=runs.get(id);runs.set(id,{...r,...p});return runs.get(id)},async putPage(p){pages.set(`${p.id}_${p.pageIndex}_${p.chunkIndex}`,p)},async resetPages(id){for(const k of pages.keys())if(k.startsWith(`${id}_`))pages.delete(k)}};
   const chrome={
-    runtime:{onInstalled:{addListener(){}},onStartup:{addListener(){}},onMessage:{addListener(fn){events.message=fn}}},
+    runtime:{id:'capture-test',getURL:p=>'chrome-extension://capture-test/'+p,onInstalled:{addListener(){}},onStartup:{addListener(){}},onMessage:{addListener(fn){events.message=fn}}},
     tabs:{onUpdated:{addListener(fn){events.tabUpdated=fn}},onRemoved:{addListener(fn){events.tabRemoved=fn}},async get(id){return{id,url:'https://chatgpt.com/g/g-p-123/c/source-123',title:'研究源对话',windowId:4}},async query(){return[]},async sendMessage(tabId,msg){calls.push(['send',tabId,msg]);return{ok:true}},async create(options){calls.push(['newtab',options]);return{id:84,windowId:4}}},
     scripting:{async executeScript(args){calls.push(['inject',args])}},
     sidePanel:{setPanelBehavior:async()=>{},async close(args){calls.push(['close',args])}},
     storage:{local:{async get(k){return{[k]:local.get(k)}},async set(values){for(const [k,v]of Object.entries(values))local.set(k,v)}},session:{async get(k){if(k==null)return Object.fromEntries(session);return{[k]:session.get(k)}},async set(items){for(const[k,v]of Object.entries(items))session.set(k,v)},async remove(keys){for(const k of [keys].flat())session.delete(k)}}}
   };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname,'..','background.js'),'utf8'),{importScripts:()=>{},ThreadLineCore:Core,ThreadLineCaptureCore:CaptureCore,ThreadLineCaptureDB:db,chrome,crypto:globalThis.crypto,console,Date,Promise,URL});
-  function message(payload,sender={}){return new Promise((resolve,reject)=>{events.message(payload,sender,reply=>{if(reply.ok)resolve(reply.data);else reject(new Error(reply.error));});});}
+  function message(payload,sender={id:'capture-test',url:'chrome-extension://capture-test/panel.html'}){return new Promise((resolve,reject)=>{events.message(payload,sender,reply=>{if(reply.ok)resolve(reply.data);else reject(new Error(reply.error));});});}
   return{message,runs,pages,calls,session,local};
 }
 test('selected-tab capture starts, only original tab can provide chunks, then completes',async()=>{

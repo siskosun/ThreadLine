@@ -3,6 +3,14 @@
 本分支原始工作为修复 Windows 上 check-syntax.mjs 的 file: URL 路径处理与异目录回归；2026-10-22 追加只读网页选择器兼容、隐藏停止按钮修复与合成回归。
 CI 是合成 ChatGPT 页面，不是已登录网页。
 
+## 2026-10-23 NEW_CHAT 来源授权回归（不代表真实故障已恢复）
+
+- 基线 PR #5 `93a88d8` 的 Windows Node 138/138。新 `test/panel-source.test.js` 先对旧 background.js 红灯：11 个分组测试，4 pass / 7 fail；同一断言随后验证严格主体、独立上下文证明、超时及敏感信息不泄漏。
+- 修复后 `npm run verify`：149/149，41 个 JS 语法文件，版本 0.6.1 和正式计划结构检查通过。普通无 tab 侧栏、完整 panel tab、缺 tab.url 的合法面板可用；错 ID/URL/origin/子框架、未知来源、伪造 payload、缺失/错误/过期/重复上下文、API 缺失/异常/超时均拒绝；全部十种面板特权操作共用相同检查。
+- `npm run test:e2e`：两套合成 MV3 通过。真实 Chromium `runtime.getContexts()` 校验面板上下文；真实子框架调用被拒绝，无新标签；storage/IndexedDB/UI/backup/restart 原功能通过；handoff 23,569 字节 exact、附件草稿保护、无附件正常预填及刷新不重放保持。零真实发送，合成 submit 计数 0。
+- 首轮 ACK 竞态失败日志保留。正向 exact 用例改为有界只读核对实际 ACK 完成，不以横幅代替成功，也不重复写入；5 秒无 ACK 必须失败。既有不匹配/已有草稿不 ACK 断言不变。
+- 来源兼容路径的冲突容器元数据在 Node 中合成；没有实际 Tabbit sender 元数据，不能声称 Tabbit/Edge 来源故障已修复。所有真实网页验收仍 BLOCKED，等待人工风险确认，见 [证据](evidence/PANEL_SOURCE_20261023.md)。
+
 ## 2026-10-23 原生附件草稿保护回归
 
 - 基线：PR #1 `93199fbee134f74ff45fc21df86674025f833be0`，Windows `npm run verify` 132/132。新附件用例先在未修改的生产代码上运行：21 个定向测试，17 通过、4 失败，失败均为不应插入却插入。未放宽保护断言。

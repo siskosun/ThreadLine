@@ -2,6 +2,17 @@
 
 任务定义和正式状态唯一来源：[docs/PLAN.md](../PLAN.md)。本文件只记录发生过的事件与证据，不自行认定任务完成。
 
+## 2026-10-23 NEW_CHAT 面板来源兼容与授权收紧（独立修复，待人工风险确认）
+
+- 以 PR #5 `93a88d834f74ebf486a8f4572b42a5d87b008fc7` 为基线，独立分支 `codex/fix-panel-source-20261023`；PR #1/#5 仍 Draft、未合并，main 仍 `f3109ebb6e5e76f4c34670b10654bd0127471bea`。不改原附件修复、正式计划或浏览器权限。
+- 用户报告：三个文件指纹与 PR #5 一致，面板运行上下文检查 true，但两次 `NEW_CHAT` 均被来源校验拒绝。**没有实际后台 MessageSender 字段**，故具体现场不匹配项仍未确定；未继续重试真实 NEW_CHAT、未发送真实消息。
+- 先写新增来源回归：原代码 **4 PASS / 7 FAIL**。确认旧规则对无 tab 来源无条件放行，并对浏览器独立证明的同一面板文档仍按容器 URL 拒绝。后者仅为合成候选兼容模式，不能写成现场根因。
+- 后台统一要求本扩展 ID、精确 panel.html 发送文档 URL，origin/frame 有值时不得矛盾；容器 URL 冲突仅在 `runtime.getContexts()` 返回同一活跃文档 ID、精确面板 URL/origin、顶层 SIDE_PANEL 或相同 tabId 的 TAB 时可用。缺 API/缺文档 ID/失配/异常/1 秒超时均拒绝，未认证来源不得执行任何业务副作用。
+- 拒绝响应保留原错误文本，增添固定 `PANEL_SOURCE_REJECTED` 原因码及布尔匹配信息，不记录 URL、ID、Token、正文或底层错误。无自动重放。
+- 本机 Windows：Node 基线 **138/138**，新回归 **149/149**；两套合成 MV3 E2E PASS，包含真实浏览器面板上下文、真实子框架 NEW_CHAT 拒绝且不建标签、原 23,569 字节 exact/附件草稿/不重放门禁。全程真实发送 0。
+- 原单测夹具使用空 sender 冒充面板，改成真实的 own-ID/panel-URL 元数据，保留业务断言；首轮完整 E2E 记录到横幅先显示、ACK 尚未完成的时序失败，改为 5 秒内只读等待真实存储 ACK，仍强制最终无 pending 记录。失败日志保留，未改变生产 handoff.js。
+- 详见 [脱敏证据与 Human Stop Gate](evidence/PANEL_SOURCE_20261023.md)。现场来源拒绝修复尚未真人复验，三项真实附件验收仍 BLOCKED，Z0-LIVE `blocked / NOT SIGNED`，不合并、不发布、不进入 P2/P3。
+
 ## 2026-10-23 原生附件草稿保护修复（待真人验收）
 
 - 交付：修复提交 [`1cba735154658391ecd5cd1a8e134fedbc236987`](https://github.com/siskosun/ThreadLine/commit/1cba735154658391ecd5cd1a8e134fedbc236987)，独立 stacked [Draft PR #5](https://github.com/siskosun/ThreadLine/pull/5)（base 为 PR #1 分支）。该源码快照 [Linux CI](https://github.com/siskosun/ThreadLine/actions/runs/39918631630) 与 [Windows CI](https://github.com/siskosun/ThreadLine/actions/runs/39918631633) 均 success：138/138 Node + 2 套 MV3 E2E；Release skipped。后续证据链接补记不改变已测源码/测试。

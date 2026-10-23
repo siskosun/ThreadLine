@@ -4,15 +4,61 @@ const SNAPSHOT_KEY = "threadline_state_snapshots";
 const CAPTURE_PREFIX = "tl_capture_owner_";
 let mutations = Promise.resolve();
 
-// The side panel normally sends messages without sender.tab. Chrome also
-// attaches sender.tab when the same extension-owned panel.html is opened in a
-// regular tab (e.g. full-width review and actual persistent-context E2E).
-// Trust that exact internal page, never a ChatGPT content script/tab URL.
-function isTrustedPanelSender(sender) {
-  if (!sender?.tab) return true;
-  const expected = chrome.runtime.getURL?.('panel.html');
-  return !!(expected && sender.id === chrome.runtime.id &&
-    sender.url === expected && (!sender.tab.url || sender.tab.url === expected));
+// The sending document is the principal, not its container tab. Never trust
+// a missing tab alone. A conflicting container requires independent browser
+// attestation of the exact live extension panel document, not payload claims.
+async function inspectPanelSender(sender) {
+  const expected = chrome.runtime.getURL('panel.html');
+  const origin = `chrome-extension://${chrome.runtime.id}`;
+  const tabURL = sender?.tab?.url;
+  const check = {
+    ok:false,reason:'ID_MISMATCH',hasTab:!!sender?.tab,
+    idMatches:!!chrome.runtime.id && sender?.id === chrome.runtime.id,
+    urlMatches:sender?.url === expected,
+    originMatches:sender?.origin === undefined || sender.origin === origin,
+    frameMatches:sender?.frameId === undefined || sender.frameId === 0,
+    tabUrlPresent:tabURL !== undefined && tabURL !== '',
+    tabUrlMatches:tabURL === undefined || tabURL === '' || tabURL === expected,
+    contextStatus:'not_checked'
+  };
+  if(!check.idMatches)return check;
+  if(!check.urlMatches)return {...check,reason:'DOCUMENT_URL_MISMATCH'};
+  if(!check.originMatches)return {...check,reason:'ORIGIN_MISMATCH'};
+  if(!check.frameMatches)return {...check,reason:'FRAME_MISMATCH'};
+  if(check.tabUrlMatches)return {...check,ok:true,reason:'EXACT_PANEL'};
+  if(typeof tabURL !== 'string')return {...check,reason:'INVALID_TAB_URL'};
+  if(typeof sender.documentId !== 'string' || !sender.documentId)
+    return {...check,reason:'DOCUMENT_ID_MISSING'};
+  if(typeof chrome.runtime.getContexts !== 'function')
+    return {...check,reason:'CONTEXT_UNAVAILABLE',contextStatus:'unavailable'};
+  let timer;
+  try {
+    const contexts = await Promise.race([
+      chrome.runtime.getContexts({contextTypes:['SIDE_PANEL','TAB'],
+        documentIds:[sender.documentId],documentUrls:[expected]}),
+      new Promise(resolve=>{timer=setTimeout(()=>resolve(null),1000);})
+    ]);
+    if(contexts === null)return {...check,reason:'CONTEXT_TIMEOUT',contextStatus:'timeout'};
+    const verified = Array.isArray(contexts) && contexts.length === 1 && contexts.every(c=>
+      c.documentId === sender.documentId && c.documentUrl === expected &&
+      c.documentOrigin === origin && (c.frameId === 0 || c.frameId === -1) &&
+      (c.contextType === 'SIDE_PANEL' ||
+        (c.contextType === 'TAB' && Number.isInteger(sender.tab?.id) &&
+          sender.tab.id >= 0 && c.tabId === sender.tab.id)));
+    return {...check,ok:verified,reason:verified?'ATTESTED_PANEL':'CONTEXT_NOT_VERIFIED',
+      contextStatus:verified?'verified':'not_matched'};
+  } catch {
+    // Never disclose raw API errors, browsing URLs, extension IDs or document IDs.
+    return {...check,reason:'CONTEXT_ERROR',contextStatus:'error'};
+  } finally {clearTimeout(timer);}
+}
+async function requirePanelSender(sender,message) {
+  const check = await inspectPanelSender(sender);
+  if(!check.ok){
+    const error = new Error(message);
+    error.code='PANEL_SOURCE_REJECTED';error.sourceCheck=check;
+    throw error;
+  }
 }
 
 
@@ -338,16 +384,16 @@ chrome.runtime.onMessage.addListener((payload,sender,reply) => {
   (async () => {
     if (!payload || typeof payload.type !== "string") throw new Error("无效消息");
     if (payload.type === "CAPTURE_START") {
-      if(!isTrustedPanelSender(sender))throw new Error("只有研线面板可启动采集");
+      await requirePanelSender(sender,"只有研线面板可启动采集");
       return beginCapture(payload.tabId);
     }
     if (["CAPTURE_RESET","CAPTURE_PAGE","CAPTURE_PROGRESS","CAPTURE_END","CAPTURE_FAIL"].includes(payload.type))return receiveCapture(payload,sender);
     if(payload.type === "WEB_ORGANIZE"){
-      if(!isTrustedPanelSender(sender))throw new Error('只有研线面板可以管理网页版项目与归档');
+      await requirePanelSender(sender,'只有研线面板可以管理网页版项目与归档');
       return organizeWeb(payload);
     }
     if(payload.type === "NEW_CHAT"){
-      if(!isTrustedPanelSender(sender))throw new Error("只有研线面板可接续研究");
+      await requirePanelSender(sender,"只有研线面板可接续研究");
       return openChatWithDraft(payload.handoff,payload.windowId,payload.projectId);
     }
     if(["HANDOFF_GET","HANDOFF_BEGIN","HANDOFF_ACK"].includes(payload.type)){
@@ -401,37 +447,37 @@ chrome.runtime.onMessage.addListener((payload,sender,reply) => {
       return {key,...ThreadLineCore.getContext(state,key)};
     }
     if (payload.type === "BACKUP_EXPORT") {
-      if(!isTrustedPanelSender(sender))throw new Error('只能由研线侧栏导出');
+      await requirePanelSender(sender,'只能由研线侧栏导出');
       const state=await readState();
       const record=await chrome.storage.local.get(SNAPSHOT_KEY);
       return ThreadLineBackup.create(state,record[SNAPSHOT_KEY]||[]);
     }
     if (payload.type === "BACKUP_IMPORT") {
-      if(!isTrustedPanelSender(sender))throw new Error('只能由研线侧栏导入');
+      await requirePanelSender(sender,'只能由研线侧栏导入');
       return importBackup(payload.json);
     }
     if (payload.type === "BACKUP_SNAPSHOTS") {
-      if(!isTrustedPanelSender(sender))throw new Error('只能由研线侧栏读取');
+      await requirePanelSender(sender,'只能由研线侧栏读取');
       const record=await chrome.storage.local.get(SNAPSHOT_KEY);
       return (record[SNAPSHOT_KEY]||[]).map((r,index)=>({index,at:r.at,reason:r.reason,revision:r.state?.revision}));
     }
     if (payload.type === "BACKUP_ROLLBACK") {
-      if(!isTrustedPanelSender(sender))throw new Error('只能由研线侧栏恢复');
+      await requirePanelSender(sender,'只能由研线侧栏恢复');
       return restoreSnapshot(payload.index);
     }
     if (payload.type === "HEALTH_CHECK") {
-      if(!isTrustedPanelSender(sender))throw new Error('只能由研线侧栏自检');
+      await requirePanelSender(sender,'只能由研线侧栏自检');
       const result=await inspectTab(payload.tabId);
       const record=await chrome.storage.local.get(PAGE_HEALTH_KEY);
       return {page:result,lastSuccess:record[PAGE_HEALTH_KEY]||{},at:Date.now()};
     }
     if (payload.type === "SNAPSHOT") {
-      if (!isTrustedPanelSender(sender)) throw new Error("无权访问面板数据");
+      await requirePanelSender(sender,"无权访问面板数据");
       await recoverCaptures();
       return snapshot();
     }
     if (payload.type === "MUTATE") {
-      if (!isTrustedPanelSender(sender)) throw new Error("只能在扩展面板中修改课题状态");
+      await requirePanelSender(sender,"只能在扩展面板中修改课题状态");
       return mutate(payload.action);
     }
     if (["PAGE_CONTEXT","OBSERVE"].includes(payload.type)) {
@@ -439,6 +485,7 @@ chrome.runtime.onMessage.addListener((payload,sender,reply) => {
       return pageContext(sender,payload);
     }
     throw new Error("无效消息类型");
-  })().then(data=>reply({ok:true,data}),err=>reply({ok:false,error:String(err.message||err)}));
+  })().then(data=>reply({ok:true,data}),err=>reply({ok:false,error:String(err.message||err),
+    ...(err.code==='PANEL_SOURCE_REJECTED'?{code:err.code,sourceCheck:err.sourceCheck}:{})}));
   return true;
 });
