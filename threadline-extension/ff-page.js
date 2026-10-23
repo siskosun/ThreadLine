@@ -3,7 +3,37 @@
   "use strict";
   const $ = id => document.getElementById(id);
   const inputs = ["ff-w0","ff-p"];
-  let pendingCreate = null; // Reuse across uncertain acknowledgements, never auto-replay.
+  let pendingCreate = null; // In-memory lease while this page stays open.
+  // One unacknowledged create intent survives THIS TAB's page/worker reload.
+  // Store only its SHA-256 and operation ID, never W0/P content in sessionStorage.
+  const CREATE_INTENT_KEY = "tl_ff_create_intent_v1";
+  function storedCreateIntent() {
+    const raw = sessionStorage.getItem(CREATE_INTENT_KEY);
+    if (raw === null) return null;
+    let record;
+    try { record = JSON.parse(raw); } catch {}
+    if (!record || typeof record.operationId !== "string" ||
+        !/^[a-zA-Z0-9_-]{6,100}$/.test(record.operationId) ||
+        typeof record.inputHash !== "string" ||
+        !/^[a-f0-9]{64}$/.test(record.inputHash))
+      throw new Error("待确认创建记录无法验证，已停止新建以避免重复实验");
+    return record;
+  }
+  async function createIntent(w0, p) {
+    const inputHash = await ThreadLineFFCore.hash(JSON.stringify([w0, p]));
+    const stored = storedCreateIntent();
+    if (stored?.inputHash === inputHash)
+      return {operationId:stored.operationId, w0, p};
+    const operationId = crypto.randomUUID();
+    // If Web Storage fails, do not silently proceed with an unrecoverable ID.
+    sessionStorage.setItem(CREATE_INTENT_KEY,JSON.stringify({operationId,inputHash}));
+    return {operationId,w0,p};
+  }
+  function acknowledgeIntent(operationId) {
+    const stored = storedCreateIntent();
+    if (stored?.operationId === operationId)
+      sessionStorage.removeItem(CREATE_INTENT_KEY);
+  }
   const send = payload => new Promise((resolve,reject) => {
     chrome.runtime.sendMessage(payload,response => {
       if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
@@ -82,9 +112,13 @@
     try {
       const w0 = $("ff-w0").value, p = $("ff-p").value;
       if (!pendingCreate || pendingCreate.w0 !== w0 || pendingCreate.p !== p)
-        pendingCreate = {operationId:crypto.randomUUID(),w0,p};
-      const created = await send({type:"FF_CREATE",...pendingCreate});
-      pendingCreate = null;
+        pendingCreate = await createIntent(w0,p);
+      const intent = pendingCreate;
+      const created = await send({type:"FF_CREATE",...intent});
+      // An accepted ACK proves this intent was persisted by the worker. Clear
+      // its lease; a lost ACK leaves the same ID available after page reload.
+      acknowledgeIntent(intent.operationId);
+      if (pendingCreate?.operationId === intent.operationId) pendingCreate = null;
       await list();
       await read(created.id);
       notice("已冻结并保存到独立本地数据库；没有打开或发送网页消息。");
