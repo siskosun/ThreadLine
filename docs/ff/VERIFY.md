@@ -133,3 +133,9 @@ PR-2/3 在用户签署此门禁通过前不得开展真实网页自动化集成�
 - Windows `npm run verify`：189/189；`npm run test:e2e`：3/3。实际 MV3 断言同一节点恢复、存储意图不变、input=0、submit=0；原长文本/附件/空段落/一次性登记及 P1 回归保持通过。
 - 代码提交 `1f7578f` 双平台 CI 通过；各命令、红绿原始日志哈希和可公开复核的脱敏全文见 [证据](evidence/HANDOFF_NOTICE_RECOVERY_20261023.md)。后续最新 HEAD 另核 CI。
 - 修复前真实 Tabbit 空白/多行保护及未知状态无重放 PASS，提示持久性 FAIL；修复后实机复测因控制通道阻塞为 BLOCKED，不能将磁盘更新或合成测试称为真实通过。0 新增发送，Edge NOT RUN，Z0-LIVE NOT SIGNED。
+
+## 2026-10-23 用户验收后的 main 集成验证（PR9）
+
+- 用户报告已验收当前所有修复与 P1 核心；记录与机器实测分别保留出处，详见 [集成证据](evidence/ACCEPTED_INTEGRATION_20261023.md)。此前 Agent 未完成的 Edge 项不被回填成实测 PASS。
+- 生产源码、测试、权限及工作流相对已验收 PR8 `102185b` 无变化。PR9 回归、准确提交 CI 和独立本地审查将关联本次集成快照；不以旧 CI 替代。
+- P1 处于 main 目标 PR 的 in_review，完整 Z0-LIVE 仍 blocked；进入 P2 的依赖和人工签署契约保持有效。

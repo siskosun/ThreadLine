@@ -185,3 +185,10 @@
 - 代码提交 `1f7578f73ca184f464f96c9542cd458842170682` 的 [Linux](https://github.com/siskosun/ThreadLine/actions/runs/39978366347) / [Windows](https://github.com/siskosun/ThreadLine/actions/runs/39978366339) CI 均通过；随后证据/测试加强提交以 PR 最新 HEAD 检查为准。
 - 修复版真实复测 BLOCKED：原生检查器激活失败，Tabbit 禁止扩展页面导航。只确认磁盘候选更新，未假称扩展已重载。未重放未知意图、未改权限；关闭新建空白页，保留四个测试页和历史失败日志。完整脱敏记录/红绿日志见 [证据](evidence/HANDOFF_NOTICE_RECOVERY_20261023.md)。
 - 本轮遵照最新用户指令对 429 暂停 30 秒后先检查状态，不覆盖此前记录。0 新增发送、0 合并、0 发布。PLAN 只增加实际进度，状态表及依赖保持不变；Z0-LIVE BLOCKED / NOT SIGNED。
+
+## 2026-10-23 用户验收后：收敛 main 集成候选（PR9）
+
+- 用户明确确认“当前所有修复与 P1 核心验收”，作为该范围的人工风险接受记录。原有 Agent 控制失败日志和测试结果不被改写；完整 Z0-LIVE 的真实消息、完整回复及异常并发签署仍单列。
+- [Draft PR9](https://github.com/siskosun/ThreadLine/pull/9) 将 PR1/3/5/6/7/8 当前代码收敛到 main 目标分支，生产源码与已验收 `102185b` 一致。旧 PR 保留，main 未变。
+- PLAN 的 P1-CORE 由 planned 改为 in_review/PR9；这是状态纠偏，未更改完成条件、依赖或校验器。合并、合并后准确提交的 CI 与完成 JSON 尚待正式执行，因此未写 done。
+- 本集成的回归和准确提交 CI 以 PR9 检查及 [集成证据](evidence/ACCEPTED_INTEGRATION_20261023.md) 为准。后续先完成该集成，再依正式 Z0-LIVE/P1 放行进入 P2；本次无新增网页发送、无 P2/P3 实现。

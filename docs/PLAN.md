@@ -15,7 +15,7 @@
 | R-REUSE | 复用调研与 Fork 审计 | in_review | - | 上游代码、Fork 差异及移植边界经评审 | PR#2 | no |
 | Z0-BASE | Windows 测试基线与路径修复 | in_review | - | Windows npm run verify 和合成 E2E 有原始日志 | PR#1 | yes |
 | Z0-LIVE | 真实登录 ChatGPT 的页面适配验收 | blocked | Z0-BASE | 双标签创建、长草稿回读、人工发送核实、完整采集、异常恢复由用户验收 | docs/ff/BLOCKED.md | yes |
-| P1-CORE | 冻结材料、独立存储及四态状态机 | planned | - | 24KB 输入和 SHA-256、attempts、单写者与原有功能回归经测试 | - | no |
+| P1-CORE | 冻结材料、独立存储及四态状态机 | in_review | - | 24KB 输入和 SHA-256、attempts、单写者与原有功能回归经测试 | PR#9 | no |
 | P2-FORK | 双会话创建与人工发送工作流 | planned | Z0-LIVE,P1-CORE | 两边输入完整且相同，0 自动发送，分支身份和重启恢复经测试 | - | yes |
 | P3-REPORT | 完整结果采集、去标签对照及 JSON 导出 | planned | P2-FORK | 双 done 才可对照，用户裁决持久化，不重放未知状态，导出可独立复算 | - | yes |
 | BETA-RELEASE | 安装升级与正式 Beta 验收 | planned | P3-REPORT | 真实双分支闭环、同路径旧数据升级、CI 与用户验收均通过 | - | yes |
@@ -41,6 +41,13 @@
 第一期**不实现自动 Flush、不自动提交消息、不自动重发、不运行 LLM 裁判、不提供 JSON 导入、不宣称验证 Fork-and-Flush 的因果收益**。功能入口默认关闭，原有 ThreadLine 课题管理与研究整理流程保持不变。
 
 ## 二、已核实的当前进展
+
+### 2026-10-23 已验收修复与 P1 核心的 main 集成候选
+
+- 用户已明确确认验收范围为“当前所有修复与 P1 核心验收”。这份确认作为用户报告记录；此前 Agent 未能完成的 Edge 控制预检日志保留，未改写为 Agent 实测成功。
+- [Draft PR9](https://github.com/siskosun/ThreadLine/pull/9) 以 main 为目标，收敛 PR1/3/5/6/7/8 的已验收代码；生产源码与 `102185b75226222446611cdefd337047644e449c` 完全相同，未新增 P2/P3。集成回归与验收范围见 [集成记录](ff/evidence/ACCEPTED_INTEGRATION_20261023.md)。
+- P1-CORE 从过时的 `planned` 更新为 `in_review` 并关联 PR9；仍需 PR 合并后的准确提交和 CI 才能按证据契约登记 `done`。Z0-LIVE 的完整消息/回复/异常恢复签署不在本次明确验收范围内，维持 blocked。
+- 下一步：完成本集成提交的 Windows / 合成 MV3 回归与双平台 CI，人工决定合并后收集合并证据；完整 Z0-LIVE 完成后再进入 P2-FORK。计划表本次变更及集成范围需随 PR 人工复核。
 
 ### 2026-10-23 开发接续核对（证据更新，任务状态未放行）
 
