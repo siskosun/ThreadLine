@@ -178,7 +178,7 @@ const ThreadLineFFCore = (() => {
         typeof evidence.reply === "string" && evidence.reply.length > 0,
         "response incomplete");
       assert(Array.isArray(evidence.endSignals) &&
-        evidence.endSignals.every(signal => typeof signal === "string" && END_SIGNALS.includes(signal)) &&
+        Array.from(evidence.endSignals).every(signal => typeof signal === "string" && END_SIGNALS.includes(signal)) &&
         new Set(evidence.endSignals).size >= 2,
         "insufficient completion signals");
       assert(evidence.persisted === true, "response not persisted");

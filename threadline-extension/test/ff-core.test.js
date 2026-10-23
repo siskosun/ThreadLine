@@ -46,7 +46,7 @@ test("FF completion requires distinct recognized string signal kinds",async()=>{
    expectedRevision:0,operationId:"op_signal01"};
  const evidence={sessionId:"chat-signal",inputLevel:"exact",taskCount:1,captureComplete:true,
    reply:"ok",persisted:true};
- for(const endSignals of [[null,false],["stable","typo"],["stable","stable"],
+ for(const endSignals of [[null,false],["stable","typo"],["stable","stable"],["stable",,],
    [{type:"stable",ms:5000},{type:"stable",ms:5000}],["stable",{}],"stable,final",[]])
    assert.throws(()=>F.advance(initial,{...event,evidence:{...evidence,endSignals}}),/completion signals/);
  for(const endSignals of [["stable","final"],["generation","stable"],["generation","final"]])
