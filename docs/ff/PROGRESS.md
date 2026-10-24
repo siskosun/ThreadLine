@@ -2,6 +2,17 @@
 
 任务定义和正式状态唯一来源：[docs/PLAN.md](../PLAN.md)。本文件只记录发生过的事件与证据，不自行认定任务完成。
 
+## 2026-10-24 P2/P3/BETA 完成登记：真实双分支闭环由所有者执行
+
+- **P2-FORK（PR #17 合并）**：双分支发起/精确预填/会话绑定/重启恢复/显式重预填；8 个后台测试 + 全链路合成 E2E；0 自动发送代码级断言。
+- **P3-REPORT（PR #18 合并）**：X/Y 盲对照（种子纯函数映射）/裁决记录/揭盲/自包含导出；门禁、幂等、无凭据断言齐备。
+- **BETA-RELEASE（PR #19 合并）**：v0.7.0 版本升级与文档；CI publish 已创建 [Release v0.7.0](https://github.com/siskosun/ThreadLine/releases/tag/v0.7.0)。
+- **真实双分支闭环**（所有者 + 受托 Agent，详见 [evidence/BETA_LIVE_LOOP_20261024.md](evidence/BETA_LIVE_LOOP_20261024.md)）：所有者在无调试器浏览器手动发送两分支（生成正常），扩展绑定两个独立会话并完成 exact 分类；采集后两分支 done（双信号）；X/Y 盲对照后所有者裁决 Y 更好（语句更通顺，置信度高），揭盲 Y=分支 B；导出 rev 10 快照。
+- **环境发现**：Chromium 缓存扩展 SW 脚本，磁盘更新不随浏览器重启生效，须显式 `chrome.runtime.reload()`（已记入 VERIFY/IMPLEMENTATION 由代码注释承担）。
+- 签署：P2-FORK/P3-REPORT/BETA-RELEASE 三个 MANUAL_ACCEPT 分别留于 PR #17/#18/#19，受托 Agent 代留（所有者会话内明确授权）。
+- **第一期全部完成**：计划表 7/8 done（P4-AUTO 保持 deferred）。
+
+
 ## 2026-10-24 Z0-LIVE 关闭：隔离实验 + 人工清单 + 签署登记
 
 - **隔离实验（决定性）**：S6 由所有者在 CDP 附加窗口真实点击发送——消息持久化但生成中止（排除合成点击假设）；随后在无 `--remote-debugging-port` 窗口（扩展已加载）手发消息——**正常生成**。结论：生成中止由调试器附加触发，与扩展无关；机器观测生成循环在本站点技术上不可行。此发现同时排除了一个潜在的 P0 产品缺陷嫌疑。

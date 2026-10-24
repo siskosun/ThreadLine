@@ -2,6 +2,11 @@
 
 该文件登记事实及解除条件，不是第二份计划。官方任务状态见 [docs/PLAN.md](../PLAN.md)。
 
+## 2026-10-24 当前无阻塞任务（第一期完成）
+
+- P2-FORK、P3-REPORT、BETA-RELEASE 均已 done（真实双分支闭环由所有者执行确认，签署齐备）；第一期收官，**无阻塞任务**。
+- P4-AUTO（第二期）保持 deferred，进入须人工重新批准并修改本计划。
+
 ## 2026-10-24 当前无阻塞任务
 
 - **Z0-LIVE 已解除**（所有者人工清单 + 隔离实验定位外部限制，详见 [evidence/Z0-LIVE.json](evidence/Z0-LIVE.json) 与 [REAL_SITE_DELEGATED_20261024.md](evidence/REAL_SITE_DELEGATED_20261024.md) 末章）。下方历史阻塞记录保留原日期含义，不再代表现状。

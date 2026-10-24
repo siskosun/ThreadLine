@@ -17,11 +17,16 @@ const fixtureFiles = [
   'docs/ff/evidence/P1-CORE.json',
   'docs/ff/evidence/Z0-BASE.json',
   'docs/ff/evidence/Z0-LIVE.json',
+  'docs/ff/evidence/P2-FORK.json',
+  'docs/ff/evidence/P3-REPORT.json',
+  'docs/ff/evidence/BETA-RELEASE.json',
   'threadline-extension/test/ff-core.test.js',
   'threadline-extension/test/ff-db.test.js',
   'threadline-extension/test/ff-background-toggle.test.js',
   'threadline-extension/test/check-syntax-portable.test.js',
-  'threadline-extension/test/extension-e2e.py'
+  'threadline-extension/test/extension-e2e.py',
+  'threadline-extension/test/ff-launch.test.js',
+  'threadline-extension/test/plan-governance.test.js'
 ];
 
 async function checks() { return import(pathToFileURL(MOD).href); }
@@ -53,12 +58,11 @@ test('canonical plan contains all required tasks and no unverified done claims',
   const actual=validatePlan(ROOT);
   assert.equal(actual.tasks.length,8);
   // Done claims must stay limited to tasks with real merged-PR evidence JSONs.
-  assert.deepEqual(actual.done.map(x=>x.task.id).sort(),['P1-CORE','R-REUSE','Z0-BASE','Z0-LIVE']);
-  // First-phase execution tasks stay gated until their own evidence lands.
-  assert.equal(actual.tasks.find(x=>x.id==='P2-FORK').status,'planned');
-  assert.equal(actual.tasks.find(x=>x.id==='P3-REPORT').status,'planned');
-  assert.notEqual(actual.tasks.find(x=>x.id==='BETA-RELEASE').status,'done');
-  assert.notEqual(actual.tasks.find(x=>x.id==='P2-FORK').status,'done');
+  assert.deepEqual(actual.done.map(x=>x.task.id).sort(),
+    ['BETA-RELEASE','P1-CORE','P2-FORK','P3-REPORT','R-REUSE','Z0-BASE','Z0-LIVE']);
+  // Phase 2 stays deferred without explicit human re-approval.
+  assert.equal(actual.tasks.find(x=>x.id==='P4-AUTO').status,'deferred');
+  assert.notEqual(actual.tasks.find(x=>x.id==='P4-AUTO').status,'done');
 });
 
 test('missing/duplicate plan markers and missing tasks are rejected',async()=>{
@@ -76,9 +80,11 @@ test('missing/duplicate plan markers and missing tasks are rejected',async()=>{
 test('a task cannot advance while its hard dependencies are incomplete',async()=>{
   const {validatePlan}=await checks();
   withFixture(dir=>{
-    // P3-REPORT still depends on P2-FORK, which is planned.
-    edit(dir,'docs/PLAN.md',s=>rowChange(s,'P3-REPORT',
-      line=>line.replace(' | planned | ',' | in_review | ').replace(' | - | yes |',' | PR#99 | yes |')));
+    // Manufacture an unfinished dependency on a done task's row.
+    edit(dir,'docs/PLAN.md',s=>rowChange(s,'P2-FORK',
+      line=>line.replace(' | Z0-LIVE,P1-CORE | ',' | Z0-LIVE,P4-AUTO | ')
+                .replace(' | done | ',' | in_review | ')
+                .replace('docs/ff/evidence/P2-FORK.json','PR#99')));
     assert.throws(()=>validatePlan(dir),/dependency is not done/);
   });
 });
@@ -99,10 +105,12 @@ test('marking done without an evidence JSON fails, even if the agent says it pas
 test('blocked tasks require a concrete blocker and legacy plan must redirect',async()=>{
   const {validatePlan}=await checks();
   withFixture(dir=>{
-    // Manufacture a blocked task, then remove its explanation: must fail.
-    edit(dir,'docs/PLAN.md',s=>rowChange(s,'P2-FORK',
-      line=>line.replace(' | planned | ',' | blocked | ').replace(' | - | yes |',' | docs/ff/BLOCKED.md | yes |')));
-    edit(dir,'docs/ff/BLOCKED.md',s=>s.replaceAll('P2-FORK','not-on-list'));
+    // Manufacture a blocked task from a done row that nothing depends on,
+    // then remove its explanation: must fail.
+    edit(dir,'docs/PLAN.md',s=>rowChange(s,'BETA-RELEASE',
+      line=>line.replace(' | done | ',' | blocked | ')
+                .replace('docs/ff/evidence/BETA-RELEASE.json','docs/ff/BLOCKED.md')));
+    edit(dir,'docs/ff/BLOCKED.md',s=>s.replaceAll('BETA-RELEASE','not-on-list'));
     assert.throws(()=>validatePlan(dir),/blocked task not explained/);
   });
   withFixture(dir=>{
