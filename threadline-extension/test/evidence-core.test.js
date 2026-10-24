@@ -218,3 +218,45 @@ test('project cap: 200 conclusions per project, then refuse', async () => {
   }
   await assert.rejects(Core.planAdoption(state, adoption('第201条'), 'op_cap000201'), /200/);
 });
+
+test('amendment creates a new immutable version with predecessor, never rewrites', async () => {
+  const db = mockIdb({ projects: { p1: Core.newProjectRecord('p1') } });
+  let state = await stateFrom(db);
+  const first = await DB.applyPlan(db, await Core.planAdoption(state, adoption('初版正文'), 'op_am000000001'));
+  state = await stateFrom(db);
+  const amended = await DB.applyPlan(db, await Core.planAmendment(state, first.conclusionId,
+    { text: '修订正文', fragments: [{ selection: '新依据' }] }, 'op_am000000002'));
+  assert.equal(amended.revision, 2);
+  state = await stateFrom(db);
+  const conclusion = state.conclusions[first.conclusionId];
+  assert.equal(conclusion.currentVersionId, amended.versionId);
+  const versions = Object.values(state.versions).filter(v => v.conclusionId === first.conclusionId);
+  assert.equal(versions.length, 2, 'history preserved');
+  const fresh = versions.find(v => v.id === amended.versionId);
+  assert.equal(fresh.changeType, 'amend');
+  assert.equal(fresh.predecessorId, first.versionId);
+  assert.ok(state.versions[first.versionId], 'original version untouched');
+  // Idempotent replay of the same amendment operation.
+  const replay = await Core.planAmendment(state, first.conclusionId,
+    { text: '修订正文', fragments: [{ selection: '新依据' }] }, 'op_am000000002');
+  assert.deepEqual(replay.replay, amended);
+});
+
+test('duplicate adoption detection: same body+fragments, different fragments', async () => {
+  const state = { conclusions: {}, versions: {}, sources: {}, links: {},
+    projects: { p1: Core.newProjectRecord('p1') }, operations: {} };
+  const apply = async (plan) => { const w = plan.writes;
+    state.conclusions[w.conclusion.id] = w.conclusion; state.versions[w.version.id] = w.version;
+    w.sources.forEach(s => state.sources[s.id] = s); w.links.forEach(l => state.links[l.id] = l);
+    state.projects.p1 = w.project; state.operations[w.ledger.operationId] = w.ledger; };
+  await apply(await Core.planAdoption(state, adoption('相同正文'), 'op_dup000000001'));
+  const same = await Core.findDuplicateAdoption(state, 'p1',
+    { text: '相同正文', fragments: [{ selection: '依据片段', before: '前文', after: '后文' }] });
+  assert.ok(same, 'identical body+fragments detected as duplicate');
+  const different = await Core.findDuplicateAdoption(state, 'p1',
+    { text: '相同正文', fragments: [{ selection: '不同的依据', before: '', after: '' }] });
+  assert.equal(different, null, 'different fragments are not duplicates');
+  const otherText = await Core.findDuplicateAdoption(state, 'p1',
+    { text: '另一条正文', fragments: [{ selection: '依据片段' }] });
+  assert.equal(otherText, null, 'different body is not a duplicate');
+});

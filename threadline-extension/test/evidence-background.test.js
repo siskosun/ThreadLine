@@ -198,3 +198,34 @@ test('withdrawal still projects; replay of a failed projection never double-bump
   const project = s.evidence.projects.get('p-taken');
   assert.equal(project.legacyNote.text, '旧的自由文本结论', 'takeover note survives withdrawal (no un-seal)');
 });
+
+test('S1b: duplicate adoption replays instead of creating a twin; amendment works end to end', async () => {
+  const s = system();
+  await s.message({ type: 'EV_ENSURE', projectId: 'p-taken' });
+  const first = await s.message(adoption('p-taken', '逐条采纳的正文'));
+  const twin = await s.message(adoption('p-taken', '逐条采纳的正文'));
+  assert.equal(twin.dedupe, true, 'duplicate flagged');
+  assert.equal(twin.id, first.conclusionId, 'same conclusion replayed');
+  const project = s.evidence.projects.get('p-taken');
+  const count = [...s.evidence.conclusions.values()].filter(c => c.projectId === 'p-taken').length;
+  assert.equal(count, 1, 'no twin created');
+  const amended = await s.message({ type: 'EV_AMEND', conclusionId: first.conclusionId,
+    text: '修订后的正文', fragments: [{ selection: '修订依据' }],
+    operationId: 'op_s1b_amend_0001' });
+  assert.equal(amended.versionId.length > 4, true);
+  const versions = [...s.evidence.versions.values()].filter(v => v.conclusionId === first.conclusionId);
+  assert.equal(versions.length, 2, 'amendment keeps history');
+  await new Promise(r => setImmediate(r));
+  const projection = s.local.get('tl_evidence_summary_p-taken');
+  assert.ok(projection.summary.includes('修订后的正文'), 'projection reflects the amendment');
+});
+
+test('EV_LOCATE degrades to fragment-only when the conversation tab is not open', async () => {
+  const s = system();
+  const result = await s.message({ type: 'EV_LOCATE', conversationId: 'conv-1234',
+    messageId: 'm1', role: 'user', contentPrefix: '前缀' });
+  assert.equal(result.located, false);
+  assert.equal(result.reason, 'conversation-not-open');
+  assert.equal(result.url, 'https://chatgpt.com/c/conv-1234');
+  await assert.rejects(s.message({ type: 'EV_LOCATE' }), /缺少会话 ID/);
+});

@@ -4,6 +4,7 @@
 
 - S0a 证据存储原型：threadline_evidence_v1 单事务权威写入（CAS/幂等台账）、只读摘要投影、崩溃点与破坏性路径设计冻结、12 次采纳计时协议、容量默认值冻结。
 - S0b 定位 spike：GPT Conversation Toolkit（MIT，pinned 119d3728）滚动坐标算法 vendored（滚动根注入化）+ 身份优先定位器（弱匹配不冒充、AbortSignal 取消）。
+- S1b 逐条采纳与交接：面板“证据结论”区（投影展示/片段展开/修订/撤回/交接材料预览复制）；Fork 揭盲后按分支采纳到课题证据库（回复为来源片段并绑定会话）；重复采纳回放不建孪生；EV_LOCATE 定位桥（身份校验，失败一律降级“仅片段”并给出会话链接，不误跳转）。
 - S1a 持久化与恢复：chrome.storage 单向投影（写后复查/待办持久/启动与读取幂等重算）；旧 decision 消息级封口（takeover + legacy-note 原样封存；MUTATE/BACKUP_IMPORT/BACKUP_ROLLBACK 拒绝接管课题的 decision 覆盖，其他字段不受影响）。
 
 ## v0.8.1 — 真人 K=4 实测修复

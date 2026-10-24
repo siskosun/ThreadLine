@@ -123,6 +123,45 @@
     }
     return box;
   }
+  function renderAdoptControl(label, value, decision, replyText) {
+    const holder = document.createElement("div");
+    holder.className = "line";
+    const branch = decision.mapping[label];
+    const attempt = value.branches[branch] && value.branches[branch].attempts.at(-1);
+    const reply = replyText || "";
+    const sessionId = attempt && attempt.evidence && attempt.evidence.sessionId;
+    const status = document.createElement("span");
+    status.className = "subtle";
+    const adopt = document.createElement("button");
+    adopt.type = "button"; adopt.className = "secondary";
+    adopt.textContent = "采纳该分支结论到证据库";
+    adopt.addEventListener("click", async () => {
+      adopt.disabled = true;
+      try {
+        const snapshot = await chrome.storage.local.get("threadline_state_v1");
+        const projects = ((snapshot["threadline_state_v1"] || {}).projects) || [];
+        if (!projects.length) throw new Error("尚无课题：请先在研线面板创建课题");
+        const names = projects.map(p => p.id + "：" + (p.name || p.id)).join("\n");
+        const chosen = prompt("采纳到哪个课题？\n" + names + "\n（输入课题 ID）", projects[0].id);
+        if (!chosen) return;
+        const project = projects.find(p => p.id === chosen);
+        if (!project) throw new Error("课题不存在：" + chosen);
+        const result = await send({ type: "EV_ADOPT", projectId: project.id,
+          text: "【Fork " + value.id.slice(0, 12) + " · " + label + "】" + reply.slice(0, 3900),
+          fragments: [{
+            selection: reply.slice(0, 2000), before: "", after: "",
+            relation: "cites", completeness: "complete", kind: "capture",
+            conversationId: sessionId || null
+          }],
+          operationId: "op_adopt_" + crypto.randomUUID().replace(/-/g, "").slice(0, 10) });
+        status.textContent = result.dedupe ? "已存在相同采纳（未重复创建）" : "已采纳：" + result.conclusionId.slice(0, 14) + "…";
+      } catch (e) { status.textContent = "采纳失败：" + e.message; }
+      finally { adopt.disabled = false; }
+    });
+    holder.appendChild(adopt); holder.appendChild(status);
+    return holder;
+  }
+
   function renderCompare(value) {
     const section = $("ff-compare");
     const branches = value.branches;
@@ -224,6 +263,10 @@
       const body = document.createElement("pre");
       body.textContent = replyOf(label);
       col.appendChild(head); col.appendChild(body);
+      // S1b: per-branch adoption into the evidence store. The reply becomes
+      // the source fragment bound to this attempt's conversation; duplicate
+      // adoptions replay instead of creating twins.
+      col.appendChild(renderAdoptControl(label, value, decision, replyOf(label)));
       columns.appendChild(col);
     }
     const v = decision.verdict;

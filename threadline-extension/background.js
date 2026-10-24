@@ -950,12 +950,25 @@ async function handleEvidence(payload, sender) {
       consumeEvidenceProjection(payload.projectId).catch(() => {});
     return { summary: Core.projectSummary(state, payload.projectId) };
   }
-  if (payload.type === "EV_ADOPT" || payload.type === "EV_WITHDRAW" || payload.type === "EV_IMPORT") {
+  if (payload.type === "EV_ADOPT" || payload.type === "EV_WITHDRAW" || payload.type === "EV_IMPORT" || payload.type === "EV_AMEND") {
     const result = await serialize(async () => {
       const db = await evidenceDb();
-      const state = await ThreadLineEvidenceDB.snapshot(db);
+      let state = await ThreadLineEvidenceDB.snapshot(db);
       let plan;
-      if (payload.type === "EV_ADOPT") {
+      if (payload.type === "EV_AMEND") {
+        plan = await Core.planAmendment(state, payload.conclusionId,
+          { text: payload.text, conditions: payload.conditions, fragments: payload.fragments },
+          payload.operationId);
+      } else if (payload.type === "EV_ADOPT") {
+        // Topic-store projects adopt without a prior EV_ENSURE call.
+        await ThreadLineEvidenceDB.ensureProject(db, payload.projectId, Core);
+        // Refresh after ensureProject so planning sees the project row.
+        state = await ThreadLineEvidenceDB.snapshot(db);
+        // Duplicate adoption guard: identical body+fragments replays the
+        // existing adopted conclusion (S1b gate: 重复采纳不重复创建).
+        const duplicate = await Core.findDuplicateAdoption(state, payload.projectId,
+          { text: payload.text, fragments: payload.fragments });
+        if (duplicate) return { ...duplicate, dedupe: true, revision: state.projects[payload.projectId]?.evidenceRevision };
         // Capture the legacy decision text verbatim at takeover time.
         const alreadyTaken = state.projects[payload.projectId]?.takeover === true;
         let legacyDecision = "";
@@ -979,7 +992,7 @@ async function handleEvidence(payload, sender) {
       return ThreadLineEvidenceDB.applyPlan(db, plan);
     });
     let touchedProject = payload.projectId;
-    if (!touchedProject && payload.type === "EV_WITHDRAW" && result?.conclusionId) {
+    if (!touchedProject && (payload.type === "EV_WITHDRAW" || payload.type === "EV_AMEND") && result?.conclusionId) {
       const db = await evidenceDb();
       const state = await ThreadLineEvidenceDB.snapshot(db);
       touchedProject = state.conclusions[result.conclusionId]?.projectId;
@@ -991,6 +1004,41 @@ async function handleEvidence(payload, sender) {
     const db = await evidenceDb();
     const state = await ThreadLineEvidenceDB.snapshot(db);
     return Core.exportPackage(state, payload.projectId);
+  }
+  if (payload.type === "EV_LOCATE") {
+    // Identity-first location in a live conversation tab (S0b locator).
+    // Any failure degrades to "fragment only" — the caller never jumps.
+    if (typeof payload.conversationId !== "string" || !payload.conversationId)
+      throw new Error("缺少会话 ID");
+    const tabs = await chrome.tabs.query({ url: "https://chatgpt.com/*" });
+    const target = tabs.find(tab => (tab.url || "").includes("/c/" + payload.conversationId));
+    if (!target) return { located: false, reason: "conversation-not-open",
+      url: "https://chatgpt.com/c/" + payload.conversationId };
+    const results = await chrome.scripting.executeScript({
+      target: { tabId: target.id },
+      func: (messageId, role, contentPrefix) => {
+        const node = messageId
+          ? document.querySelector('[data-message-id="' + messageId + '"]') : null;
+        const verify = el => {
+          if (!el) return false;
+          if (role && el.getAttribute("data-message-author-role") !== role) return false;
+          if (contentPrefix) {
+            const text = (el.textContent || "").replace(/\s+/g, " ").trim();
+            if (!text.startsWith(contentPrefix.replace(/\s+/g, " ").trim())) return false;
+          }
+          return true;
+        };
+        if (node && verify(node)) {
+          node.scrollIntoView({ behavior: "smooth", block: "center" });
+          return { located: true, verified: true };
+        }
+        return { located: false, verified: false, reason: node ? "identity-mismatch" : "not-found" };
+      },
+      args: [payload.messageId || null, payload.role || null, payload.contentPrefix || null]
+    });
+    return results && results[0] && results[0].result
+      ? results[0].result
+      : { located: false, reason: "injection-failed" };
   }
   if (payload.type === "EV_QUOTA") {
     let estimate = null;
