@@ -2,6 +2,12 @@
 
 该文件登记事实及解除条件，不是第二份计划。官方任务状态见 [docs/PLAN.md](../PLAN.md)。
 
+## 2026-10-24 委托验收轮后仍阻塞项
+
+- **Z0-BASE 已解除**：PR #10 为完成载体（所有者委托签署 comment 6380321705）；PR #1 已关闭（登记提交信息含 "close #1" 关键字触发自动关闭，与 superseded 处置一致）。计划表随登记 PR 更新。
+- **Z0-LIVE 仍 BLOCKED**：零发送套件 4/4 PASS（[REAL_SITE_DELEGATED_20261024.md](evidence/REAL_SITE_DELEGATED_20261024.md)），但 3 次委托发送的生成流均 `ERR_ABORTED`、零助手回合（跨 Tabbit/Edge 双通道、40+ 分钟），判定为账号侧条件（持续 429）。**解除条件**：账号恢复可生成状态后重测双信号完成、可信回复完整性、双标签重叠；人工发送须重新授权并记录。恢复后新 attempt 重测，不覆盖本轮 unknown/failed 记录。
+- **P2-FORK / P3-REPORT**：继续等待 Z0-LIVE 正式 done。
+
 ## 2026-10-24 真实站点零发送复验中止于 429
 
 - 已登录 Tabbit 浏览器对 main `b0d470b` 候选的真实站点零发送复验：页面请求报 `SITE_RATE_LIMITED`（429），**按停止规则立即中止，未执行任何预填/回读用例**；0 发送。加载路径已同步为 main 代码（磁盘指纹见 [REAL_SITE_429_20261024.md](evidence/REAL_SITE_429_20261024.md)），但运行中的扩展仍为旧构建，需重启浏览器或手动重载后才运行 main 代码。
