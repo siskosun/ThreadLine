@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "task_id": "P1-CORE",
+  "pr_number": 10,
+  "merge_commit": "b0d470b3d7a386f2243f1bafb26aa54c7fcc26a0",
+  "test_cases": [
+    {"file": "threadline-extension/test/ff-core.test.js", "name": "FF frozen input preserves BOM, CRLF, trailing spaces, CJK, emoji and code blocks"},
+    {"file": "threadline-extension/test/ff-core.test.js", "name": "FF rejects oversize UTF-8 and forged hashes"},
+    {"file": "threadline-extension/test/ff-core.test.js", "name": "FF SHA-256 follows fixed canonicalization and preserves formatting"},
+    {"file": "threadline-extension/test/ff-core.test.js", "name": "FF duplicate operation is idempotent across revision changes but conflicting replay fails"},
+    {"file": "threadline-extension/test/ff-core.test.js", "name": "FF unknown attempt is not silently retried or replaced"},
+    {"file": "threadline-extension/test/ff-core.test.js", "name": "FF status machine requires distinct completion signals and one task"},
+    {"file": "threadline-extension/test/ff-db.test.js", "name": "FF update rejects tampering with createOperationId or createdAt"},
+    {"file": "threadline-extension/test/ff-db.test.js", "name": "FF rejects non-transactional or invalid revision updates"},
+    {"file": "threadline-extension/test/ff-background-toggle.test.js", "name": "turning FF off before queued CREATE commits must reject the stale operation"}
+  ]
+}

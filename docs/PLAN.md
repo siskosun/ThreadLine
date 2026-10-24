@@ -1,8 +1,8 @@
 # ThreadLine 开发计划
 
 **唯一正式计划：** 本文件 `docs/PLAN.md`。其他 ChatGPT 资料库、对话、PR 说明和 `docs/ff/` 附录仅作为参考或证据，均不能覆盖本文件的任务状态。
-**事实核查日：** 2026-10-23。
-**基线：** main `f3109ebb6e5e76f4c34670b10654bd0127471bea`（含已合并治理 PR #2），应用仍为 v0.6.1。
+**事实核查日：** 2026-10-24。
+**基线：** main `b0d470b3d7a386f2243f1bafb26aa54c7fcc26a0`（含已合并治理 PR #2 与 P1-CORE PR #10），应用仍为 v0.6.1。
 **实施授权范围：** 第零步与第一期；第二期暂缓。不得仅凭 Agent 声称完成而更新状态。
 
 ## 执行任务与验收门禁
@@ -15,7 +15,7 @@
 | R-REUSE | 复用调研与 Fork 审计 | done | - | 上游代码、Fork 差异及移植边界经评审 | docs/ff/evidence/R-REUSE.json | no |
 | Z0-BASE | Windows 测试基线与路径修复 | in_review | - | Windows npm run verify 和合成 E2E 有原始日志 | PR#1 | yes |
 | Z0-LIVE | 真实登录 ChatGPT 的页面适配验收 | blocked | Z0-BASE | 双标签创建、长草稿回读、人工发送核实、完整采集、异常恢复由用户验收 | docs/ff/BLOCKED.md | yes |
-| P1-CORE | 冻结材料、独立存储及四态状态机 | in_review | - | 24KB 输入和 SHA-256、attempts、单写者与原有功能回归经测试 | PR#10 | no |
+| P1-CORE | 冻结材料、独立存储及四态状态机 | done | - | 24KB 输入和 SHA-256、attempts、单写者与原有功能回归经测试 | docs/ff/evidence/P1-CORE.json | no |
 | P2-FORK | 双会话创建与人工发送工作流 | planned | Z0-LIVE,P1-CORE | 两边输入完整且相同，0 自动发送，分支身份和重启恢复经测试 | - | yes |
 | P3-REPORT | 完整结果采集、去标签对照及 JSON 导出 | planned | P2-FORK | 双 done 才可对照，用户裁决持久化，不重放未知状态，导出可独立复算 | - | yes |
 | BETA-RELEASE | 安装升级与正式 Beta 验收 | planned | P3-REPORT | 真实双分支闭环、同路径旧数据升级、CI 与用户验收均通过 | - | yes |
@@ -41,6 +41,19 @@
 第一期**不实现自动 Flush、不自动提交消息、不自动重发、不运行 LLM 裁判、不提供 JSON 导入、不宣称验证 Fork-and-Flush 的因果收益**。功能入口默认关闭，原有 ThreadLine 课题管理与研究整理流程保持不变。
 
 ## 二、已核实的当前进展
+
+### 2026-10-24 P1-CORE 合并对账与完成证据登记
+
+独立核对 GitHub 事实后的结论（不信任聊天快照）：
+
+| 项目 | 事实 | 计划表状态 |
+| --- | --- | --- |
+| main | `b0d470b3d7a386f2243f1bafb26aa54c7fcc26a0`；P1-CORE PR [#10](https://github.com/siskosun/ThreadLine/pull/10) 于 2026-10-24T03:56:34Z 合并；merge 提交 `verify` 检查 success（check-run `b0d470b3`） | P1-CORE → `done`（新增 canonical JSON） |
+| P1-CORE 证据 | 新增 [evidence/P1-CORE.json](ff/evidence/P1-CORE.json)：PR#10、merge SHA、9 个 ff-core/ff-db/ff-background-toggle 回归用例；无人工门禁（`no`） | 线上由 `check-plan.mjs --github` 复核 |
+| 合并后回归 | Windows 本机（Node v26.10.0、Python 3.12.10、Playwright 1.64.0）：`npm run verify` **190/190**、`npm run test:e2e` **3/3** 合成 MV3 全 PASS，0 自动发送 | 不等于 Z0-LIVE 真实验收 |
+| Release 作业 | merge 提交上 publish 作业失败：`build-release.py` 仍断言 PR#10 之前的旧守卫符号 `isTrustedPanelSender`；修复 PR 已单独提交 | 不阻塞 P1-CORE `done`（证据契约只要求 `verify` success） |
+| Z0-BASE | PR #1 仍 Draft/open；其实现血统已随 PR #10 进入 main；所有者 `MANUAL_ACCEPT Z0-BASE <PR_HEAD_SHA>` 仍缺 | 保持 `in_review` / PR#1 |
+| Z0-LIVE | 无变化：无绑定 HEAD 的完整真人签署 | 保持 `blocked`；P2-FORK 继续不得执行/评审 |
 
 ### 2026-10-23 验收对账（main 与开放 Draft PR）
 
@@ -189,7 +202,7 @@ GitHub CI 成功只证明相应分支的现有自动化检查通过，不代表 
 
 ## 十、下一步与维护规则
 
-当前顺序：R-REUSE 已合并并登记证据；评审 Draft PR #10（续作自 #9）作为 P1-CORE 集成面；PR #1 的 Windows 基线仍待所有者 `MANUAL_ACCEPT`；Z0-LIVE 保持 blocked，未签署前不得执行/评审 P2-FORK；P3-REPORT 等待 P2-FORK；第二期保持 `deferred`。
+当前顺序：R-REUSE 与 P1-CORE 均已合并且登记 canonical 证据；P1-CORE 完成登记与 Release 打包符号修复各自以独立 PR 提交人工复核；PR #1 的 Windows 基线仍待所有者 `MANUAL_ACCEPT`；Z0-LIVE 保持 blocked，未签署前不得执行/评审 P2-FORK；P3-REPORT 等待 P2-FORK；第二期保持 `deferred`。
 
 **GitHub 是唯一权威持久位置。** 本文件负责目标、阶段、任务状态及验收标准。根目录 `AGENTS.md` 约束执行者；`docs/ff/REUSE_AUDIT_20261021.md` 是复用证据，不是计划；`docs/ff/DEVELOPMENT_PLAN.md` 只保留重定向。ChatGPT Library 中的历史副本只供查看，不能作为当前状态来源。
 

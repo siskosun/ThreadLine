@@ -2,6 +2,14 @@
 
 该文件登记事实及解除条件，不是第二份计划。官方任务状态见 [docs/PLAN.md](../PLAN.md)。
 
+## 2026-10-24 P1-CORE 阻塞解除；剩余门禁不变
+
+- **P1-CORE 已解除**：PR [#10](https://github.com/siskosun/ThreadLine/pull/10) 于 2026-10-24T03:56:34Z 合并入 main（merge `b0d470b3d7a386f2243f1bafb26aa54c7fcc26a0`，`verify` success）；`docs/ff/evidence/P1-CORE.json` 已随完成登记 PR 提交，人工门禁为 `no`。下方 2026-10-23 条目中“P1-CORE 未合并/无 JSON”自本条起不再是现状。
+- **新增（非任务门禁）**：merge 提交上 Release publish 作业因 `build-release.py` 旧符号断言失败；修复以独立 PR 提交评审。该作业失败不影响 P1-CORE 证据契约。
+- **Z0-LIVE**：仍 **BLOCKED / NOT SIGNED**；无所有者绑定 HEAD 的 `MANUAL_ACCEPT Z0-LIVE <sha>`。影响：不得执行或评审 P2-FORK / P3-REPORT。
+- **Z0-BASE 人工门禁**：PR #1 仍 Draft；实现血统已随 PR #10 进入 main，但完成登记仍需所有者在对应 PR 留 `MANUAL_ACCEPT Z0-BASE <PR_HEAD_SHA>` 并由该 PR 合并；不能标 done。
+- R-REUSE、P1-CORE 的解除不改变上述真人门禁。
+
 ## 2026-10-23 验收对账后仍阻塞项
 
 - **Z0-LIVE**：仍 **BLOCKED / NOT SIGNED**。部分 Edge/Tabbit 零发送脱敏证据不等于完整计划门禁；无仓库所有者绑定 HEAD 的 `MANUAL_ACCEPT Z0-LIVE <sha>`。影响：不得执行或评审 P2-FORK / P3-REPORT。

@@ -2,6 +2,14 @@
 
 任务定义和正式状态唯一来源：[docs/PLAN.md](../PLAN.md)。本文件只记录发生过的事件与证据，不自行认定任务完成。
 
+## 2026-10-24 P1-CORE 合并对账、完成证据与 Release 符号修复
+
+- 核对 GitHub：PR [#10](https://github.com/siskosun/ThreadLine/pull/10)（P1-CORE，续作自 #9）已于 2026-10-24T03:56:34Z 合并入 main，merge 提交 `b0d470b3d7a386f2243f1bafb26aa54c7fcc26a0`；该提交 GitHub Actions `verify` check-run 结论 success。PR #1 仍 Draft/open；Z0-LIVE 无新签署。
+- Windows 本机实测 main `b0d470b`（Node v26.10.0、Python 3.12.10、Playwright 1.64.0 + Chromium）：`cd threadline-extension && npm run verify` **190/190 Node PASS**；`npm run test:e2e` 三套合成 MV3 全 PASS（持久扩展 + 子框架 NEW_CHAT 拒绝；23,569 字节 exact 零发送；Fork P1 默认关闭、24KB、CAS/重放/XSS/重启）。全程 0 自动发送；合成结果不冒充 Z0-LIVE。
+- 发现并修复合并回归：merge 提交上 publish 作业失败（run 40060353674）——`scripts/build-release.py:44` 仍断言 PR#10 之前的旧符号 `isTrustedPanelSender`。修复分支 `fix/release-marker-20261024`：断言现行 `inspectPanelSender` / `requirePanelSender`，并将 `SHA256SUMS.txt` 写入固定为 LF（Windows 本机此前会写出 CRLF 使 `sha256sum -c` 失败）。本机复验：ZIP 200179 字节、sha256 `76089e37156fbb7d3bdcdea456e0f90b62b3ba15c67a699159b55305bb638c80`、`sha256sum -c` OK；测试后已还原 dist 跟踪文件。以独立修复 PR 提交评审。
+- 新增 [evidence/P1-CORE.json](evidence/P1-CORE.json)：pr_number=10、merge SHA、9 个真实回归用例（ff-core 冻结/24KB/SHA-256/幂等/未知不重放/双信号、ff-db 创建身份与 CAS、ff-background-toggle 过期操作拒绝）。P1-CORE 人工门禁为 `no`；计划表 `in_review` → `done` 随本 PR 人工复核生效。
+- **明确未完成：** Z0-BASE 所有者 `MANUAL_ACCEPT`（PR #1 或按证据契约改挂的 PR）、Z0-LIVE 全部真人项、P2-FORK/P3-REPORT 未启动。本 PR 不解除这些门禁。
+
 ## 2026-10-23 验收对账 + P1 创建身份加固
 
 - 核对 main `f3109ebb6e5e76f4c34670b10654bd0127471bea`：治理 PR [#2](https://github.com/siskosun/ThreadLine/pull/2) 已合并且 merge 提交 verify success；开放 Draft [#1](https://github.com/siskosun/ThreadLine/pull/1)、[#3](https://github.com/siskosun/ThreadLine/pull/3)、[#5](https://github.com/siskosun/ThreadLine/pull/5)、[#6](https://github.com/siskosun/ThreadLine/pull/6)、[#7](https://github.com/siskosun/ThreadLine/pull/7)、[#8](https://github.com/siskosun/ThreadLine/pull/8)、[#9](https://github.com/siskosun/ThreadLine/pull/9) 均仍 Draft。
