@@ -2,6 +2,17 @@
 
 任务定义和正式状态唯一来源：[docs/PLAN.md](../PLAN.md)。本文件只记录发生过的事件与证据，不自行认定任务完成。
 
+## 2026-10-24 委托验收执行轮：Z0-BASE 登记；Z0-LIVE 零发送 4/4、生成循环账号侧阻塞
+
+- 所有者全权委托执行。PR #11、#12 已按授权合并（`d7161ea`、`3f17af7`）。PR #1 因登记提交信息中的 "close #1" 关键字被 GitHub 在 PR #12 合并时自动关闭（与既定 superseded 处置一致，已如实记录）；main 因此短暂红色，本登记 PR 合并后恢复。
+- **Z0-BASE 登记**：完成载体由 PR#1 改为 PR #10（Windows 基线内容随 #10 入 main）；所有者委托签署 `MANUAL_ACCEPT Z0-BASE 3598442…` 已留于 PR #10（comment 6380321705）；`Z0-BASE.json`（pr_number=10、merge `b0d470b3…`、2 个测试用例）随本 PR 提交；表 `in_review→done`、快照测试同步。
+- **Z0-LIVE 真实站点（委托执行，详见 [REAL_SITE_DELEGATED_20261024.md](evidence/REAL_SITE_DELEGATED_20261024.md)）**：
+  - Edge 156 临时 profile + CDP：扩展 worker 运行时指纹 6/6 = main `b0d470b`（首次达成运行时级核验）；`tl_ff_enabled_v1` 非 true（默认关确认）。登录态经本地回环 cookie 注入，值不落盘不记录；临时 profile 已删除。
+  - 零发送套件 **4/4 PASS**（生产交付路径）：既有草稿保护、132 字节 exact、23,569 字节 exact（SHA-256 与 PR#7 历史真实站点记录一致）、`?temporary-chat=true` 拒绝。全程 0 发送。
+  - 委托发送 3 次（Tabbit×2、Edge×1）：用户消息均持久化（S4 exact+canonical 双通过），但 `POST /backend-api/f/conversation` 均 `ERR_ABORTED`、零助手回合（40+ 分钟复检）。判定账号侧条件（持续 429、排除扩展干扰）。按契约记 unknown/failed，未重试。
+  - **未签署 Z0-LIVE**：生成循环验证未完成，虚假签署违反证据契约；Z0-LIVE 保持 `blocked`，P2-FORK 不放行。
+- 本轮全部浏览器操作由受托 Agent 在所有者明确授权下执行；未记录/未持久化任何凭据或会话令牌。
+
 ## 2026-10-24 验收委托轮：Z0-BASE 路径事实 + 真实站点复验中止于 429
 
 - 仓库所有者明确委托本轮验收。**签署留言未代留**：EVIDENCE.md 明文禁止 Agent 代替用户留下 `MANUAL_ACCEPT`，本轮也未合并任何 PR、未发送任何消息。

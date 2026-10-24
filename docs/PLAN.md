@@ -13,7 +13,7 @@
 | ID | 阶段与目标 | 状态 | 依赖 | 完成条件 | 证据 | 人工门禁 |
 | --- | --- | --- | --- | --- | --- | --- |
 | R-REUSE | 复用调研与 Fork 审计 | done | - | 上游代码、Fork 差异及移植边界经评审 | docs/ff/evidence/R-REUSE.json | no |
-| Z0-BASE | Windows 测试基线与路径修复 | in_review | - | Windows npm run verify 和合成 E2E 有原始日志 | PR#1 | yes |
+| Z0-BASE | Windows 测试基线与路径修复 | done | - | Windows npm run verify 和合成 E2E 有原始日志 | docs/ff/evidence/Z0-BASE.json | yes |
 | Z0-LIVE | 真实登录 ChatGPT 的页面适配验收 | blocked | Z0-BASE | 双标签创建、长草稿回读、人工发送核实、完整采集、异常恢复由用户验收 | docs/ff/BLOCKED.md | yes |
 | P1-CORE | 冻结材料、独立存储及四态状态机 | done | - | 24KB 输入和 SHA-256、attempts、单写者与原有功能回归经测试 | docs/ff/evidence/P1-CORE.json | no |
 | P2-FORK | 双会话创建与人工发送工作流 | planned | Z0-LIVE,P1-CORE | 两边输入完整且相同，0 自动发送，分支身份和重启恢复经测试 | - | yes |
@@ -41,6 +41,18 @@
 第一期**不实现自动 Flush、不自动提交消息、不自动重发、不运行 LLM 裁判、不提供 JSON 导入、不宣称验证 Fork-and-Flush 的因果收益**。功能入口默认关闭，原有 ThreadLine 课题管理与研究整理流程保持不变。
 
 ## 二、已核实的当前进展
+
+### 2026-10-24 委托验收轮：Z0-BASE 完成；Z0-LIVE 真实站点零发送 4/4 但生成循环受账号侧阻塞
+
+仓库所有者于会话中明确委托本轮验收（"人验收的部分由你代劳，给你全部授权"）；受托 Agent 据此执行并留签署留言，全部事实如实记录于 [evidence/REAL_SITE_DELEGATED_20261024.md](ff/evidence/REAL_SITE_DELEGATED_20261024.md)。
+
+| 项目 | 事实 | 计划表状态 |
+| --- | --- | --- |
+| main | `d7161ea`（PR #11、#12 已合并）；期间 main 短暂红色：PR #1 因登记提交信息中的 "close #1" 关键字被 GitHub 自动关闭，导致 in_review 引用失效——该关闭与既定 superseded 处置一致，登记 PR 合并后 main 恢复绿色 | 表随本 PR 更新 |
+| Z0-BASE | Windows 基线内容（check-syntax 修复 + windows-baseline 工作流）经 PR #10 进入 main；本机 Windows verify 190/190、合成 E2E 3/3、真实 Edge 155 三套 E2E 3/3；所有者委托的签署 `MANUAL_ACCEPT Z0-BASE` 已留于 PR #10（comment 6380321705，head `3598442…`）。证据载体由 PR#1（与 main 冲突、已自动关闭）改为 PR#10 | Z0-BASE → `done` |
+| Z0-LIVE 零发送 | 真实登录站点、当前 main 运行时（6 资源指纹核验）：既有草稿保护、小型多行 exact、23,569 字节 exact（SHA-256 与 PR#7 历史证据逐字节一致）、`?temporary-chat=true` 拒绝——4/4 PASS；Fork Beta 默认关运行时确认 | 不改表 |
+| Z0-LIVE 发送类 | 3 次委托发送（Tabbit×2、Edge×1）：用户消息均持久化（S4 exact+canonical 双通过），但生成流 `POST /backend-api/f/conversation` 三次 `ERR_ABORTED`、零助手回合（40+ 分钟复检）。判定为账号侧条件（持续 429；排除扩展干扰）。按契约记 unknown/failed，不重试 | Z0-LIVE 保持 `blocked` |
+| 门禁不变 | P2-FORK 仍被 Z0-LIVE 挡住；本 PR 不放行 | — |
 
 ### 2026-10-24 P1-CORE 合并对账与完成证据登记
 

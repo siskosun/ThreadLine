@@ -11,9 +11,16 @@ const ROOT = path.resolve(__dirname, '../..');
 const MOD = path.join(ROOT, 'scripts', 'check-plan.mjs');
 const fixtureFiles = [
   'docs/PLAN.md','AGENTS.md','docs/ff/DEVELOPMENT_PLAN.md','docs/ff/BLOCKED.md',
-  // Canonical done evidence must travel with PLAN fixtures once a task is done.
+  // Canonical done evidence must travel with PLAN fixtures once a task is done,
+  // together with every test file its test_cases reference.
   'docs/ff/evidence/R-REUSE.json',
-  'docs/ff/evidence/P1-CORE.json'
+  'docs/ff/evidence/P1-CORE.json',
+  'docs/ff/evidence/Z0-BASE.json',
+  'threadline-extension/test/ff-core.test.js',
+  'threadline-extension/test/ff-db.test.js',
+  'threadline-extension/test/ff-background-toggle.test.js',
+  'threadline-extension/test/check-syntax-portable.test.js',
+  'threadline-extension/test/extension-e2e.py'
 ];
 
 async function checks() { return import(pathToFileURL(MOD).href); }
@@ -45,9 +52,9 @@ test('canonical plan contains all required tasks and no unverified done claims',
   const actual=validatePlan(ROOT);
   assert.equal(actual.tasks.length,8);
   // Done claims must stay limited to tasks with real merged-PR evidence JSONs.
-  assert.deepEqual(actual.done.map(x=>x.task.id).sort(),['P1-CORE','R-REUSE']);
+  assert.deepEqual(actual.done.map(x=>x.task.id).sort(),['P1-CORE','R-REUSE','Z0-BASE']);
   assert.equal(actual.tasks.find(x=>x.id==='Z0-LIVE').status,'blocked');
-  assert.equal(actual.tasks.find(x=>x.id==='Z0-BASE').status,'in_review');
+  assert.equal(actual.tasks.find(x=>x.id==='Z0-LIVE').status,'blocked');
   assert.notEqual(actual.tasks.find(x=>x.id==='P2-FORK').status,'done');
 });
 

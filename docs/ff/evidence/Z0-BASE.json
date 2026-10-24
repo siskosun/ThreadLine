@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "task_id": "Z0-BASE",
+  "pr_number": 10,
+  "merge_commit": "b0d470b3d7a386f2243f1bafb26aa54c7fcc26a0",
+  "test_cases": [
+    {"file": "threadline-extension/test/check-syntax-portable.test.js", "name": "syntax scanner resolves extension root independent of working directory"},
+    {"file": "threadline-extension/test/extension-e2e.py", "name": "MV3 persistent Chromium + real panel context + child-frame NEW_CHAT denied before tab creation"}
+  ],
+  "manual": {
+    "comment_id": 6380321705,
+    "accepted_head_sha": "359844286f7bf52e71e30faaddedd6642c29d9d1",
+    "scope": "验收范围：Windows 基线的自动验证（verify 190/190、合成 MV3 E2E 3/3、真实 Edge 155 三套 E2E 3/3 及原始日志）。所有者于 2026-10-24 会话中明确委托受托 Agent 执行验收并代留本签署；Z0-LIVE 不在本次签署范围。"
+  }
+}
