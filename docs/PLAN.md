@@ -1,9 +1,9 @@
 # ThreadLine 开发计划
 
 **唯一正式计划：** 本文件 `docs/PLAN.md`。其他 ChatGPT 资料库、对话、PR 说明和 `docs/ff/` 附录仅作为参考或证据，均不能覆盖本文件的任务状态。
-**事实核查日：** 2026-10-24。
-**基线：** main `b0d470b3d7a386f2243f1bafb26aa54c7fcc26a0`（含已合并治理 PR #2 与 P1-CORE PR #10），应用仍为 v0.6.1。
-**实施授权范围：** 第零步与第一期；第二期暂缓。不得仅凭 Agent 声称完成而更新状态。
+**事实核查日：** 2026-10-24（v0.7.0 发布后）。
+**本次核对基线：** main `077b21c06cc0411d3b43404641444653e93f77ec`；v0.7.0 已发布。原第一期启动基线 `b0d470b3d7a386f2243f1bafb26aa54c7fcc26a0`（v0.6.1）仅为历史记录。
+**实施授权范围：** 既有第零步与第一期；第二期 P4-AUTO 仍暂缓。下文 v0.8.0 路线属于后续规划，尚未注册为可执行任务。发布事实不等于正式任务验收，不得仅凭 Agent 声称完成而更新状态。
 
 ## 执行任务与验收门禁
 
@@ -21,6 +21,8 @@
 | BETA-RELEASE | 安装升级与正式 Beta 验收 | planned | P3-REPORT | 真实双分支闭环、同路径旧数据升级、CI 与用户验收均通过 | - | yes |
 | P4-AUTO | 第二期多分支和自动 Flush | deferred | BETA-RELEASE | 另行审批并补齐等预算对照及裁判校准要求 | - | yes |
 <!-- PLAN_TASKS_END -->
+
+**当前对账说明：** P2-FORK、P3-REPORT、BETA-RELEASE 已有合并实现与 v0.7.0 发布事实，但仍缺逐任务 canonical JSON、经审核的适用人工验收及计划状态登记，故本次不改动这三项的 `planned`。该标签在此刻表示**正式登记未完成**，不能被误读为代码尚未实现。既有检查器要求前置任务先 `done` 才能使依赖任务进入执行／评审态；后续按 P2 → P3 → BETA 的依赖顺序完成登记。未来路线不插入此机器表，待现有门禁收口并经人工审批，再另行修改任务表、检查器和测试。
 
 ### 状态与证据契约
 
@@ -41,6 +43,13 @@
 第一期**不实现自动 Flush、不自动提交消息、不自动重发、不运行 LLM 裁判、不提供 JSON 导入、不宣称验证 Fork-and-Flush 的因果收益**。功能入口默认关闭，原有 ThreadLine 课题管理与研究整理流程保持不变。
 
 ## 二、已核实的当前进展
+
+### 2026-10-24 v0.7.0 发布事实与任务验收分离
+
+- GitHub main 为 `077b21c06cc0411d3b43404641444653e93f77ec`；[PR #17（P2）](https://github.com/siskosun/ThreadLine/pull/17)、[PR #18（P3）](https://github.com/siskosun/ThreadLine/pull/18)、[PR #19（Beta 发布）](https://github.com/siskosun/ThreadLine/pull/19) 均已合并。
+- [v0.7.0 Release](https://github.com/siskosun/ThreadLine/releases/tag/v0.7.0) 已公开发布（2026-10-24T10:03:57Z），附安装包与 SHA256SUMS；提交 `077b21c` 上 GitHub Actions 的 `verify` 与 `Publish tested release archive` 检查均成功。
+- **未登记为正式完成：** 本次未找到与 P2-FORK、P3-REPORT、BETA-RELEASE 匹配的 canonical 完成证据和任务级人工门禁闭环，不代用户签署、不把成功发布替代人验。三项保留 `planned`，应由独立验收 PR 顺序对账。
+- **界面文案债务：** `ff.html` 仍写“基础开发版”“不会新建网页会话”，`panel.html` 的 Fork 入口仍写“开发预览”“当前仅冻结”，与已发布功能不一致。后续 UI 修复首先纠正这些过时承诺，并核对真实能力与权限边界。
 
 ### 2026-10-24 Z0-LIVE 完成：隔离实验定位外部限制；人工清单由所有者完成
 
@@ -212,7 +221,7 @@ GitHub CI 成功只证明相应分支的现有自动化检查通过，不代表 
 
 每个 PR 运行仓库现有 `npm run verify` 及可执行的合成 Chromium E2E；最终再做真实登录网页闭环验收。新回归至少覆盖：长文本、两种编辑器、多标签交错、重复事件、Service Worker 重启、非法 FF 消息来源、不可信输出/XSS、凭据泄漏、单侧失败不对照、unknown 不重发、旧课题数据同目录升级。
 
-所有 PR 先 Draft/评审，不直推 main、不自动合并、不自动发布 Release。发布前统一检查 `manifest.json`、`package.json`、README/CHANGELOG/VERIFY 与 `scripts/build-release.py` 既有版本/来源校验；正式 Beta 版号拟定 v0.7.0，**尚未发布**。
+所有 PR 先 Draft/评审，不直推 main、不自动合并、不自动发布 Release。发布前统一检查 `manifest.json`、`package.json`、README/CHANGELOG/VERIFY 与 `scripts/build-release.py` 既有版本/来源校验；正式 Beta 版号 v0.7.0 已于 2026-10-24 发布；正式任务验收尚未按逐任务证据契约完成。
 
 出现真实网页门禁无法通过、会话归属无法确认或发送状态不可判定时，停止 PR-2/3；不允许删除测试、放宽断言、用合成页面冒充真实验收。过程与阻塞仅记录于 `docs/ff/PROGRESS.md` 和 `docs/ff/BLOCKED.md`，不得将计划口号当成执行结果。
 
@@ -224,7 +233,7 @@ GitHub CI 成功只证明相应分支的现有自动化检查通过，不代表 
 
 ## 十、下一步与维护规则
 
-当前顺序：R-REUSE、Z0-BASE、P1-CORE、Z0-LIVE 均已合并且登记 canonical 证据（签署均挂 PR #10）；P2-FORK 依赖（Z0-LIVE、P1-CORE）已全部解除，进入可开发状态；P3-REPORT 等待 P2-FORK；BETA-RELEASE 等待 P3-REPORT；第二期保持 `deferred`。
+当前顺序：R-REUSE、Z0-BASE、Z0-LIVE、P1-CORE 已按既有登记为 `done`。P2-FORK、P3-REPORT、BETA-RELEASE 的实现 PR #17/#18/#19 均已合并且 v0.7.0 已发布，但**正式计划登记仍为 `planned`**：先按依赖及签署契约补足 P2，再补 P3，最后补 BETA-RELEASE；不得先把下游任务置为 `done`。第二期 P4-AUTO 保持 `deferred`。该收口完成后，按第十一节评审下一阶段路线。
 
 **GitHub 是唯一权威持久位置。** 本文件负责目标、阶段、任务状态及验收标准。根目录 `AGENTS.md` 约束执行者；`docs/ff/REUSE_AUDIT_20261021.md` 是复用证据，不是计划；`docs/ff/DEVELOPMENT_PLAN.md` 只保留重定向。ChatGPT Library 中的历史副本只供查看，不能作为当前状态来源。
 
