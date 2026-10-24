@@ -57,3 +57,12 @@ E2E 环境 `storage.estimate` 返回可用（usage/quota 字段存在）；真�
 - **S1b（采纳与交接 UI）**：整理/Fork 共用逐条采纳、片段展示、交接预览。估 **12–22 小时**（风险：整理记录→片段绑定的来源编号映射；定位降级路径）。
 - **S0b（定位 spike）**：另计 ≤8 小时，独立进行。
 - 总体风险：ChatGPT DOM 变化影响采集片段来源定位（S0b 降级路径覆盖）；MV3 SW 生命周期导致的投影延迟（C4 设计已兜底）；超大库性能（S1a 复测）。
+
+## 7. S1a 实施附录（2026-10-25）
+
+D1/D4 与投影已按上文设计落地（PR 见 S1A-PERSIST 证据）：
+
+- **单向投影（C4 闭环）**：`consumeEvidenceProjection` 只从已提交权威库重算摘要 → 写 `chrome.storage` `tl_evidence_summary_<projectId>`（带 evidenceRevision/projectionRevision）→ **写后复查** revision → 同事务 CAS 清投影待办。写入失败：权威提交不受影响，待办持久保留；读取（EV_SUMMARY）与 SW 启动时幂等重算。后台测试 + E2E 均验证"投影失败 → 待办留存 → 读取/启动恢复"。
+- **旧 decision 封口（D1）**：首次采纳即置 `takeover:true`（撤回也不解除），旧正文以 `legacyNote{text, verified:false}` 原样封存；`MUTATE`（decision 补丁）、`BACKUP_IMPORT`（含接管课题的旧备份）、`BACKUP_ROLLBACK`（快照含接管课题）在**消息层**拒绝并说明指引；goal 等其他字段照常可编辑；未接管课题不受影响。
+- **E2E**：真实浏览器验证 storage 投影、封口拒绝、goal 仍可编辑、投影跨完整重启存活。
+- **大库探针（一次性合成配置，未入 CI）**：150 结论 × 8 片段（包 7.03 MiB，IndexedDB 用量 3.2 MiB，quota ≈ 10 GiB，persisted=false）：采纳中位 62.5 ms/条、LIST 767 ms、EXPORT 878 ms、SUMMARY 47 ms。首期默认容量**维持冻结**；EV_LIST 当前全量返回片段，S1b 接 UI 时按需分页（已记录）。

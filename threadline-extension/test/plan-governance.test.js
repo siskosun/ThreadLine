@@ -119,7 +119,7 @@ test('blocked tasks require a concrete blocker and legacy plan must redirect',as
                 .replace('docs/ff/evidence/P4-AUTO.json','docs/ff/BLOCKED.md')));
     // S0A depends on P4-AUTO; drop it back to planned so the blocked-rule
     // itself is what the gate must report.
-    for (const sid of ['S0A-PROTOTYPE','S0B-LOCATE'])
+    for (const sid of ['S0A-PROTOTYPE','S0B-LOCATE','S1A-PERSIST','S1B-ADOPT'])
       edit(dir,'docs/PLAN.md',s=>rowChange(s,sid,
         line=>line.replace(/ \| (in_review|done) \| /,' | planned | ')
                   .replace(/ \| (PR#\d+|docs\/ff\/evidence\/S[0-9A-Z-]+\.json) \| /,' | - | ')));

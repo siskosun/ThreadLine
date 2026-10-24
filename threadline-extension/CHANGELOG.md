@@ -1,5 +1,11 @@
 # ThreadLine CHANGELOG
 
+## 未发布（计划 §十一 S0a/S0b/S1a）
+
+- S0a 证据存储原型：threadline_evidence_v1 单事务权威写入（CAS/幂等台账）、只读摘要投影、崩溃点与破坏性路径设计冻结、12 次采纳计时协议、容量默认值冻结。
+- S0b 定位 spike：GPT Conversation Toolkit（MIT，pinned 119d3728）滚动坐标算法 vendored（滚动根注入化）+ 身份优先定位器（弱匹配不冒充、AbortSignal 取消）。
+- S1a 持久化与恢复：chrome.storage 单向投影（写后复查/待办持久/启动与读取幂等重算）；旧 decision 消息级封口（takeover + legacy-note 原样封存；MUTATE/BACKUP_IMPORT/BACKUP_ROLLBACK 拒绝接管课题的 decision 覆盖，其他字段不受影响）。
+
 ## v0.8.1 — 真人 K=4 实测修复
 
 - 修复 K=4 采集阻断：`FF_CAPTURE`/`FF_REPREFILL` 不再硬编码 A/B 分支白名单，改为校验目标分支属于当前实验（真人实测发现 C/D 分支永远无法完成，见 `docs/ff/evidence/P4-LIVE-K4-V080.json`）。
