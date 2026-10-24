@@ -15,7 +15,7 @@ async function page(options={}){
    replaceChildren(){this.children=[];},appendChild(child){this.children.push(child);}});
  const $=id=>{if(!nodes.has(id))nodes.set(id,element());return nodes.get(id);};
  let armed=false;
- const chrome={runtime:{sendMessage(payload,cb){
+ const chrome={runtime:{getManifest:()=>({version:'0.8.0-test'}),sendMessage(payload,cb){
    (async()=>{
      if(payload.type==='FF_STATUS')return {enabled:true};
      if(payload.type==='FF_CREATE'){

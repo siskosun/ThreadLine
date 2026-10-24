@@ -404,3 +404,27 @@ test("FF P4 comparison records budget parity for K=4",async()=>{
   assert.equal(decision.budgetParity,true,'equal budgets yield parity');
   assert.ok(decision.timings.A && decision.timings.B);
 });
+
+test("FF_SUMMARY is a panel-only read-only progress digest",async()=>{
+  const s=system();
+  const panelSender={id:'ff-launch-test',url:'chrome-extension://ff-launch-test/panel.html'};
+  // Before enabling: summary says disabled.
+  assert.equal((await s.message({type:'FF_SUMMARY'},panelSender)).enabled,false);
+  await s.message({type:'FF_SET_ENABLED',enabled:true,ack:'local-only-no-send'},s.ffSender);
+  // No experiments yet.
+  assert.equal((await s.message({type:'FF_SUMMARY'},panelSender)).latest,null);
+  // The Fork page itself must not read the panel digest, and vice versa the
+  // panel cannot use the Fork page's message surface.
+  await assert.rejects(s.message({type:'FF_SUMMARY'},s.ffSender),/only the panel/);
+  await assert.rejects(s.message({type:'FF_LIST'},panelSender),/only Fork extension page/);
+  const created=await s.setupExperiment('create_sum00000001');
+  const r=await s.message({type:'FF_LAUNCH',experimentId:created.id,
+    operationId:'launch_sum0000001'},s.ffSender);
+  void r;
+  const summary=await s.message({type:'FF_SUMMARY'},panelSender);
+  assert.equal(summary.latest.branchCount,2);
+  assert.equal(summary.latest.branches.map(b=>b.label).sort().join(','),'A,B');
+  const snap=JSON.stringify(summary);
+  for(const banned of ['w0','frozen','reply','sessionId'])
+    assert.ok(!snap.includes('"' + banned + '"'),'summary must not carry experiment content');
+});

@@ -80,6 +80,13 @@
     if (typeof ev.assistantBytes === "number") parts.push("回复 " + ev.assistantBytes + " 字节");
     if (Array.isArray(ev.endSignals)) parts.push("完成信号 " + ev.endSignals.join("/"));
     if (info.status === "pending" && ev.sessionId) parts.push("回复生成后请点击采集");
+    if (info.status === "pending" && attempt) {
+      const next = {created:"下一步：等待预填逐字核对（绿色横幅）",
+        awaiting_send:"下一步：在该分支标签中手动点击发送",
+        generating:"下一步：回复生成完成后点「采集回复」",
+        capturing:"等待采集与完成判定"}[info.phase];
+      if (next) parts.push(next);
+    }
     detail.textContent = parts.join("；");
     box.appendChild(detail);
     if (info.status === "pending" && attempt && Number.isInteger(ev.tabId)) {
@@ -254,7 +261,10 @@
       const button = document.createElement("button");
       button.type = "button";
       button.className = "secondary";
-      button.textContent = item.id + " · A:" + item.statusA + " / B:" + item.statusB;
+      const statuses = item.statuses || {A:item.statusA, B:item.statusB};
+      const mark = s => s === "done" ? "✓" : s === "failed" ? "✗" : s === "unknown" ? "?" : "…";
+      button.textContent = item.id + " · K=" + (item.branchCount || Object.keys(statuses).length) +
+        " · " + Object.entries(statuses).map(([l,s]) => l + mark(s)).join(" ");
       button.addEventListener("click", () => read(item.id).catch(e=>notice(e.message,true)));
       holder.appendChild(button);
     }
@@ -392,9 +402,12 @@
       link.href = url; link.download = snapshot.experiment.id + "-fork-export.json";
       document.body.appendChild(link); link.click(); link.remove();
       setTimeout(() => URL.revokeObjectURL(url), 5000);
-      notice("已导出自包含 JSON；仅导出，本阶段不支持导入。");
+      notice("已导出自包含 JSON。可在实验列表的导入入口经严格验证后导入（哈希与映射重算，不覆盖既有实验）。");
     } catch (e) { notice(e.message, true); }
     finally { button.disabled = false; }
   });
+  const manifest = chrome.runtime.getManifest();
+  $("ff-version-note").textContent = "当前加载版本 v" + manifest.version +
+    "。侧载扩展不会自动更新：升级新版后请在扩展管理页手动「重新加载」，并完全重启浏览器。";
   refresh().catch(error => notice(error.message,true));
 })();

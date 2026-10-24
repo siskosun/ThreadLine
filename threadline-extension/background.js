@@ -530,6 +530,22 @@ async function ffEnabled() {
   return state[FF_ENABLED_KEY] === true;
 }
 async function handleFF(payload, sender) {
+  if (payload.type === "FF_SUMMARY") {
+    // Read-only progress digest for the sidebar panel: no experiment content,
+    // no evidence, no replies - only labels, statuses and phases.
+    const panelURL = chrome.runtime.getURL("panel.html");
+    const trustedPanel = !!(sender && sender.id === chrome.runtime.id &&
+      sender.url === panelURL && (!sender.tab || sender.tab.url === panelURL));
+    if (!trustedPanel) throw new Error("only the panel may read the Fork progress summary");
+    if (!await ffEnabled()) return {enabled:false};
+    const rows = await ThreadLineFFDB.list();
+    const latest = rows.sort((a,b)=>b.createdAt-a.createdAt)[0];
+    if (!latest) return {enabled:true, latest:null};
+    return {enabled:true, latest:{id:latest.id,
+      branchCount:Object.keys(latest.branches).length,
+      branches:Object.entries(latest.branches).map(([label,b]) =>
+        ({label, status:b.status, phase:b.phase}))}};
+  }
   if (!trustedFFSender(sender)) throw new Error("only Fork extension page may access FF data");
   if (payload.type === "FF_STATUS")
     return {enabled:await ffEnabled(), phase:"core_only", sendsAutomatically:false};
@@ -576,9 +592,13 @@ async function handleFF(payload, sender) {
   }
   if (payload.type === "FF_LIST") {
     const rows = await ThreadLineFFDB.list();
-    return rows.map(x => ({id:x.id, revision:x.revision, createdAt:x.createdAt,
-      bytes:x.frozen?.bytes, statusA:x.branches?.A?.status,
-      statusB:x.branches?.B?.status})).sort((a,b) => b.createdAt-a.createdAt);
+    return rows.map(x => {
+      const statuses = Object.fromEntries(Object.entries(x.branches || {})
+        .map(([label,b]) => [label,b.status]));
+      return {id:x.id, revision:x.revision, createdAt:x.createdAt,
+        bytes:x.frozen?.bytes, branchCount:Object.keys(statuses).length,
+        statuses, statusA:x.branches?.A?.status, statusB:x.branches?.B?.status};
+    }).sort((a,b) => b.createdAt-a.createdAt);
   }
   if (payload.type === "FF_READ") {
     const row = await ThreadLineFFDB.read(payload.id);
