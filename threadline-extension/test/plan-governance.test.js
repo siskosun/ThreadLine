@@ -16,6 +16,7 @@ const fixtureFiles = [
   'docs/ff/evidence/R-REUSE.json',
   'docs/ff/evidence/P1-CORE.json',
   'docs/ff/evidence/Z0-BASE.json',
+  'docs/ff/evidence/Z0-LIVE.json',
   'threadline-extension/test/ff-core.test.js',
   'threadline-extension/test/ff-db.test.js',
   'threadline-extension/test/ff-background-toggle.test.js',
@@ -52,9 +53,11 @@ test('canonical plan contains all required tasks and no unverified done claims',
   const actual=validatePlan(ROOT);
   assert.equal(actual.tasks.length,8);
   // Done claims must stay limited to tasks with real merged-PR evidence JSONs.
-  assert.deepEqual(actual.done.map(x=>x.task.id).sort(),['P1-CORE','R-REUSE','Z0-BASE']);
-  assert.equal(actual.tasks.find(x=>x.id==='Z0-LIVE').status,'blocked');
-  assert.equal(actual.tasks.find(x=>x.id==='Z0-LIVE').status,'blocked');
+  assert.deepEqual(actual.done.map(x=>x.task.id).sort(),['P1-CORE','R-REUSE','Z0-BASE','Z0-LIVE']);
+  // First-phase execution tasks stay gated until their own evidence lands.
+  assert.equal(actual.tasks.find(x=>x.id==='P2-FORK').status,'planned');
+  assert.equal(actual.tasks.find(x=>x.id==='P3-REPORT').status,'planned');
+  assert.notEqual(actual.tasks.find(x=>x.id==='BETA-RELEASE').status,'done');
   assert.notEqual(actual.tasks.find(x=>x.id==='P2-FORK').status,'done');
 });
 
@@ -73,7 +76,8 @@ test('missing/duplicate plan markers and missing tasks are rejected',async()=>{
 test('a task cannot advance while its hard dependencies are incomplete',async()=>{
   const {validatePlan}=await checks();
   withFixture(dir=>{
-    edit(dir,'docs/PLAN.md',s=>rowChange(s,'P2-FORK',
+    // P3-REPORT still depends on P2-FORK, which is planned.
+    edit(dir,'docs/PLAN.md',s=>rowChange(s,'P3-REPORT',
       line=>line.replace(' | planned | ',' | in_review | ').replace(' | - | yes |',' | PR#99 | yes |')));
     assert.throws(()=>validatePlan(dir),/dependency is not done/);
   });
@@ -95,7 +99,10 @@ test('marking done without an evidence JSON fails, even if the agent says it pas
 test('blocked tasks require a concrete blocker and legacy plan must redirect',async()=>{
   const {validatePlan}=await checks();
   withFixture(dir=>{
-    edit(dir,'docs/ff/BLOCKED.md',s=>s.replaceAll('Z0-LIVE','not-on-list'));
+    // Manufacture a blocked task, then remove its explanation: must fail.
+    edit(dir,'docs/PLAN.md',s=>rowChange(s,'P2-FORK',
+      line=>line.replace(' | planned | ',' | blocked | ').replace(' | - | yes |',' | docs/ff/BLOCKED.md | yes |')));
+    edit(dir,'docs/ff/BLOCKED.md',s=>s.replaceAll('P2-FORK','not-on-list'));
     assert.throws(()=>validatePlan(dir),/blocked task not explained/);
   });
   withFixture(dir=>{

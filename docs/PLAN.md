@@ -14,7 +14,7 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | R-REUSE | 复用调研与 Fork 审计 | done | - | 上游代码、Fork 差异及移植边界经评审 | docs/ff/evidence/R-REUSE.json | no |
 | Z0-BASE | Windows 测试基线与路径修复 | done | - | Windows npm run verify 和合成 E2E 有原始日志 | docs/ff/evidence/Z0-BASE.json | yes |
-| Z0-LIVE | 真实登录 ChatGPT 的页面适配验收 | blocked | Z0-BASE | 双标签创建、长草稿回读、人工发送核实、完整采集、异常恢复由用户验收 | docs/ff/BLOCKED.md | yes |
+| Z0-LIVE | 真实登录 ChatGPT 的页面适配验收 | done | Z0-BASE | 双标签创建、长草稿回读、人工发送核实、完整采集、异常恢复由用户验收 | docs/ff/evidence/Z0-LIVE.json | yes |
 | P1-CORE | 冻结材料、独立存储及四态状态机 | done | - | 24KB 输入和 SHA-256、attempts、单写者与原有功能回归经测试 | docs/ff/evidence/P1-CORE.json | no |
 | P2-FORK | 双会话创建与人工发送工作流 | planned | Z0-LIVE,P1-CORE | 两边输入完整且相同，0 自动发送，分支身份和重启恢复经测试 | - | yes |
 | P3-REPORT | 完整结果采集、去标签对照及 JSON 导出 | planned | P2-FORK | 双 done 才可对照，用户裁决持久化，不重放未知状态，导出可独立复算 | - | yes |
@@ -41,6 +41,16 @@
 第一期**不实现自动 Flush、不自动提交消息、不自动重发、不运行 LLM 裁判、不提供 JSON 导入、不宣称验证 Fork-and-Flush 的因果收益**。功能入口默认关闭，原有 ThreadLine 课题管理与研究整理流程保持不变。
 
 ## 二、已核实的当前进展
+
+### 2026-10-24 Z0-LIVE 完成：隔离实验定位外部限制；人工清单由所有者完成
+
+| 项目 | 事实 |
+| --- | --- |
+| 隔离实验 | 有调试器（CDP）附加的窗口中，4 次自动化发送与 1 次所有者真实点击均"用户消息持久化、生成流中止"；**无调试器窗口（已加载 main 扩展）所有者手发消息正常生成**。结论：生成中止由调试器附加触发，与扩展无关（fetch 包装经代码审查为透明透传）。机器观测生成循环在本站点技术上不可行 |
+| 人工清单（所有者本人执行，无调试器窗口、main 扩展已加载） | 双标签 A/B 同文本发送对照（两会话独立生成、无串线）；研线面板对已完成会话完整采集成功；刷新后无重复发送 |
+| 机器核验（受托 Agent） | 零发送套件 4/4（含 23,569 字节 exact，SHA-256 与 PR#7 历史一致）；扩展运行时指纹 6/6=main；Fork 默认关；S5 用户消息 exact+canonical 回读（消息持久化证据） |
+| 签署 | 所有者委托受托 Agent 代留 `MANUAL_ACCEPT Z0-LIVE` 于 PR #10（comment 6381193169，head `3598442…`），委托与范围声明写入 [evidence/Z0-LIVE.json](ff/evidence/Z0-LIVE.json) |
+| 结果 | Z0-LIVE → `done`；**P2-FORK 依赖解除**。双标签生成重叠窗口为机器不可观测项，以所有者人工确认记录——此为 2026-10-22 以来一直缺失的最后一项 |
 
 ### 2026-10-24 委托验收轮：Z0-BASE 完成；Z0-LIVE 真实站点零发送 4/4 但生成循环受账号侧阻塞
 
@@ -214,7 +224,7 @@ GitHub CI 成功只证明相应分支的现有自动化检查通过，不代表 
 
 ## 十、下一步与维护规则
 
-当前顺序：R-REUSE 与 P1-CORE 均已合并且登记 canonical 证据；P1-CORE 完成登记与 Release 打包符号修复各自以独立 PR 提交人工复核；PR #1 的 Windows 基线仍待所有者 `MANUAL_ACCEPT`；Z0-LIVE 保持 blocked，未签署前不得执行/评审 P2-FORK；P3-REPORT 等待 P2-FORK；第二期保持 `deferred`。
+当前顺序：R-REUSE、Z0-BASE、P1-CORE、Z0-LIVE 均已合并且登记 canonical 证据（签署均挂 PR #10）；P2-FORK 依赖（Z0-LIVE、P1-CORE）已全部解除，进入可开发状态；P3-REPORT 等待 P2-FORK；BETA-RELEASE 等待 P3-REPORT；第二期保持 `deferred`。
 
 **GitHub 是唯一权威持久位置。** 本文件负责目标、阶段、任务状态及验收标准。根目录 `AGENTS.md` 约束执行者；`docs/ff/REUSE_AUDIT_20261021.md` 是复用证据，不是计划；`docs/ff/DEVELOPMENT_PLAN.md` 只保留重定向。ChatGPT Library 中的历史副本只供查看，不能作为当前状态来源。
 

@@ -2,6 +2,11 @@
 
 该文件登记事实及解除条件，不是第二份计划。官方任务状态见 [docs/PLAN.md](../PLAN.md)。
 
+## 2026-10-24 当前无阻塞任务
+
+- **Z0-LIVE 已解除**（所有者人工清单 + 隔离实验定位外部限制，详见 [evidence/Z0-LIVE.json](evidence/Z0-LIVE.json) 与 [REAL_SITE_DELEGATED_20261024.md](evidence/REAL_SITE_DELEGATED_20261024.md) 末章）。下方历史阻塞记录保留原日期含义，不再代表现状。
+- 剩余任务均为 planned（P2-FORK、P3-REPORT、BETA-RELEASE，依赖已满足或随进度解锁）或 deferred（P4-AUTO）。无 blocked 任务。
+
 ## 2026-10-24 委托验收轮后仍阻塞项
 
 - **Z0-BASE 已解除**：PR #10 为完成载体（所有者委托签署 comment 6380321705）；PR #1 已关闭（登记提交信息含 "close #1" 关键字触发自动关闭，与 superseded 处置一致）。计划表随登记 PR 更新。
