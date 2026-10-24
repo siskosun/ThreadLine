@@ -374,7 +374,7 @@ def run():
             launched = reopened.evaluate("""id => chrome.runtime.sendMessage(
               {type:'FF_LAUNCH',experimentId:id,operationId:'op_p2e2e0002'})""", p2id)
             assert launched["ok"], launched
-            tabA, tabB = launched["data"]["tabIdA"], launched["data"]["tabIdB"]
+            tabA, tabB = launched["data"]["tabIds"]["A"], launched["data"]["tabIds"]["B"]
             assert tabA != tabB
             worker2 = ctx2.service_workers[0]
             def sw_read(expr, arg=None):
@@ -511,8 +511,21 @@ def run():
             assert reopened.locator("#ff-reply-X").text_content() == "好的，OK。"
             reveal_before = reopened.locator("#ff-reveal").text_content()
             assert "分支" not in (reveal_before or ""), "pre-verdict reveal must stay hidden"
-            assert reopened.evaluate(
-                "() => document.getElementById('ff-verdict-form').hidden") is False
+            # P4 calibration gate: the verdict form opens only after passing.
+            reopened.locator('input[name="cal-cal-econ-0001"][value="1"]').check()
+            reopened.locator('input[name="cal-cal-logic-0001"][value="1"]').check()
+            reopened.locator("#ff-calibrate").click()
+            expect(reopened.locator("#ff-calibration-result")).to_contain_text(
+                "已通过", timeout=10000)
+            page_errors = []
+            reopened.on("pageerror", lambda e: page_errors.append(str(e)[:120]))
+            reopened.locator("#ff-list button", has_text=p2id).click()
+            reopened.wait_for_timeout(2000)
+            print("PAGE-ERRORS:", page_errors,
+                  "STATE:", reopened.evaluate(
+                    "() => ({v:document.getElementById('ff-verdict-form').hidden,"
+                    "cal:document.getElementById('ff-calibration').hidden})"))
+            expect(reopened.locator("#ff-verdict-form")).to_be_visible(timeout=10000)
             # Record the verdict through the real form controls.
             reopened.locator("#ff-preference").select_option("X")
             reopened.locator("#ff-criteria").fill("X 的回复更完整（E2E 虚构裁决）")
@@ -530,13 +543,50 @@ def run():
             serialized = _json.dumps(snapshot["data"], ensure_ascii=False)
             for banned in ["authorization", "cookie", "token"]:
                 assert banned not in serialized.lower(), "export must be credential-free"
+
+            # ---------- P4: K=4 orchestration and validated import ----------
+            p4create = reopened.evaluate("""() => chrome.runtime.sendMessage(
+              {type:'FF_CREATE',operationId:'op_p4e2e0001',
+               w0:'四分支共同材料',p:'回答同一任务',branchCount:4})""")
+            assert p4create["ok"] and p4create["data"]["id"], p4create
+            p4id = p4create["data"]["id"]
+            p4row = reopened.evaluate("(id) => chrome.runtime.sendMessage({type:'FF_READ',id})", p4id)
+            assert len(p4row["data"]["branches"]) == 4
+            tabs_before_p4 = sw_read("async () => (await chrome.tabs.query({url:'https://chatgpt.com/*'})).length")
+            launched4 = reopened.evaluate("""id => chrome.runtime.sendMessage(
+              {type:'FF_LAUNCH',experimentId:id,operationId:'op_p4e2e0002'})""", p4id)
+            assert launched4["ok"] and len(launched4["data"]["tabIds"]) == 4, launched4
+            deadline = time.time() + 40
+            tabs_now = 0
+            while time.time() < deadline:
+                tabs_now = sw_read("async () => (await chrome.tabs.query({url:'https://chatgpt.com/*'})).length")
+                if tabs_now == tabs_before_p4 + 4:
+                    break
+                time.sleep(0.5)
+            assert tabs_now == tabs_before_p4 + 4, "K=4 launch opens four tabs"
+            deadline = time.time() + 40
+            p4row = None
+            while time.time() < deadline:
+                p4row = sw_read("async id => (await ThreadLineFFDB.read(id))", p4id)
+                if all(p4row["branches"][b]["phase"] == "awaiting_send" for b in p4row["branches"]):
+                    break
+                time.sleep(0.5)
+            assert all(p4row["branches"][b]["phase"] == "awaiting_send" for b in p4row["branches"]), (
+                "all four branches prefill-ACK", {b: p4row["branches"][b]["phase"] for b in p4row["branches"]})
+            # Validated import: exporting the K=2 experiment then importing into
+            # a fresh extension ID would need a second install; here the ID
+            # collision path is asserted instead (import never overwrites).
+            conflicting = reopened.evaluate("(p) => chrome.runtime.sendMessage(p)",
+              {"type":"FF_IMPORT","snapshot":snapshot["data"]})
+            assert not conflicting["ok"] and "already exists" in conflicting["error"], conflicting
             ctx2.close()
     print("PASS: Fork P1 default-off, permission-bound messages, 24KB input, "
           "atomic IDB/CAS and reducer guards, replay-safe attempts, post-ACK display recovery, "
           "XSS, legacy isolation and restart; P2 dual-branch launch with exact prefill, "
           "simulated human send binding, capture-driven completion and 0 automatic sends; "
           "P3 blind X/Y comparison with pre-verdict hiding, recorded verdict with reveal, "
-          "and credential-free self-contained export (synthetic-only)")
+          "and credential-free self-contained export; P4 K=4 orchestration with four "
+          "prefilled tabs and validated import collision rejection (synthetic-only)")
 
 
 if __name__ == "__main__":
