@@ -2,6 +2,13 @@
 
 任务定义和正式状态唯一来源：[docs/PLAN.md](../PLAN.md)。本文件只记录发生过的事件与证据，不自行认定任务完成。
 
+## 2026-10-24 browser/real-Edge 验证轮（门禁不变）
+
+- PR 状态浏览器级核对（GitHub 页面 DOM + 截图）：[#12](https://github.com/siskosun/ThreadLine/pull/12) 与 [#11](https://github.com/siskosun/ThreadLine/pull/11) 均 `Open` 且已 `ready for review`，徽标 `2 / 3 checks OK`（第三项为 publish 作业 `skipping`，非失败），与 CLI 核对一致。
+- 真实安装 Edge（155.0.4283.62，`THREADLINE_CHROMIUM_PATH` 覆盖 `executable_path`）运行仓库自有三套合成 MV3 E2E：**3/3 PASS**，与捆绑 Chromium CI 结果一致。零发送、无认证账号、合成页面；日志见 [REAL_EDGE_E2E_20261024.txt](evidence/REAL_EDGE_E2E_20261024.txt)。同树 `npm run verify` 190/190。这不构成 Z0-LIVE 真实站点验收，未改任何门禁。
+- 计算机操作（computer use）通道在本会话由宿主标记不可用（`Computer Use is unavailable for this node_repl session`）；browser use 仅注册 IAB 后端，无法加载 MV3 扩展或 `chrome-extension://` 页面。两者均按技能规则停止，未绕过、未改系统权限。真实登录 ChatGPT 的 Z0-LIVE 仍需用户操作。
+- 本轮仅新增证据与进度记录，不改计划表、依赖或签署契约；随本 PR 人工复核。
+
 ## 2026-10-24 P1-CORE 合并对账、完成证据与 Release 符号修复
 
 - 核对 GitHub：PR [#10](https://github.com/siskosun/ThreadLine/pull/10)（P1-CORE，续作自 #9）已于 2026-10-24T03:56:34Z 合并入 main，merge 提交 `b0d470b3d7a386f2243f1bafb26aa54c7fcc26a0`；该提交 GitHub Actions `verify` check-run 结论 success。PR #1 仍 Draft/open；Z0-LIVE 无新签署。
