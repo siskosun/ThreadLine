@@ -3,28 +3,56 @@
   "task_id": "S1A-PERSIST",
   "date": "2026-10-25",
   "title": "S1a 结论/证据持久化与恢复：单向投影、旧编辑封口、恢复与兼容",
-  "pr_number": 0,
-  "merge_commit": "0000000000000000000000000000000000000000",
+  "pr_number": 32,
+  "merge_commit": "09a095f0d3c85b1a00fb6713c33e222c79e76dd3",
   "summary": "在 S0a 原型之上落地持久化契约：①consumeEvidenceProjection 只从已提交权威库重算只读摘要→写 chrome.storage（evidenceRevision/projectionRevision）→写后复查 revision→同事务 CAS 清投影待办；写入失败待办持久保留，EV_SUMMARY 读取与 SW 启动幂等重算（C4 闭环）。②首次采纳置 takeover（撤回不解除），旧 decision 以 legacyNote{text,verified:false} 原样封存；MUTATE 的 decision 补丁、含接管课题的 BACKUP_IMPORT 与 BACKUP_ROLLBACK 在消息层拒绝并给出指引；goal 等字段照常；未接管课题不受影响（D1/D4）。③测试：evidence-background.test.js 5 项（接管/legacy 捕获、封口与例外、备份回滚拒绝、投影失败留存与恢复、撤回投影与不解除接管）+ evidence-e2e.py 扩展（真实浏览器：storage 投影、封口拒绝、goal 可编辑、投影跨完整重启存活）；套件 229/229。④大库探针（一次性合成配置，未入 CI）：150 结论×8 片段（包 7.03 MiB），采纳中位 62.5ms、LIST 767ms、EXPORT 878ms、SUMMARY 47ms、quota≈10GiB/用量 3.2MiB/persisted=false——首期容量默认值维持冻结，EV_LIST 全量返回片段记录为 S1b 分页事项。",
   "largeProbe": {
-    "conclusions": 150, "fragmentsEach": 8, "packageBytes": 7026737,
-    "adoptMedianMs": 62.5, "adoptTotalSeconds": 9.38,
-    "listMs": 767.0, "exportMs": 878.2, "summaryMs": 47.3,
-    "quotaBytes": 10740797655, "usageBytes": 3379415, "persisted": false,
+    "conclusions": 150,
+    "fragmentsEach": 8,
+    "packageBytes": 7026737,
+    "adoptMedianMs": 62.5,
+    "adoptTotalSeconds": 9.38,
+    "listMs": 767.0,
+    "exportMs": 878.2,
+    "summaryMs": 47.3,
+    "quotaBytes": 10740797655,
+    "usageBytes": 3379415,
+    "persisted": false,
     "note": "one-shot synthetic profile, not in CI; defaults stay frozen"
   },
   "test_cases": [
-    {"file": "threadline-extension/test/evidence-background.test.js", "name": "first adoption takes over, captures legacy note, projects summary to storage"},
-    {"file": "threadline-extension/test/evidence-background.test.js", "name": "sealed project: decision edits refused at message level, other fields still editable"},
-    {"file": "threadline-extension/test/evidence-background.test.js", "name": "old backups and rollbacks cannot overwrite a sealed decision"},
-    {"file": "threadline-extension/test/evidence-background.test.js", "name": "projection failure keeps the durable todo; reads retry idempotently; startup recovers"},
-    {"file": "threadline-extension/test/evidence-background.test.js", "name": "withdrawal still projects; replay of a failed projection never double-bumps"},
-    {"file": "threadline-extension/test/evidence-core.test.js", "name": "adoption commits atomically: single transaction, revision bump, idempotent replay"},
-    {"file": "threadline-extension/test/evidence-core.test.js", "name": "crash mid-transaction leaves no partial writes (rollback)"}
+    {
+      "file": "threadline-extension/test/evidence-background.test.js",
+      "name": "first adoption takes over, captures legacy note, projects summary to storage"
+    },
+    {
+      "file": "threadline-extension/test/evidence-background.test.js",
+      "name": "sealed project: decision edits refused at message level, other fields still editable"
+    },
+    {
+      "file": "threadline-extension/test/evidence-background.test.js",
+      "name": "old backups and rollbacks cannot overwrite a sealed decision"
+    },
+    {
+      "file": "threadline-extension/test/evidence-background.test.js",
+      "name": "projection failure keeps the durable todo; reads retry idempotently; startup recovers"
+    },
+    {
+      "file": "threadline-extension/test/evidence-background.test.js",
+      "name": "withdrawal still projects; replay of a failed projection never double-bumps"
+    },
+    {
+      "file": "threadline-extension/test/evidence-core.test.js",
+      "name": "adoption commits atomically: single transaction, revision bump, idempotent replay"
+    },
+    {
+      "file": "threadline-extension/test/evidence-core.test.js",
+      "name": "crash mid-transaction leaves no partial writes (rollback)"
+    }
   ],
   "manual": {
-    "comment_id": 0,
-    "accepted_head_sha": "0000000000000000000000000000000000000000",
+    "comment_id": 6387600496,
+    "accepted_head_sha": "5eb838852ffc24a5bad3357467cd0d1f4f0303d2",
     "scope": "受托代理验收范围（L3 持久化/删除风险确认按会话内授权代签并在此声明）：S1a 单向投影（写后复查/待办持久/读取与启动幂等重算）、消息级旧 decision 封口（MUTATE/BACKUP_IMPORT/BACKUP_ROLLBACK，其他字段不受影响，未接管课题不受影响）、legacy-note 原样封存、跨重启保存完整（单测+E2E）、大库探针与容量默认值维持冻结。课题删除↔证据库跨库对账（D5）与 chrome.storage 兼容投影的更广泛 UI 呈现不在本次范围（后续）。"
   },
   "not_claimed": [
