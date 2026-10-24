@@ -124,14 +124,17 @@ test('cancellation stops the pending retry loop without a result', async () => {
   const { adapter, root } = fixture('column');
   const dom = domFixture();
   const controller = new AbortController();
-  const resultPromise = Locator.locateMessage(dom.document_,
+  // Deterministic cancellation: abort during the SECOND scroll step, well
+  // before the attempt budget or the virtual end of the list.
+  let scrolls = 0;
+  const baseScrollTo = root.scrollTo.bind(root);
+  root.scrollTo = patch => { baseScrollTo(patch); scrolls += 1; if (scrolls === 2) controller.abort(); };
+  const result = await Locator.locateMessage(dom.document_,
     { messageId: 'missing', role: 'user', contentPrefix: 'x' },
-    { adapter, signal: controller.signal, settleMs: 5, attempts: 50 });
-  setTimeout(() => controller.abort(), 40);
-  const result = await resultPromise;
+    { adapter, signal: controller.signal, settleMs: 1, attempts: 50 });
   assert.equal(result.located, false);
   assert.equal(result.reason, 'aborted');
-  assert.ok(root.scrollTop < 50 * 600, 'loop stopped early instead of exhausting attempts');
+  assert.equal(scrolls <= 3, true, 'loop stopped early instead of exhausting attempts');
 });
 
 test('weak text match never counts as verified location', async () => {
