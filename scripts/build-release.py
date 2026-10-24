@@ -41,8 +41,9 @@ with ZipFile(OUT) as zf:
     assert 'threadline-extension/backup-core.js' in names
     built_version = json.loads(zf.read('threadline-extension/manifest.json'))['version']
     assert built_version == VERSION
-    assert b'isTrustedPanelSender' in zf.read('threadline-extension/background.js')
+    assert b'inspectPanelSender' in zf.read('threadline-extension/background.js')
+    assert b'requirePanelSender' in zf.read('threadline-extension/background.js')
 
 checksum = sha256(OUT.read_bytes()).hexdigest()
-(ROOT / 'dist' / 'SHA256SUMS.txt').write_text(f'{checksum}  {OUT.name}\n', encoding='utf-8')
+(ROOT / 'dist' / 'SHA256SUMS.txt').write_text(f'{checksum}  {OUT.name}\n', encoding='utf-8', newline='\n')
 print(f'{OUT.name}: {OUT.stat().st_size} bytes, sha256={checksum}')
