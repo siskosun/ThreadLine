@@ -1,6 +1,6 @@
-# ThreadLine v0.7.0 · 完整使用说明
+# ThreadLine v0.8.0 · 完整使用说明
 
-[从 GitHub 下载安装包](https://github.com/siskosun/ThreadLine/releases/download/v0.7.0/ThreadLine-v0.7.0.zip) · [返回仓库首页](https://github.com/siskosun/ThreadLine)
+[从 GitHub 下载安装包](https://github.com/siskosun/ThreadLine/releases/download/v0.8.0/ThreadLine-v0.8.0.zip) · [返回仓库首页](https://github.com/siskosun/ThreadLine)
 
 ## 安装
 

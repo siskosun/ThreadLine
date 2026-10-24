@@ -1,22 +1,22 @@
 # ThreadLine（研线）
 
-> **v0.7.0 测试版** · Chrome / Edge 右侧栏研究工作台
+> **v0.8.0 测试版** · Chrome / Edge 右侧栏研究工作台
 
 多条 ChatGPT 对话同时研究同一课题时，在不同窗口显示统一的有效结论、已收口状态和需核对的字段差异，避免误在旧分支继续工作。辅助提供按需对话采集、AI 整理、思维导图，以及手动触发的网页项目/归档操作。
 
 ## 下载安装包
 
-**[下载 ThreadLine v0.7.0 安装 ZIP（GitHub Release）](https://github.com/siskosun/ThreadLine/releases/download/v0.7.0/ThreadLine-v0.7.0.zip)**
+**[下载 ThreadLine v0.8.0 安装 ZIP（GitHub Release）](https://github.com/siskosun/ThreadLine/releases/download/v0.8.0/ThreadLine-v0.8.0.zip)**
 
 不需要构建工具。下载 ZIP → 解压 → 打开 `edge://extensions/` 或 `chrome://extensions/` → 启用开发人员模式 →「加载解压缩的扩展程序」→ 选中包含 `manifest.json` 的 `threadline-extension` 文件夹。
 
-正式安装包由 GitHub Actions 在全部测试通过后构建并发布；[下载 SHA256 校验文件](https://github.com/siskosun/ThreadLine/releases/download/v0.7.0/SHA256SUMS.txt)。如 Release 尚未完成，可使用[旧版 v0.6.1 仓库压缩包](dist/ThreadLine-v0.6.0.zip)。侧载扩展不会自动更新。
+正式安装包由 GitHub Actions 在全部测试通过后构建并发布；[下载 SHA256 校验文件](https://github.com/siskosun/ThreadLine/releases/download/v0.8.0/SHA256SUMS.txt)。如 Release 尚未完成，可使用[旧版 v0.6.0 仓库压缩包](dist/ThreadLine-v0.6.0.zip)。侧载扩展不会自动更新。
 
 **从 v0.5.0 升级：** 使用相同扩展目录覆盖并重新加载，先在新版「全部课题与管理 → 课题备份与恢复」导出一次 JSON。v0.6.0 没有强行添加 `manifest.key`，避免改变旧扩展 ID 导致原状态不可见。以后迁移到其他安装路径，应先从原扩展导出 JSON，安装后导入。备份不包含短期采集全文。
 
 ## Fork 双分支对照 Beta
 
-新增第一期能力（默认关闭，独立 IndexedDB，不影响原有课题）：冻结共同材料与指令 → 发起双分支（两个独立新聊天、同一文本预填、**永不自动发送**）→ 人工发送后自动绑定会话身份并读取真实用户消息对照分类 → 两分支完成后生成 X/Y 去标签对照（映射可由记录的随机种子独立复算）→ 提交裁决后揭盲 → 自包含 JSON 导出（仅导出）。浏览器重启可从持久身份恢复；未确认的操作永不自动重放。完整契约见 `docs/PLAN.md`。
+对照实验能力（默认关闭，独立 IndexedDB，不影响原有课题）：冻结共同材料与指令 → 发起 K（2–4）个独立新聊天标签、同一文本逐字预填（**永不自动发送**）→ 你手动发送后自动绑定各分支会话身份并对照真实用户消息分类 → 全部分支完成后生成去标签对照（映射由记录的随机种子决定，可独立复算）→ 裁决前需通过隐藏校准题（服务端门禁）→ 提交裁决后揭盲 → 自包含 JSON 导出，并支持经严格验证的导入（哈希与映射重算，不覆盖既有实验）。浏览器重启可从持久身份恢复；未确认的操作永不自动重放。完整契约见 `docs/PLAN.md`。
 
 ## 核心功能
 

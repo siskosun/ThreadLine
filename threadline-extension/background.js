@@ -439,7 +439,7 @@ async function ffObserveHook(tabId, status, key) {
     if (attempt && attempt.status === "pending" && !attempt.evidence?.sessionId) {
       await ffAdvance(bind, {status:"pending", phase:"generating",
         operationId:`${bind.operationId}_conv_${conversationId}`,
-        updates:{conversationId, sessionId:conversationId},
+        updates:{conversationId, sessionId:conversationId, sentAt:Date.now()},
         reason:"conversation URL bound to branch"});
       // Post-send input classification from the conversation's own rendering.
       chrome.tabs.sendMessage(tabId, {type:"TL_FF_READ_USER_MESSAGE"}).then(async res => {
@@ -483,10 +483,14 @@ async function ffCaptureEnded(run, tabId) {
     ["exact", "canonical_equivalent"].includes(inputLevel) &&
     taskCount === 1 && reply.length > 0;
   if (canComplete) {
+    const sentAt = attempt.evidence.sentAt;
+    const timing = {replyBytes:ThreadLineFFCore.byteLength(reply),
+      sentMs:Number.isFinite(sentAt) ? Date.now() - sentAt : null};
     await ffAdvance(bind, {status:"done", phase:"capturing",
       operationId:`${bind.operationId}_${bind.branch}_done`,
       reason:"capture completed; completion contract satisfied",
-      updates:{captureComplete:true, persisted:true, reply, taskCount, endSignals:signals}});
+      updates:{captureComplete:true, persisted:true, reply, taskCount,
+        endSignals:signals, capturedAt:Date.now(), timing}});
   } else {
     await ffAdvance(bind, {status:"pending", phase:"capturing",
       operationId:`${bind.operationId}_captry_${run.id}`,
@@ -526,6 +530,22 @@ async function ffEnabled() {
   return state[FF_ENABLED_KEY] === true;
 }
 async function handleFF(payload, sender) {
+  if (payload.type === "FF_SUMMARY") {
+    // Read-only progress digest for the sidebar panel: no experiment content,
+    // no evidence, no replies - only labels, statuses and phases.
+    const panelURL = chrome.runtime.getURL("panel.html");
+    const trustedPanel = !!(sender && sender.id === chrome.runtime.id &&
+      sender.url === panelURL && (!sender.tab || sender.tab.url === panelURL));
+    if (!trustedPanel) throw new Error("only the panel may read the Fork progress summary");
+    if (!await ffEnabled()) return {enabled:false};
+    const rows = await ThreadLineFFDB.list();
+    const latest = rows.sort((a,b)=>b.createdAt-a.createdAt)[0];
+    if (!latest) return {enabled:true, latest:null};
+    return {enabled:true, latest:{id:latest.id,
+      branchCount:Object.keys(latest.branches).length,
+      branches:Object.entries(latest.branches).map(([label,b]) =>
+        ({label, status:b.status, phase:b.phase}))}};
+  }
   if (!trustedFFSender(sender)) throw new Error("only Fork extension page may access FF data");
   if (payload.type === "FF_STATUS")
     return {enabled:await ffEnabled(), phase:"core_only", sendsAutomatically:false};
@@ -549,9 +569,10 @@ async function handleFF(payload, sender) {
       if (typeof operationId !== "string" ||
         !/^[a-zA-Z0-9_-]{6,100}$/.test(operationId))
         throw new Error("explicit create operation ID required");
+      const branchCount = payload.branchCount === undefined ? 2 : payload.branchCount;
       const frozen = await ThreadLineFFCore.freeze(payload.w0, payload.p);
       const id = "ff_" + operationId;
-      const record = ThreadLineFFCore.newExperiment(frozen, id);
+      const record = ThreadLineFFCore.newExperiment(frozen, id, branchCount);
       record.createOperationId = operationId;
       let saved = record;
       try {
@@ -571,9 +592,13 @@ async function handleFF(payload, sender) {
   }
   if (payload.type === "FF_LIST") {
     const rows = await ThreadLineFFDB.list();
-    return rows.map(x => ({id:x.id, revision:x.revision, createdAt:x.createdAt,
-      bytes:x.frozen?.bytes, statusA:x.branches?.A?.status,
-      statusB:x.branches?.B?.status})).sort((a,b) => b.createdAt-a.createdAt);
+    return rows.map(x => {
+      const statuses = Object.fromEntries(Object.entries(x.branches || {})
+        .map(([label,b]) => [label,b.status]));
+      return {id:x.id, revision:x.revision, createdAt:x.createdAt,
+        bytes:x.frozen?.bytes, branchCount:Object.keys(statuses).length,
+        statuses, statusA:x.branches?.A?.status, statusB:x.branches?.B?.status};
+    }).sort((a,b) => b.createdAt-a.createdAt);
   }
   if (payload.type === "FF_READ") {
     const row = await ThreadLineFFDB.read(payload.id);
@@ -619,14 +644,14 @@ async function handleFF(payload, sender) {
       if (record.branches.A.status === "done" || record.branches.B.status === "done")
         throw new Error("a completed branch cannot be relaunched; create a new experiment");
       const tabIds = {}, attemptIds = {}, terminal = {};
-      for (const branch of ["A", "B"]) {
+      for (const branch of Object.keys(record.branches)) {
         const attempts = record.branches[branch].attempts;
         const active = attempts.at(-1);
         if (active && active.status === "pending")
           throw new Error("branch " + branch + " is still running");
         terminal[branch] = attempts.length > 0;
       }
-      for (const branch of ["A", "B"]) {
+      for (const branch of Object.keys(record.branches)) {
         // Create the tab idle, then navigate: a create-with-URL navigation can
         // start before observers attach, escaping interception and injection.
         const tab = await chrome.tabs.create({active:false});
@@ -647,10 +672,10 @@ async function handleFF(payload, sender) {
               : "P2 launch: plain new-chat tab created",
             evidence:{tabId:tab.id}, manualNewAttempt:terminalBranch}));
       }
-      for (const branch of ["A", "B"])
+      for (const branch of Object.keys(record.branches))
         ffSeedHandoff(tabIds[branch], record.frozen.text);
-      return {tabIdA:tabIds.A, tabIdB:tabIds.B, attemptIdA:attemptIds.A,
-        attemptIdB:attemptIds.B, revision:record.revision};
+      return {tabIds, attemptIds, revision:record.revision,
+        branchCount:Object.keys(record.branches).length};
     });
   }
   if (payload.type === "FF_REPREFILL") {
@@ -715,14 +740,35 @@ async function handleFF(payload, sender) {
       if (!ThreadLineFFCore.eligibleForComparison(existing))
         throw new Error("both branches must be done with verified input and captures");
       const mapping = await ThreadLineFFCore.assignMapping(existing, payload.operationId);
+      // Equal-budget parity is defined by CONFIGURATION equality across
+      // branches (model/effort/tools checks), NOT by wall-clock timing:
+      // human waiting time must not influence the comparison.
+      const configs = [];
+      const timings = {};
+      for (const [label, branch] of Object.entries(existing.branches)) {
+        configs.push(JSON.stringify(branch.isolation?.checks || {}));
+        const ev = branch.attempts.at(-1).evidence || {};
+        timings[label] = {sentMs:Number.isFinite(ev.timing?.sentMs) ? ev.timing.sentMs : null,
+          replyBytes:Number.isSafeInteger(ev.timing?.replyBytes) ? ev.timing.replyBytes : null};
+      }
+      const budgetParity = configs.every(c => c === configs[0]);
       const saved = await ThreadLineFFDB.update(existing.id, existing.revision,
-        record => ({...record, decision:mapping, revision:record.revision + 1}));
+        record => ({...record, decision:{...mapping, budgetParity, timings},
+          revision:record.revision + 1}));
       return saved.decision;
     });
   }
   if (payload.type === "FF_VERDICT") {
     return serialize(async () => {
       if (!await ffEnabled()) throw new Error("Fork Beta is disabled");
+      // Server-side calibration gate: the submitting Fork page's tab must
+      // hold a fresh passing calibration record.
+      if (!Number.isInteger(sender.tab?.id))
+        throw new Error("the Fork page must be opened as a tab for verdicts");
+      const cal = await chrome.storage.session.get(`tl_ff_cal_${sender.tab.id}`);
+      const calRecord = cal[`tl_ff_cal_${sender.tab.id}`];
+      if (!calRecord || Date.now() - calRecord.passedAt > 3600000)
+        throw new Error("verdict requires a passing calibration first");
       const existing = await ThreadLineFFDB.read(payload.experimentId);
       if (!existing) throw new Error("experiment not found");
       if (!existing.decision?.mapping) throw new Error("no comparison mapping assigned yet");
@@ -741,6 +787,35 @@ async function handleFF(payload, sender) {
     if (!existing) throw new Error("experiment not found");
     await ThreadLineFFCore.verifyFrozen(existing.frozen);
     return ThreadLineFFCore.exportSnapshot(existing);
+  }
+  if (payload.type === "FF_IMPORT") {
+    // Validated import: hashes recomputed, decision seed re-derived, and the
+    // target ID must not collide. Import never mutates existing experiments.
+    return serialize(async () => {
+      if (!await ffEnabled()) throw new Error("Fork Beta is disabled");
+      const validated = await ThreadLineFFCore.validateImport(payload.snapshot);
+      const existing = await ThreadLineFFDB.read(validated.id);
+      if (existing) throw new Error("an experiment with this ID already exists");
+      const record = {...validated,
+        createOperationId:payload.snapshot.experiment.createOperationId ||
+          "import_" + crypto.randomUUID(),
+        createdAt:Number.isSafeInteger(payload.snapshot.experiment.createdAt)
+          ? payload.snapshot.experiment.createdAt : Date.now()};
+      await ThreadLineFFDB.createImported(record);
+      return {id:record.id, revision:record.revision,
+        branchCount:record.branchCount};
+    });
+  }
+  if (payload.type === "FF_CALIBRATION") {
+    // Scoring happens inside ff-core; expected answers only surface in the result.
+    const result = ThreadLineFFCore.judgeCalibration(payload.responses);
+    // A pass is recorded against the Fork page's tab and expires after an
+    // hour: verdicts require a fresh server-side calibration record, not a
+    // UI-only gate.
+    if (result.pass && Number.isInteger(sender.tab?.id))
+      await chrome.storage.session.set(
+        {[`tl_ff_cal_${sender.tab.id}`]:{passedAt:Date.now()}});
+    return result;
   }
   throw new Error("unknown Fork message type");
 }

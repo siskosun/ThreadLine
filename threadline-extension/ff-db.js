@@ -74,6 +74,15 @@ const ThreadLineFFDB = (() => {
       result(record);
     });
   }
+  function createImported(record) {
+    if (!record || typeof record.id !== "string" ||
+      !Number.isSafeInteger(record.revision) || record.revision < 0)
+      return Promise.reject(new Error("invalid imported experiment"));
+    return transaction("readwrite", (store, result) => {
+      store.add(record);
+      result(record);
+    });
+  }
   function update(id, expectedRevision, reducer) {
     if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0 ||
       typeof reducer !== "function")
@@ -108,7 +117,7 @@ const ThreadLineFFDB = (() => {
       };
     });
   }
-  return {NAME, VERSION, read, list, create, update};
+  return {NAME, VERSION, read, list, create, createImported, update};
 })();
 if (typeof globalThis !== "undefined") globalThis.ThreadLineFFDB = ThreadLineFFDB;
 if (typeof module !== "undefined") module.exports = ThreadLineFFDB;

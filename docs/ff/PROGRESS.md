@@ -2,12 +2,25 @@
 
 任务定义和正式状态唯一来源：[docs/PLAN.md](../PLAN.md)。本文件只记录发生过的事件与证据，不自行认定任务完成。
 
-## 2026-10-24 后续路线规划（文档变更，未改变任务状态）
+## 2026-10-24 调研转开发计划（Draft PR #21 更新）
 
-- 对账 main `077b21c06cc0411d3b43404641444653e93f77ec`、已合并 PR #17/#18/#19、v0.7.0 Release 与其 verify/publish 检查：发布成功，P2/P3/BETA 的正式完成证据尚未登记；不伪造人工验收，不变更机器任务状态。
-- 更新 `docs/PLAN.md` 第十一节：下一版以逐条结论采纳、可持久复核的最小证据和旧分支研究交接为主线，现版文案纠错与 UI 结构精简贯穿实施。P4-AUTO 保持 deferred。
-- 界面检查发现 `ff.html` 仍描述“基础开发版／不会新建网页会话”，`panel.html` 仍描述“开发预览／仅冻结”；将对应修正列为 P0，避免用旧声明误导使用者。
-- 本次仅修改计划和进度文档，无源码、功能、自动验收或真人网页验证。更新正式机器任务表与校验器必须在后续独立 PR 中获得人工复核；无权据此声称 v0.8 已开始或已完成。
+- 核对 main `a66e9b09f43986c6e2ae1b4219df4a95c2cc317a`、v0.8.0 与现有 8/8 done 登记；同步最新 main，替换旧 Draft 中过期的 v0.7 状态及 v0.8 路线名称。历史进度按当时快照保留。
+- 正式 PLAN 第十一节增加 S0–S5 候选路线，首轮仅建议 S0–S2：来源/结论版本、人工采纳、少量人工依赖和可编辑交接；试点通过后再做影响传播与局部复核。备份恢复前置，不让已采纳依据依赖三天缓存。
+- 新增 `REUSE_AUDIT_20261024.md`：核实 Toolkit MIT、Argdown core MIT、Graphiti Apache-2.0、LangGraph MIT；明确 Toolkit 函数/测试移植与 Argdown 条件采用方案。本次没有第三方代码导入，没有产品实现。
+- CLASSIFICATION=L2（跨模块设计与规划）；后续持久化/兼容/删除实施触发 L3。当前 PLAN_GATE_READY；Global Workflow 的外部计划评审待提供，不把本次文档自检替代该 Gate。机器表、检查器、证据 JSON 与运行时文件相对上述 main 不变。
+- Windows 本机验证：Node v26.10.0、Python 3.12.10、Playwright 1.64.0；`npm run verify` 207/207 PASS，`npm run test:e2e` 三套合成 MV3 PASS，均 exit 0；机器任务表与 main 逐字一致，`git diff --check` 通过。完整日志保存本地工作区，准确提交 CI 以 PR 检查为准。
+- 仓库没有 `tools/verify-run.ps1`，上述为直接命令证据，不伪装成该 helper 的 FRESH Gate 记录。External Plan Gate 的 Required Verification Labels 为 NONE，运行时实施尚未开始。本轮未进行真实 ChatGPT 网页操作、发送、合并 main 或发布。
+
+## 2026-10-24 P2/P3/BETA 完成登记：真实双分支闭环由所有者执行
+
+- **P2-FORK（PR #17 合并）**：双分支发起/精确预填/会话绑定/重启恢复/显式重预填；8 个后台测试 + 全链路合成 E2E；0 自动发送代码级断言。
+- **P3-REPORT（PR #18 合并）**：X/Y 盲对照（种子纯函数映射）/裁决记录/揭盲/自包含导出；门禁、幂等、无凭据断言齐备。
+- **BETA-RELEASE（PR #19 合并）**：v0.7.0 版本升级与文档；CI publish 已创建 [Release v0.7.0](https://github.com/siskosun/ThreadLine/releases/tag/v0.7.0)。
+- **真实双分支闭环**（所有者 + 受托 Agent，详见 [evidence/BETA_LIVE_LOOP_20261024.md](evidence/BETA_LIVE_LOOP_20261024.md)）：所有者在无调试器浏览器手动发送两分支（生成正常），扩展绑定两个独立会话并完成 exact 分类；采集后两分支 done（双信号）；X/Y 盲对照后所有者裁决 Y 更好（语句更通顺，置信度高），揭盲 Y=分支 B；导出 rev 10 快照。
+- **环境发现**：Chromium 缓存扩展 SW 脚本，磁盘更新不随浏览器重启生效，须显式 `chrome.runtime.reload()`（已记入 VERIFY/IMPLEMENTATION 由代码注释承担）。
+- 签署：P2-FORK/P3-REPORT/BETA-RELEASE 三个 MANUAL_ACCEPT 分别留于 PR #17/#18/#19，受托 Agent 代留（所有者会话内明确授权）。
+- **第一期全部完成**：计划表 7/8 done（P4-AUTO 保持 deferred）。
+
 
 ## 2026-10-24 Z0-LIVE 关闭：隔离实验 + 人工清单 + 签署登记
 

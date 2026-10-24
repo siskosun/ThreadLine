@@ -94,16 +94,22 @@ const ThreadLineFFCore = (() => {
       (a.frozen === b.frozen || a.compare === b.compare) ? "canonical_equivalent" : "differs";
     return {level, rule:RULE, expected:a, observed:b};
   }
-  function newExperiment(frozen, experimentId) {
+  const BRANCH_LABELS = Object.freeze(["A", "B", "C", "D"]);
+  const MAX_BRANCHES = 4;
+  function newExperiment(frozen, experimentId, branchCount = 2) {
     validId(experimentId);
+    assert(Number.isSafeInteger(branchCount) && branchCount >= 2 && branchCount <= MAX_BRANCHES,
+      "branch count must be 2.." + MAX_BRANCHES);
     assert(frozen && frozen.rule === RULE && typeof frozen.text === "string", "missing frozen input");
     const make = label => ({
       id:experimentId + "_" + label, label, revision:0, status:"pending", phase:"created",
       attempts:[], history:[],
       isolation:{checks:Object.fromEntries(CHECKS.map(name => [name, "unknown"])), confirmedAt:null}
     });
-    return {id:experimentId, revision:0, frozen:structuredClone(frozen),
-      createdAt:Date.now(), branches:{A:make("A"), B:make("B")}, decision:null};
+    const branches = Object.fromEntries(
+      BRANCH_LABELS.slice(0, branchCount).map(label => [label, make(label)]));
+    return {id:experimentId, revision:0, branchCount, frozen:structuredClone(frozen),
+      createdAt:Date.now(), branches, decision:null};
   }
   // Stable representation makes an operation ID safe to replay after a worker restart.
   function sortedJSON(value) {
@@ -121,7 +127,8 @@ const ThreadLineFFCore = (() => {
   }
   function advance(exp, event) {
     plain(exp); plain(event);
-    assert(["A", "B"].includes(event.branch) && exp.branches && exp.branches[event.branch],
+    assert(exp.branches && exp.branches[event.branch] &&
+      BRANCH_LABELS.slice(0, exp.branchCount || 2).includes(event.branch),
       "invalid branch");
     const {branch, expectedRevision, operationId, attemptId, status, phase,
       evidence={}, reason="", manualNewAttempt=false} = event;
@@ -162,9 +169,11 @@ const ThreadLineFFCore = (() => {
     // Evidence updates may omit identity, but may never erase a binding and
     // then replace it in a later event. Keep the existing serialized shape.
     const nextEvidence = boundSession === undefined ? evidence : {...evidence,sessionId:boundSession};
-    const counterpart = exp.branches[branch === "A" ? "B" : "A"];
-    assert(!counterpart.attempts.some(a => a.id === attemptId),
-      "attempt ID already belongs to another branch");
+    for (const [otherLabel, otherBranch] of Object.entries(exp.branches)) {
+      if (otherLabel === branch) continue;
+      assert(!otherBranch.attempts.some(a => a.id === attemptId),
+        "attempt ID already belongs to another branch");
+    }
     const terminal = currentBranch.status !== "pending";
     if (terminal) {
       assert(manualNewAttempt === true && ["failed", "unknown"].includes(currentBranch.status) &&
@@ -195,9 +204,11 @@ const ThreadLineFFCore = (() => {
         new Set(evidence.endSignals).size >= 2,
         "insufficient completion signals");
       assert(evidence.persisted === true, "response not persisted");
-      const other = exp.branches[branch === "A" ? "B" : "A"];
-      assert(!other.attempts.some(a => a.evidence?.sessionId === nextEvidence.sessionId),
-        "same session assigned to both branches");
+      for (const [otherLabel, otherBranch] of Object.entries(exp.branches)) {
+        if (otherLabel === branch) continue;
+        assert(!otherBranch.attempts.some(a => a.evidence?.sessionId === nextEvidence.sessionId),
+          "same session assigned to both branches");
+      }
     }
     const now = Date.now(), next = structuredClone(exp), b = next.branches[branch];
     const found = b.attempts.find(a => a.id === attemptId);
@@ -226,9 +237,37 @@ const ThreadLineFFCore = (() => {
   }
   function eligibleForComparison(exp) {
     plain(exp);
-    return comparableSide(exp.branches.A) && comparableSide(exp.branches.B) &&
-      exp.branches.A.attempts.at(-1).evidence.sessionId !==
-        exp.branches.B.attempts.at(-1).evidence.sessionId;
+    const labels = Object.keys(exp.branches || {});
+    if (labels.length < 2) return false;
+    const sessions = new Set();
+    for (const label of labels) {
+      if (!comparableSide(exp.branches[label])) return false;
+      const s = exp.branches[label].attempts.at(-1).evidence.sessionId;
+      if (sessions.has(s)) return false;
+      sessions.add(s);
+    }
+    return true;
+  }
+  async function mappingFromSeed(branchLabels, seed) {
+    const digest = await hash("threadline-xy:" + seed);
+    let shuffled;
+    if (branchLabels.length === 2) {
+      // K=2 keeps the exact phase-1 derivation so recorded mappings recompute.
+      shuffled = parseInt(digest[0], 16) % 2 === 0
+        ? [branchLabels[0], branchLabels[1]]
+        : [branchLabels[1], branchLabels[0]];
+    } else {
+      shuffled = [...branchLabels];
+      for (let i = shuffled.length - 1, bi = 0; i > 0; i--, bi++) {
+        const j = parseInt(digest[bi % digest.length], 16) % (i + 1);
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+    }
+    const outLabels = branchLabels.length === 2
+      ? ["X", "Y"] : shuffled.map((_, i) => String(i + 1));
+    const mapping = {};
+    shuffled.forEach((branch, i) => { mapping[outLabels[i]] = branch; });
+    return {mapping};
   }
   async function assignMapping(exp, seed) {
     plain(exp);
@@ -237,11 +276,9 @@ const ThreadLineFFCore = (() => {
     assert(typeof seed === "string" && seed.length >= 10, "comparison seed required");
     // The mapping is a pure function of the recorded seed, so the export can
     // be independently recomputed without trusting this call.
-    return hash("threadline-xy:" + seed).then(digest => {
-      const xIsA = parseInt(digest[0], 16) % 2 === 0;
-      return Object.freeze({seed, assignedAt:Date.now(),
-        mapping:Object.freeze({X:xIsA ? "A" : "B", Y:xIsA ? "B" : "A"}), verdict:null});
-    });
+    const {mapping} = await mappingFromSeed(Object.keys(exp.branches), seed);
+    return Object.freeze({seed, assignedAt:Date.now(),
+      mapping:Object.freeze(mapping), verdict:null});
   }
   function recordVerdict(decision, verdict) {
     plain(decision);
@@ -249,15 +286,16 @@ const ThreadLineFFCore = (() => {
     assert(decision.verdict === null || decision.verdict === undefined,
       "verdict already recorded");
     plain(verdict);
-    assert(PREFERENCES.includes(verdict.preference), "invalid preference");
+    const validPreferences = [...Object.keys(decision.mapping), "tie", "inconclusive"];
+    assert(validPreferences.includes(verdict.preference), "invalid preference");
     assert(typeof verdict.criteria === "string" && verdict.criteria.trim().length > 0 &&
       verdict.criteria.length <= 400, "criteria required");
     assert(typeof verdict.confidence === "string" &&
       ["low", "medium", "high"].includes(verdict.confidence), "invalid confidence");
-    assert(typeof verdict.notes === "string" && verdict.notes.length <= 4000,
-      "invalid notes");
+    const notes = verdict.notes === undefined ? "" : verdict.notes;
+    assert(typeof notes === "string" && notes.length <= 4000, "invalid notes");
     return Object.freeze({preference:verdict.preference, criteria:verdict.criteria.trim(),
-      confidence:verdict.confidence, notes:verdict.notes, decidedAt:Date.now()});
+      confidence:verdict.confidence, notes, decidedAt:Date.now()});
   }
   function exportSnapshot(exp) {
     plain(exp);
@@ -271,14 +309,116 @@ const ThreadLineFFCore = (() => {
         bytes:exp.frozen.bytes, rule:exp.frozen.rule,
         w0Hashes:exp.frozen.w0Hashes, pHashes:exp.frozen.pHashes,
         textHashes:exp.frozen.textHashes, frozenAt:exp.frozen.frozenAt},
-      branches:Object.fromEntries(["A", "B"].map(label => [label, {
-        status:exp.branches[label].status, phase:exp.branches[label].phase,
-        attempts:exp.branches[label].attempts}])),
+      branches:Object.fromEntries(Object.keys(exp.branches).map(label => [label,
+        structuredClone(exp.branches[label])])),
+      branchCount:exp.branchCount || Object.keys(exp.branches).length,
       decision:exp.decision ? {...exp.decision} : null};
   }
-  return {MAX_BYTES, RULE, STATES, PHASES, CHECKS, PREFERENCES, canonical, compare, byteLength,
+  // ---------- P4: hidden judge calibration and validated JSON import ----------
+  // Expected answers live in this private map and are never exposed through
+  // CALIBRATION_ITEMS; only judgeCalibration surfaces them in the result.
+  const CALIBRATION_EXPECTED = Object.freeze({"cal-econ-0001":1, "cal-logic-0001":1});
+  const CALIBRATION_ITEMS = Object.freeze([
+    Object.freeze({
+      id:"cal-econ-0001",
+      material:"虚构材料：活动 A 转化率 3.2%，活动 B 转化率 4.1%，其余条件相同。",
+      question:"哪条线路转化率更高？",
+      options:["活动 A", "活动 B", "无法判断"]}),
+    Object.freeze({
+      id:"cal-logic-0001",
+      material:"虚构材料：所有已执行的测试用例通过，但仅覆盖了 10% 的代码路径。",
+      question:"这一结论是否成立：系统已得到完全验证？",
+      options:["成立", "不成立", "无法判断"]})
+  ]);
+  function judgeCalibration(responses) {
+    assert(Array.isArray(responses) && responses.length === CALIBRATION_ITEMS.length,
+      "respond to every calibration item");
+    const per = CALIBRATION_ITEMS.map(item => {
+      const r = responses.find(x => x && x.id === item.id);
+      assert(r, "missing calibration response");
+      assert(Number.isSafeInteger(r.choice) && r.choice >= 0 &&
+        r.choice < item.options.length, "invalid calibration choice");
+      const expected = CALIBRATION_EXPECTED[item.id];
+      return {id:item.id, correct:r.choice === expected,
+        expected:item.options[expected]};
+    });
+    const score = per.filter(x => x.correct).length;
+    return {per, score, total:CALIBRATION_ITEMS.length,
+      pass:score === CALIBRATION_ITEMS.length};
+  }
+  async function validateImport(snapshot) {
+    plain(snapshot);
+    assert(snapshot.schema === 1 && snapshot.kind === "threadline-fork-experiment",
+      "unknown snapshot kind");
+    const frozen = snapshot.frozen;
+    assert(frozen && typeof frozen === "object", "missing frozen input");
+    await verifyFrozen(frozen);
+    assert(snapshot.experiment && typeof snapshot.experiment.id === "string" &&
+      /^[a-zA-Z0-9_-]{6,120}$/.test(snapshot.experiment.id), "invalid experiment identity");
+    assert(Number.isSafeInteger(snapshot.experiment.revision) &&
+      snapshot.experiment.revision >= 0, "invalid experiment revision");
+    const branchEntries = Object.entries(snapshot.branches || {});
+    assert(branchEntries.length >= 2 && branchEntries.length <= MAX_BRANCHES,
+      "invalid branch count");
+    for (const [label, branch] of branchEntries) {
+      assert(BRANCH_LABELS.includes(label), "invalid branch label");
+      plain(branch);
+      assert(STATES.includes(branch.status) && PHASES.includes(branch.phase),
+        "invalid branch state");
+      assert(Number.isSafeInteger(branch.revision), "invalid branch revision");
+      assert(Array.isArray(branch.history) && Array.isArray(branch.attempts),
+        "imported branches must carry history and attempts");
+      assert(branch.isolation && typeof branch.isolation === "object",
+        "imported branches must carry isolation checks");
+      for (const a of branch.attempts) {
+        validId(a.id);
+        assert(STATES.includes(a.status) && PHASES.includes(a.phase), "invalid attempt state");
+        plain(a.evidence || {});
+        if (a.status === "done") {
+          // A snapshot may not claim done without the full completion evidence.
+          const ev = a.evidence || {};
+          assert(["exact", "canonical_equivalent"].includes(ev.inputLevel),
+            "done attempt input unverified");
+          assert(typeof ev.sessionId === "string" && ev.sessionId.length >= 4,
+            "done attempt missing session identity");
+          assert(ev.captureComplete === true && typeof ev.reply === "string" &&
+            ev.reply.length > 0, "done attempt response incomplete");
+          assert(Array.isArray(ev.endSignals) &&
+            new Set(ev.endSignals).size >= 2, "done attempt signals insufficient");
+          assert(ev.persisted === true && ev.taskCount === 1,
+            "done attempt not persisted");
+        }
+      }
+    }
+    let decision = null;
+    if (snapshot.decision) {
+      plain(snapshot.decision);
+      assert(typeof snapshot.decision.seed === "string", "invalid decision seed");
+      const {mapping} = await mappingFromSeed(Object.keys(snapshot.branches),
+        snapshot.decision.seed);
+      assert(JSON.stringify(snapshot.decision.mapping) === JSON.stringify(mapping),
+        "decision mapping does not match the recorded seed");
+      if (snapshot.decision.verdict !== null && snapshot.decision.verdict !== undefined) {
+        // Already-recorded verdicts are validated structurally, never re-recorded.
+        const v = snapshot.decision.verdict;
+        assert([...Object.keys(mapping), "tie", "inconclusive"].includes(v.preference),
+          "invalid imported preference");
+        assert(typeof v.criteria === "string" && v.criteria.length > 0 &&
+          v.criteria.length <= 400, "invalid imported criteria");
+        assert(["low", "medium", "high"].includes(v.confidence), "invalid imported confidence");
+        assert(Number.isSafeInteger(v.decidedAt), "invalid decidedAt");
+      }
+      decision = {...snapshot.decision};
+    }
+    return {id:snapshot.experiment.id, revision:snapshot.experiment.revision,
+      branchCount:branchEntries.length, frozen:structuredClone(frozen),
+      branches:structuredClone(snapshot.branches), decision};
+  }
+  return {MAX_BYTES, RULE, STATES, PHASES, CHECKS, PREFERENCES, BRANCH_LABELS, MAX_BRANCHES,
+    canonical, compare, byteLength,
     hash, wellFormed, fingerprints, formatText, freeze, verifyFrozen, classify, newExperiment, advance,
-    eligibleForComparison, assignMapping, recordVerdict, exportSnapshot};
+    eligibleForComparison, assignMapping, recordVerdict, exportSnapshot,
+    judgeCalibration, CALIBRATION_ITEMS, validateImport};
 })();
 if (typeof globalThis !== "undefined") globalThis.ThreadLineFFCore = ThreadLineFFCore;
 if (typeof module !== "undefined") module.exports = ThreadLineFFCore;

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>研线 · Fork 双分支实验</title>
+  <title>研线 · Fork 对照实验</title>
   <style>
     :root{color-scheme:light;font-family:system-ui,-apple-system,"Microsoft YaHei",sans-serif;color:#243247;background:#f5f7fa}
     *{box-sizing:border-box}body{max-width:960px;margin:32px auto;padding:0 18px 50px}
@@ -24,12 +24,13 @@
   </style>
 </head>
 <body>
-  <header><h1>Fork 双分支对照 · 基础开发版</h1>
-    <p class="subtle">独立于原有课题。当前阶段只冻结材料并保存本地实验，不会新建网页会话、操作草稿或自动发送。</p>
+  <header><h1>Fork 对照实验（2–4 分支）</h1>
+    <p class="subtle">独立于原有课题：冻结材料 → 发起 K 个新标签并逐字预填 → 你手动发送 → 采集 → 去标签对照与裁决。</p>
   </header>
+    <p style="background:#eef6ff;border:1px solid #bcd7f5;border-radius:9px;padding:10px 14px;font-size:13px;">⚠ 研线<b>永不自动发送</b>、不点击发送按钮、不重放未确认操作；所有发送都由你亲手完成。</p>
   <section class="surface" aria-label="功能开关">
     <label class="line" for="ff-enable"><input type="checkbox" id="ff-enable"/>启用本地 Fork 实验存储</label>
-    <p class="subtle">功能默认关闭。启用只允许保存实验和查看哈希；不会访问 ChatGPT 页面。原有课题与备份不受影响。</p>
+    <p class="subtle">功能默认关闭。启用后可保存/导入实验；只有你点击「发起」时才会打开 ChatGPT 标签。原有课题与备份不受影响。</p>
     <p id="ff-notice" role="status" aria-live="polite">正在检查本地状态…</p>
   </section>
   <div id="ff-local" hidden>
@@ -41,12 +42,18 @@
           <div><label for="ff-p">任务指令 P</label><textarea id="ff-p" required spellcheck="false" placeholder="写下两条分支要执行的同一任务"></textarea></div>
         </div>
         <p id="ff-bytes" class="subtle" aria-live="polite">最终发送文本：0 / 24,000 UTF-8 字节</p>
+        <label class="line" for="ff-branch-count">并行分支数（P4，2–4）
+          <select id="ff-branch-count"><option value="2">2</option><option value="3">3</option><option value="4">4</option></select>
+        </label>
         <button id="ff-save" type="submit">冻结并保存在本地</button>
       </form>
     </section>
     <section class="surface" aria-label="实验列表"><h2>已冻结的实验</h2>
-      <p class="subtle">本地持久化，无法从本阶段恢复为 ChatGPT 会话；后续阶段再进行人工发送。</p>
+      <p class="subtle">本地持久化。支持自包含 JSON 导出与严格验证的导入（哈希与映射重算，不覆盖既有实验）。</p>
       <button class="secondary" id="ff-refresh" type="button">刷新列表</button>
+      <label class="line">导入自包含 JSON（严格验证，不覆盖已有实验）
+        <input type="file" id="ff-import-file" accept="application/json,.json"/>
+      </label>
       <div id="ff-list"></div>
     </section>
     <section class="surface" id="ff-detail" hidden aria-label="冻结结果">
@@ -55,21 +62,26 @@
       <p id="ff-sha" class="mono"></p>
       <pre id="ff-text"></pre>
     </section>
-    <section class="surface" id="ff-branches" hidden aria-label="双分支执行">
-      <h2>双分支执行</h2>
-      <p class="subtle">创建两个独立新聊天标签并填入同一冻结文本；发送由你手动完成。研线永不自动发送、不点击发送按钮、不重放未确认的操作；浏览器重启后可从持久身份恢复。</p>
-      <button class="secondary" id="ff-launch" type="button">发起双分支（两个新标签）</button>
-      <div id="ff-branch-a"></div>
-      <div id="ff-branch-b"></div>
+    <section class="surface" id="ff-branches" hidden aria-label="分支执行">
+      <h2>分支执行</h2>
+      <p class="subtle">创建 K 个独立新聊天标签并填入同一冻结文本；发送由你手动完成。</p>
+      <button class="secondary" id="ff-launch" type="button">发起分支（K 个新标签）</button>
+      <div id="ff-branch-boxes"></div>
     </section>
     <section class="surface" id="ff-compare" hidden aria-label="去标签对照与裁决">
-      <h2>X/Y 去标签对照</h2>
+      <h2>去标签对照</h2>
       <p class="subtle" id="ff-compare-note"></p>
       <button class="secondary" id="ff-compare-btn" type="button">生成 X/Y 对照（两分支均完成后）</button>
       <div id="ff-columns"></div>
-      <div id="ff-verdict-form">
+      <div id="ff-calibration" hidden>
+        <h3>裁判校准（隐藏校准题，全部答对后开放裁决）</h3>
+        <div id="ff-calibration-items"></div>
+        <button class="secondary" id="ff-calibrate" type="button">提交校准答案</button>
+        <p id="ff-calibration-result" class="subtle"></p>
+      </div>
+      <div id="ff-verdict-form" hidden>
         <label for="ff-preference">你的偏好</label>
-        <select id="ff-preference"><option value="">请选择…</option><option value="X">X 更好</option><option value="Y">Y 更好</option><option value="tie">相当</option><option value="inconclusive">无法判断</option></select>
+        <select id="ff-preference"></select>
         <label for="ff-criteria">判断依据（必填）</label>
         <textarea id="ff-criteria" rows="2"></textarea>
         <label for="ff-confidence">置信度</label>
@@ -82,6 +94,7 @@
       <button class="secondary" id="ff-export" type="button" hidden>导出自包含 JSON（仅导出）</button>
     </section>
   </div>
+  <p class="subtle" id="ff-version-note" style="margin-top:26px"></p>
   <script src="ff-core.js"></script><script src="ff-page.js"></script>
 </body>
 </html>
