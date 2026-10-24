@@ -74,7 +74,7 @@ test('FF P4 K=4 orchestration generalizes branches, budgets and mapping',async()
 test('FF P4 calibration scoring is hidden until judged and gates nothing by accident',async()=>{
   const items=F.CALIBRATION_ITEMS;
   assert.equal(items.length,2);
-  for(const item of items)assert.equal(item.expectedIndex,undefined===item.expectedIndex?1:item.expectedIndex);
+  for(const item of items)assert.equal(item.expectedIndex,undefined,'expected answers must not be exposed');
   const perfect=items.map(item=>({id:item.id,choice:1}));
   const result=F.judgeCalibration(perfect);
   assert.equal(result.pass,true);
@@ -124,4 +124,37 @@ test('FF P4 import validates hashes, seed-derived mapping and rejects tampering'
   await assert.rejects(()=>F.validateImport(flipped),/does not match the recorded seed/);
   // Unknown snapshot kinds are rejected.
   await assert.rejects(()=>F.validateImport({...snapshot,kind:"something-else"}),/unknown snapshot kind/);
+});
+
+test('FF P4 import rejects done branches claimed without completion evidence',async()=>{
+  // The state machine already refuses to CREATE such records in-process, so
+  // the snapshot is built from a valid export and then mutated: the import
+  // validator is the only line of defense against hand-crafted data.
+  const frozen=await F.freeze("import W0","task");
+  const build=async id=>{
+    let r=F.newExperiment(frozen,id);
+    for(const branch of ["A","B"]){
+      const conv="conv-ok-"+branch.toLowerCase()+"-0001";
+      const evs=[
+        {operationId:"opo_"+branch+"_0001",status:"pending",phase:"created",evidence:{tabId:1}},
+        {operationId:"opo_"+branch+"_ack001",status:"pending",phase:"awaiting_send",
+         evidence:{tabId:1,inputLevel:"exact",prefill:"exact_ack",
+           sessionId:"chat-ok-"+branch.toLowerCase(),conversationId:conv}},
+        {operationId:"opo_"+branch+"_done01",status:"done",phase:"capturing",
+         evidence:{tabId:1,inputLevel:"exact",prefill:"exact_ack",
+           sessionId:"chat-ok-"+branch.toLowerCase(),conversationId:conv,
+           captureComplete:true,persisted:true,taskCount:1,reply:branch+" reply",
+           endSignals:["final","generation"]}}];
+      for(const ev of evs){
+        r=F.advance(r,{branch,expectedRevision:r.revision,attemptId:"att_ok_"+branch,...ev});
+      }
+    }
+    r.createOperationId="opo_create00001";
+    return r;
+  };
+  const exp=await build("ff_ok_snap00001");
+  const decision=await F.assignMapping(exp,"okseed000001");
+  const snapshot=F.exportSnapshot({...exp,decision});
+  delete snapshot.branches.A.attempts.at(-1).evidence.reply;
+  await assert.rejects(()=>F.validateImport(snapshot),/done attempt response incomplete/);
 });

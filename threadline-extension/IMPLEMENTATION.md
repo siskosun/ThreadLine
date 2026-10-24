@@ -1,4 +1,4 @@
-# ThreadLine v0.7.0 实现及开源复用
+# ThreadLine v0.8.0 实现及开源复用
 
 扩展仍然是 Chromium MV3 原生 HTML/CSS/JavaScript，无 Node 运行依赖、服务器或第三方模型服务作为 Core 的必需组件。Node 22+ 只用于开发和验证。
 

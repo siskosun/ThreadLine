@@ -300,15 +300,24 @@ test("FF comparison, verdict and export: gated, blind, deterministic, self-conta
   const again=await s.message({type:'FF_COMPARE',experimentId:created.id,
     operationId:'compare_op_00003'},s.ffSender);
   assert.equal(again.mapping.X,decision.mapping.X,'idempotent mapping');
+  // 服务端校准门禁：无 tab 的 sender 不能提交裁决。
   await assert.rejects(s.message({type:'FF_VERDICT',experimentId:created.id,
-    preference:'bogus',criteria:'c',confidence:'low'},s.ffSender),/invalid preference/);
+    preference:'X',criteria:'c',confidence:'low'},s.ffSender),/opened as a tab/);
+  const ffTab={id:'ff-launch-test',url:'chrome-extension://ff-launch-test/ff.html',
+    tab:{id:77,url:'chrome-extension://ff-launch-test/ff.html'}};
+  await assert.rejects(s.message({type:'FF_VERDICT',experimentId:created.id,
+    preference:'X',criteria:'c',confidence:'low'},ffTab),/passing calibration/);
+  const items=require('../ff-core.js').CALIBRATION_ITEMS;
+  const scored=await s.message({type:'FF_CALIBRATION',
+    responses:items.map(item=>({id:item.id,choice:1}))},ffTab);
+  assert.equal(scored.pass,true);
   const afterVerdict=await s.message({type:'FF_VERDICT',experimentId:created.id,
     preference:'X',criteria:'回复更完整',confidence:'high',notes:'备注'},
-    s.ffSender);
+    ffTab);
   assert.equal(afterVerdict.verdict.preference,'X');
   assert.ok(afterVerdict.verdict.decidedAt>0);
   await assert.rejects(s.message({type:'FF_VERDICT',experimentId:created.id,
-    preference:'Y',criteria:'c',confidence:'low'},s.ffSender),/already recorded/);
+    preference:'Y',criteria:'c',confidence:'low'},ffTab),/already recorded/);
   // The mapping remains recomputable from the recorded seed.
   assert.match(decision.seed,/^[a-zA-Z0-9_-]{10,100}$/);
   const snapshot=await s.message({type:'FF_EXPORT',experimentId:created.id},s.ffSender);
@@ -387,11 +396,11 @@ test("FF P4 comparison records budget parity for K=4",async()=>{
     const row=await s.message({type:'FF_READ',id:created.id},s.ffSender);
     lastRev=row.revision;
     const ev=row.branches[branch].attempts.at(-1).evidence;
-    assert.ok(ev.budget && Number.isFinite(ev.budget.sentMs),'budget recorded at done');
-    assert.ok(ev.budget.replyBytes>0);
+    assert.ok(ev.timing && Number.isFinite(ev.timing.sentMs),'timing recorded at done');
+    assert.ok(ev.timing.replyBytes>0);
   }
   const decision=await s.message({type:'FF_COMPARE',experimentId:created.id,
     operationId:'compare_p4_000001'},s.ffSender);
   assert.equal(decision.budgetParity,true,'equal budgets yield parity');
-  assert.ok(decision.budgets.A && decision.budgets.B);
+  assert.ok(decision.timings.A && decision.timings.B);
 });

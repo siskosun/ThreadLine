@@ -484,13 +484,13 @@ async function ffCaptureEnded(run, tabId) {
     taskCount === 1 && reply.length > 0;
   if (canComplete) {
     const sentAt = attempt.evidence.sentAt;
-    const budget = {replyBytes:ThreadLineFFCore.byteLength(reply),
+    const timing = {replyBytes:ThreadLineFFCore.byteLength(reply),
       sentMs:Number.isFinite(sentAt) ? Date.now() - sentAt : null};
     await ffAdvance(bind, {status:"done", phase:"capturing",
       operationId:`${bind.operationId}_${bind.branch}_done`,
       reason:"capture completed; completion contract satisfied",
       updates:{captureComplete:true, persisted:true, reply, taskCount,
-        endSignals:signals, capturedAt:Date.now(), budget}});
+        endSignals:signals, capturedAt:Date.now(), timing}});
   } else {
     await ffAdvance(bind, {status:"pending", phase:"capturing",
       operationId:`${bind.operationId}_captry_${run.id}`,
@@ -720,17 +720,20 @@ async function handleFF(payload, sender) {
       if (!ThreadLineFFCore.eligibleForComparison(existing))
         throw new Error("both branches must be done with verified input and captures");
       const mapping = await ThreadLineFFCore.assignMapping(existing, payload.operationId);
-      const budgets = {};
+      // Equal-budget parity is defined by CONFIGURATION equality across
+      // branches (model/effort/tools checks), NOT by wall-clock timing:
+      // human waiting time must not influence the comparison.
+      const configs = [];
+      const timings = {};
       for (const [label, branch] of Object.entries(existing.branches)) {
+        configs.push(JSON.stringify(branch.isolation?.checks || {}));
         const ev = branch.attempts.at(-1).evidence || {};
-        budgets[label] = {sentMs:Number.isFinite(ev.budget?.sentMs) ? ev.budget.sentMs : null,
-          replyBytes:Number.isSafeInteger(ev.budget?.replyBytes) ? ev.budget.replyBytes : null};
+        timings[label] = {sentMs:Number.isFinite(ev.timing?.sentMs) ? ev.timing.sentMs : null,
+          replyBytes:Number.isSafeInteger(ev.timing?.replyBytes) ? ev.timing.replyBytes : null};
       }
-      const sentVals = Object.values(budgets).map(x => x.sentMs).filter(Number.isFinite);
-      const budgetParity = sentVals.length === Object.keys(budgets).length &&
-        Math.max(...sentVals) <= 3 * Math.min(...sentVals);
+      const budgetParity = configs.every(c => c === configs[0]);
       const saved = await ThreadLineFFDB.update(existing.id, existing.revision,
-        record => ({...record, decision:{...mapping, budgets, budgetParity},
+        record => ({...record, decision:{...mapping, budgetParity, timings},
           revision:record.revision + 1}));
       return saved.decision;
     });
@@ -738,6 +741,14 @@ async function handleFF(payload, sender) {
   if (payload.type === "FF_VERDICT") {
     return serialize(async () => {
       if (!await ffEnabled()) throw new Error("Fork Beta is disabled");
+      // Server-side calibration gate: the submitting Fork page's tab must
+      // hold a fresh passing calibration record.
+      if (!Number.isInteger(sender.tab?.id))
+        throw new Error("the Fork page must be opened as a tab for verdicts");
+      const cal = await chrome.storage.session.get(`tl_ff_cal_${sender.tab.id}`);
+      const calRecord = cal[`tl_ff_cal_${sender.tab.id}`];
+      if (!calRecord || Date.now() - calRecord.passedAt > 3600000)
+        throw new Error("verdict requires a passing calibration first");
       const existing = await ThreadLineFFDB.read(payload.experimentId);
       if (!existing) throw new Error("experiment not found");
       if (!existing.decision?.mapping) throw new Error("no comparison mapping assigned yet");
@@ -777,7 +788,14 @@ async function handleFF(payload, sender) {
   }
   if (payload.type === "FF_CALIBRATION") {
     // Scoring happens inside ff-core; expected answers only surface in the result.
-    return ThreadLineFFCore.judgeCalibration(payload.responses);
+    const result = ThreadLineFFCore.judgeCalibration(payload.responses);
+    // A pass is recorded against the Fork page's tab and expires after an
+    // hour: verdicts require a fresh server-side calibration record, not a
+    // UI-only gate.
+    if (result.pass && Number.isInteger(sender.tab?.id))
+      await chrome.storage.session.set(
+        {[`tl_ff_cal_${sender.tab.id}`]:{passedAt:Date.now()}});
+    return result;
   }
   throw new Error("unknown Fork message type");
 }
