@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "task_id": "P3-REPORT",
+  "pr_number": 18,
+  "merge_commit": "e0613600700ad433d205c5efead380084a57e5fa",
+  "test_cases": [
+    {
+      "file": "threadline-extension/test/ff-core.test.js",
+      "name": "FF P3 mapping is gated, seed-deterministic, and verdict is validated"
+    },
+    {
+      "file": "threadline-extension/test/ff-launch.test.js",
+      "name": "FF comparison, verdict and export: gated, blind, deterministic, self-contained"
+    }
+  ],
+  "manual": {
+    "comment_id": 6383149180,
+    "accepted_head_sha": "92aeed77689016828acc731f2f97b3be5c24f891",
+    "scope": "验收范围：所有者于 2026-10-24 在真实双分支闭环中阅读 X/Y 去标签对照并人工裁决（Y 更好/依据语句更通顺/置信度高）；裁决前对照未显示 A/B 对应关系，提交后揭盲正确。所有者会话内明确委托受托 Agent 代留本签署。"
+  }
+}

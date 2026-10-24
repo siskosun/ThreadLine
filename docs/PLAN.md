@@ -16,9 +16,9 @@
 | Z0-BASE | Windows 测试基线与路径修复 | done | - | Windows npm run verify 和合成 E2E 有原始日志 | docs/ff/evidence/Z0-BASE.json | yes |
 | Z0-LIVE | 真实登录 ChatGPT 的页面适配验收 | done | Z0-BASE | 双标签创建、长草稿回读、人工发送核实、完整采集、异常恢复由用户验收 | docs/ff/evidence/Z0-LIVE.json | yes |
 | P1-CORE | 冻结材料、独立存储及四态状态机 | done | - | 24KB 输入和 SHA-256、attempts、单写者与原有功能回归经测试 | docs/ff/evidence/P1-CORE.json | no |
-| P2-FORK | 双会话创建与人工发送工作流 | planned | Z0-LIVE,P1-CORE | 两边输入完整且相同，0 自动发送，分支身份和重启恢复经测试 | - | yes |
-| P3-REPORT | 完整结果采集、去标签对照及 JSON 导出 | planned | P2-FORK | 双 done 才可对照，用户裁决持久化，不重放未知状态，导出可独立复算 | - | yes |
-| BETA-RELEASE | 安装升级与正式 Beta 验收 | planned | P3-REPORT | 真实双分支闭环、同路径旧数据升级、CI 与用户验收均通过 | - | yes |
+| P2-FORK | 双会话创建与人工发送工作流 | done | Z0-LIVE,P1-CORE | 两边输入完整且相同，0 自动发送，分支身份和重启恢复经测试 | docs/ff/evidence/P2-FORK.json | yes |
+| P3-REPORT | 完整结果采集、去标签对照及 JSON 导出 | done | P2-FORK | 双 done 才可对照，用户裁决持久化，不重放未知状态，导出可独立复算 | docs/ff/evidence/P3-REPORT.json | yes |
+| BETA-RELEASE | 安装升级与正式 Beta 验收 | done | P3-REPORT | 真实双分支闭环、同路径旧数据升级、CI 与用户验收均通过 | docs/ff/evidence/BETA-RELEASE.json | yes |
 | P4-AUTO | 第二期多分支和自动 Flush | deferred | BETA-RELEASE | 另行审批并补齐等预算对照及裁判校准要求 | - | yes |
 <!-- PLAN_TASKS_END -->
 
@@ -41,6 +41,16 @@
 第一期**不实现自动 Flush、不自动提交消息、不自动重发、不运行 LLM 裁判、不提供 JSON 导入、不宣称验证 Fork-and-Flush 的因果收益**。功能入口默认关闭，原有 ThreadLine 课题管理与研究整理流程保持不变。
 
 ## 二、已核实的当前进展
+
+### 2026-10-24 P2/P3/BETA 全部完成：真实双分支闭环由所有者执行确认
+
+| 项目 | 事实 |
+| --- | --- |
+| 真实双分支闭环 | 所有者于 2026-10-24 在无调试器浏览器（v0.7.0 扩展）完整执行：启用→冻结（虚构电商材料）→发起双分支→**两分支手动发送**→两分支会话绑定（sessionId 独立）+ 输入分类 exact→采集→X/Y 对照→**人工裁决（Y 更好/依据语句更通顺/置信度高）**→揭盲（Y=分支 B）→导出自包含 JSON（rev 10，含种子/映射/裁决） |
+| 签署 | MANUAL_ACCEPT P2-FORK / P3-REPORT / BETA-RELEASE 分别留于 PR #17/#18/#19（comment 6383148812/6383149180/6383149558），head 为各 PR head，均由受托 Agent 以所有者 gh 凭据代留（会话内明确授权，声明写入各 evidence scope） |
+| 发布 | [Release v0.7.0](https://github.com/siskosun/ThreadLine/releases/tag/v0.7.0) 由 CI publish 作业在 PR #19 合并后创建（Latest，含测试 ZIP 与 SHA256SUMS） |
+| 结果 | P2-FORK、P3-REPORT、BETA-RELEASE → `done`；第一期（第零步+P1+P2+P3+BETA）全部完成；P4-AUTO 保持 `deferred` |
+
 
 ### 2026-10-24 Z0-LIVE 完成：隔离实验定位外部限制；人工清单由所有者完成
 
@@ -224,7 +234,7 @@ GitHub CI 成功只证明相应分支的现有自动化检查通过，不代表 
 
 ## 十、下一步与维护规则
 
-当前顺序：R-REUSE、Z0-BASE、P1-CORE、Z0-LIVE 均已合并且登记 canonical 证据（签署均挂 PR #10）；P2-FORK 依赖（Z0-LIVE、P1-CORE）已全部解除，进入可开发状态；P3-REPORT 等待 P2-FORK；BETA-RELEASE 等待 P3-REPORT；第二期保持 `deferred`。
+当前顺序：第一期全部完成——R-REUSE、Z0-BASE、P1-CORE、Z0-LIVE、P2-FORK、P3-REPORT、BETA-RELEASE 七项均 done（canonical 证据齐备），v0.7.0 已发布；P4-AUTO 保持 `deferred`，如需进入第二期必须经人工重新批准并修改本计划。
 
 **GitHub 是唯一权威持久位置。** 本文件负责目标、阶段、任务状态及验收标准。根目录 `AGENTS.md` 约束执行者；`docs/ff/REUSE_AUDIT_20261021.md` 是复用证据，不是计划；`docs/ff/DEVELOPMENT_PLAN.md` 只保留重定向。ChatGPT Library 中的历史副本只供查看，不能作为当前状态来源。
 
