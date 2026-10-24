@@ -14,4 +14,4 @@
 
 ## v0.6.1 修复与打包
 
-`isTrustedPanelSender` 允许合法的扩展 `panel.html` 在侧边栏或独立标签页中访问共享状态，拒绝 ChatGPT 网页和伪造来源；新增正反权限测试。`scripts/build-release.py` 使用确定性文件顺序、固定 ZIP 时间和 SHA256 清单，通过 GitHub Actions 自动发布。
+面板来源校验 `inspectPanelSender` / `requirePanelSender` 允许合法的扩展 `panel.html` 在侧边栏或独立标签页中访问共享状态，对冲突容器要求浏览器独立证明同一活跃面板文档，拒绝 ChatGPT 网页和伪造来源；新增正反权限测试。`scripts/build-release.py` 使用确定性文件顺序、固定 ZIP 时间和 SHA256 清单，通过 GitHub Actions 自动发布。
