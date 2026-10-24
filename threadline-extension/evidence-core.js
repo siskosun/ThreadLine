@@ -154,6 +154,97 @@
     };
   }
 
+  /* Amendment: a substantive edit creates a NEW immutable version with a
+   * predecessor link; history is never rewritten (plan §十一.5 S1 table).
+   * Version cap (50) applies; adopted-only; withdrawn conclusions must be
+   * re-adopted explicitly instead of amended. */
+  async function planAmendment(state, conclusionId, input, operationId) {
+    if (!isId(conclusionId, "con_")) throw new Error("结论 ID 无效");
+    if (!input || typeof input.text !== "string" || !input.text.trim())
+      throw new Error("修订正文不能为空");
+    if (codePoints(input.text) > LIMITS.conclusionCodePoints)
+      throw new Error("结论正文超过 4000 code points");
+    if ((input.fragments || []).length > LIMITS.fragmentsPerConclusion)
+      throw new Error("单条结论最多 8 个片段");
+    const requestHash = await hashRequest({ conclusionId, ...input });
+    const prior = state.operations[operationId];
+    if (prior) {
+      if (prior.requestHash !== requestHash)
+        throw new Error("操作 ID 已用于不同请求，已拒绝");
+      return { replay: prior.result };
+    }
+    const conclusion = state.conclusions[conclusionId];
+    if (!conclusion) throw new Error("结论不存在");
+    if (conclusion.status === "withdrawn") throw new Error("结论已撤回：请重新采纳而不是修订");
+    const project = state.projects[conclusion.projectId];
+    if (!project) throw new Error("课题记录缺失");
+    const versions = Object.values(state.versions)
+      .filter(v => v.conclusionId === conclusionId);
+    if (versions.length >= LIMITS.versionsPerConclusion)
+      throw new Error("版本数达上限（50）：请导出或清理");
+    const at = now();
+    const versionId = "ver_" + uuid();
+    const version = {
+      id: versionId, conclusionId, text: input.text,
+      conditions: input.conditions || "", changeType: "amend",
+      predecessorId: conclusion.currentVersionId, createdAt: at, creator: "user"
+    };
+    const sources = [], links = [];
+    for (let i = 0; i < (input.fragments || []).length; i++) {
+      const f = input.fragments[i];
+      validateFragment(f);
+      const sourceId = "src_" + uuid() + "_a" + i;
+      sources.push({
+        id: sourceId, kind: f.kind || "capture",
+        captureRunId: f.captureRunId || null, conversationId: f.conversationId || null,
+        messageId: f.messageId || null, url: f.url || null,
+        before: f.before || "", selection: f.selection, after: f.after || "",
+        textHash: await hashText((f.before || "") + f.selection + (f.after || "")),
+        capturedAt: f.capturedAt || at,
+        completeness: f.completeness || "unknown"
+      });
+      links.push({ id: "lnk_" + uuid() + "_a" + i, versionId, sourceId,
+        relation: f.relation || "cites" });
+    }
+    const result = { conclusionId, versionId, revision: project.evidenceRevision + 1 };
+    return {
+      replay: null, result, writes: {
+        conclusion: { ...conclusion, currentVersionId: versionId },
+        version, sources, links,
+        project: { ...project, evidenceRevision: project.evidenceRevision + 1, projectionTodo: true },
+        ledger: { operationId, requestHash, result, at }
+      }
+    };
+  }
+
+  /* Duplicate adoption guard (S1b gate): adopting the exact same body with
+   * the exact same fragment set for the SAME project replays the existing
+   * adopted conclusion instead of creating a twin. Different fragments or a
+   * withdrawn original still create a fresh conclusion. */
+  async function findDuplicateAdoption(state, projectId, input) {
+    const incoming = (input.fragments || []).map(f => ({
+      selection: f.selection, before: f.before || "", after: f.after || "" }));
+    const candidate = await hashRequest({ text: input.text, fragments: incoming });
+    for (const conclusion of Object.values(state.conclusions)) {
+      if (conclusion.projectId !== projectId || conclusion.status !== "adopted") continue;
+      const version = state.versions[conclusion.currentVersionId];
+      if (!version || version.text !== input.text) continue;
+      const links = Object.values(state.links)
+        .filter(l => l.versionId === version.id);
+      const fragments = links.map(l => {
+        const source = state.sources[l.sourceId] || {};
+        return { selection: source.selection, before: source.before || "", after: source.after || "" };
+      });
+      const existing = await hashRequest({
+        text: version.text,
+        fragments: fragments.map(f => ({ selection: f.selection, before: f.before || "", after: f.after || "" }))
+      });
+      if (existing === candidate)
+        return conclusion;
+    }
+    return null;
+  }
+
   async function planWithdrawal(state, conclusionId, reason, operationId) {
     if (!isId(conclusionId, "con_")) throw new Error("结论 ID 无效");
     if (!isId(operationId, "op_")) throw new Error("操作 ID 无效");
@@ -301,7 +392,7 @@
   const Core = {
     LIMITS, codePoints, bytes,
     validateFragment, validateAdoption, validateWithdrawalInput: () => {},
-    planAdoption, planWithdrawal, projectSummary,
+    planAdoption, planAmendment, planWithdrawal, findDuplicateAdoption, projectSummary,
     exportPackage, importPackage, hashText, hashRequest, uuid,
     newProjectRecord: projectId => ({
       projectId, evidenceRevision: 0, projectionRevision: 0, projectionTodo: false,

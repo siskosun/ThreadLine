@@ -419,6 +419,158 @@
   chrome.tabs.onRemoved.addListener(()=>refresh());
   chrome.windows.onFocusChanged.addListener(()=>refresh());
   setInterval(()=>{refresh();renderFFProgress();},12000);
+
+  /* ---- Evidence conclusions (S1b): read-only views + amend/withdraw ----
+   * The panel only sends EV_* commands; the service worker is the writer. */
+  const evSend = payload => new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage(payload, response => {
+      if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
+      if (!response || !response.ok) return reject(new Error((response && response.error) || "后台无返回"));
+      resolve(response.data);
+    });
+  });
+  const ev$ = id => document.getElementById(id);
+
+  async function renderEvidence() {
+    const snapshot = await evSend({ type: "SNAPSHOT" });
+    const state = snapshot.state || snapshot;
+    const select = ev$("evidence-project");
+    const current = select.value;
+    select.replaceChildren();
+    for (const project of (state.projects || [])) {
+      const option = document.createElement("option");
+      option.value = project.id;
+      option.textContent = project.name || project.id;
+      select.appendChild(option);
+    }
+    if ([...select.options].some(o => o.value === current)) select.value = current;
+    await renderEvidenceProject();
+  }
+
+  async function renderEvidenceProject() {
+    const projectId = ev$("evidence-project").value;
+    if (!projectId) { ev$("evidence-summary").textContent = "暂无课题。"; ev$("evidence-list").replaceChildren(); return; }
+    let data;
+    try { data = await evSend({ type: "EV_LIST", projectId }); }
+    catch (e) { ev$("evidence-summary").textContent = "证据库不可用：" + e.message; return; }
+    const projection = await chrome.storage.local.get("tl_evidence_summary_" + projectId);
+    const entry = projection["tl_evidence_summary_" + projectId];
+    ev$("evidence-summary").textContent = entry
+      ? entry.summary + "\n（只读投影 v" + entry.projectionRevision + "；完整内容见下方列表）"
+      : "尚无采纳结论。首次采纳后，旧“有效结论”字段将封口为只读投影。";
+    const holder = ev$("evidence-list");
+    holder.replaceChildren();
+    for (const row of data.rows) {
+      const item = document.createElement("div");
+      item.className = "evidence-item";
+      const head = document.createElement("p");
+      const c = row.conclusion;
+      head.textContent = (c.status === "withdrawn" ? "[已撤回] " : "") +
+        (row.current ? row.current.text.slice(0, 90) : c.id) +
+        (row.versions && row.versions.length > 1 ? "（修订 " + (row.versions.length - 1) + " 次）" : "");
+      item.appendChild(head);
+      for (const fragment of row.fragments || []) {
+        const box = document.createElement("details");
+        const summary = document.createElement("summary");
+        summary.textContent = "依据片段 · " + (fragment.relation || "cites") +
+          (fragment.conversationId ? " · 会话 " + String(fragment.conversationId).slice(0, 8) + "…" : " · 仅片段（来源不可定位）");
+        const pre = document.createElement("pre");
+        pre.style.whiteSpace = "pre-wrap";
+        pre.textContent = (fragment.before || "") + "【" + fragment.selection + "】" + (fragment.after || "");
+        box.appendChild(summary); box.appendChild(pre);
+        if (fragment.conversationId) {
+          const locateRow = document.createElement(div);
+          locateRow.className = line;
+          const btn = document.createElement(button);
+          btn.type = button; btn.className = secondary; btn.textContent = 在对话中定位;
+          const note = document.createElement(span);
+          note.className = subtle;
+          btn.addEventListener(click, async () => {
+            note.textContent = "定位中…";
+            try {
+              const r = await evSend({ type: EV_LOCATE,
+                conversationId: fragment.conversationId,
+                messageId: fragment.messageId || null,
+                role: null, contentPrefix: fragment.selection.slice(0, 40) });
+              note.textContent = r.located && r.verified
+                ? 已定位到原消息
+                : (r.reason === conversation-not-open
+                    ? "对话未打开（仅片段）：https://chatgpt.com/c/" + fragment.conversationId
+                    : "定位不可靠，仅显示片段");
+            } catch (e) { note.textContent = "定位失败（仅片段）"; }
+          });
+          locateRow.appendChild(btn); locateRow.appendChild(note);
+          box.appendChild(locateRow);
+        }
+        item.appendChild(box);
+      }
+      if (c.status !== "withdrawn") {
+        const row2 = document.createElement("div");
+        row2.className = "line";
+        const amend = document.createElement("button");
+        amend.type = "button"; amend.className = "secondary"; amend.textContent = "修订";
+        amend.addEventListener("click", async () => {
+          const text = prompt("修订结论正文（生成新版本，历史保留）：", row.current ? row.current.text : "");
+          if (text === null) return;
+          try {
+            await evSend({ type: "EV_AMEND", conclusionId: c.id, text,
+              fragments: (row.fragments || []).map(f => ({
+                selection: f.selection, before: f.before, after: f.after,
+                conversationId: f.conversationId, messageId: f.messageId,
+                relation: f.relation, completeness: f.completeness })),
+              operationId: "op_amend_" + crypto.randomUUID().replace(/-/g, "").slice(0, 12) });
+            await renderEvidenceProject();
+          } catch (e) { alert("修订失败：" + e.message); }
+        });
+        const withdraw = document.createElement("button");
+        withdraw.type = "button"; withdraw.className = "secondary"; withdraw.textContent = "撤回";
+        withdraw.addEventListener("click", async () => {
+          if (!confirm("撤回该结论？历史与片段保留。")) return;
+          try {
+            await evSend({ type: "EV_WITHDRAW", conclusionId: c.id, reason: "面板撤回",
+              operationId: "op_wd_" + crypto.randomUUID().replace(/-/g, "").slice(0, 12) });
+            await renderEvidenceProject();
+          } catch (e) { alert("撤回失败：" + e.message); }
+        });
+        row2.appendChild(amend); row2.appendChild(withdraw);
+        item.appendChild(row2);
+      }
+      holder.appendChild(item);
+    }
+  }
+
+  ev$("evidence-refresh").addEventListener("click", () => renderEvidenceProject());
+  ev$("evidence-project").addEventListener("change", () => renderEvidenceProject());
+  ev$("evidence-handoff").addEventListener("click", async () => {
+    const projectId = ev$("evidence-project").value;
+    if (!projectId) return;
+    try {
+      const data = await evSend({ type: "EV_LIST", projectId });
+      const corrected = [], withdrawn = [], active = [];
+      for (const row of data.rows) {
+        const c = row.conclusion;
+        if (c.status === "withdrawn") { withdrawn.push(row); continue; }
+        if (row.versions && row.versions.length > 1) corrected.push(row);
+        else active.push(row);
+      }
+      const lines = ["【交接材料 · " + (ev$("evidence-project").selectedOptions[0]?.textContent || projectId) + "】", ""];
+      lines.push("■ 已采纳结论（" + active.length + "）");
+      for (const r of active) lines.push("- " + (r.current?.text || ""));
+      lines.push("", "■ 更正过的结论（" + corrected.length + "，以最新为准）");
+      for (const r of corrected) lines.push("- " + (r.current?.text || "") + "（原：" +
+        (data.rows.find(x => x === r) ? "" : "") + "历史版本保留）");
+      lines.push("", "■ 已撤回（" + withdrawn.length + "，请勿继续引用）");
+      for (const r of withdrawn) lines.push("- " + (r.current?.text || "").slice(0, 80));
+      lines.push("", "■ 已知未知项：未逐条核验外部资料；来源定位失败时仅有片段。");
+      const view = ev$("evidence-handoff-view");
+      view.hidden = false;
+      view.textContent = lines.join("\n");
+      try { await navigator.clipboard.writeText(view.textContent); ev$("evidence-handoff").textContent = "已复制到剪贴板（可再编辑）"; }
+      catch { ev$("evidence-handoff").textContent = "预览已生成（请手动复制）"; }
+      setTimeout(() => { ev$("evidence-handoff").textContent = "生成交接材料（预览并复制）"; }, 2500);
+    } catch (e) { alert("交接生成失败：" + e.message); }
+  });
+  renderEvidence().catch(() => {});
   document.querySelector(".workspace-tabs").addEventListener("keydown", e => {
     if (!["ArrowLeft","ArrowRight"].includes(e.key)) return;
     e.preventDefault();

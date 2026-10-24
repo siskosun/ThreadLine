@@ -535,6 +535,42 @@ def run():
             expect(reopened.locator("#ff-reveal")).to_contain_text("裁决：X", timeout=15000)
             assert "分支" in reopened.locator("#ff-reveal").text_content(), (
                 "post-verdict reveal shows the mapping")
+            # S1b: adopt the revealed branch conclusion into the evidence
+            # store. A topic project must exist for the prompt-based picker.
+            seeded = reopened.evaluate("""() => {
+              return new Promise(resolve => chrome.storage.local.get('threadline_state_v1', record => {
+                const state = record['threadline_state_v1'];
+                state.projects.unshift({ id: 'e2e-topic', name: 'E2E 课题', goal: '',
+                  decision: '', stage: 'active', knowledgeVersion: 0, lastChange: null,
+                  history: [], createdAt: 1, updatedAt: 1, closedAt: null });
+                chrome.storage.local.set({ threadline_state_v1: state }, () => resolve(true));
+              }));
+            }""")
+            assert seeded is True
+            reopened.once("dialog", lambda dialog: dialog.accept("e2e-topic")
+                if dialog.type == "prompt" else dialog.accept())
+            adopt_buttons = reopened.locator("button", has_text="采纳该分支结论到证据库")
+            adopt_buttons.first.click()
+            expect(reopened.locator("#ff-columns")).to_contain_text("已采纳：con_",
+                timeout=10000)
+            adopted = reopened.evaluate(
+                "(p) => chrome.runtime.sendMessage(p)",
+                {"type": "EV_LIST", "projectId": "e2e-topic"})
+            assert adopted["ok"] and len(adopted["data"]["rows"]) == 1, adopted
+            adopted_row = adopted["data"]["rows"][0]
+            assert adopted_row["conclusion"]["projectId"] == "e2e-topic"
+            assert adopted_row["fragments"] and adopted_row["fragments"][0]["selection"]
+            assert adopted_row["conclusion"]["takeover"] if "takeover" in adopted_row["conclusion"] else True
+            # Duplicate adoption replays instead of creating a twin.
+            reopened.once("dialog", lambda dialog: dialog.accept("e2e-topic")
+                if dialog.type == "prompt" else dialog.accept())
+            adopt_buttons.first.click()
+            expect(reopened.locator("#ff-columns")).to_contain_text("未重复创建",
+                timeout=10000)
+            adopted_again = reopened.evaluate(
+                "(p) => chrome.runtime.sendMessage(p)",
+                {"type": "EV_LIST", "projectId": "e2e-topic"})
+            assert len(adopted_again["data"]["rows"]) == 1, "duplicate adoption must not twin"
             snapshot = reopened.evaluate("(p) => chrome.runtime.sendMessage(p)",
               {"type":"FF_EXPORT","experimentId":p2id})
             assert snapshot["ok"] and snapshot["data"]["kind"] == "threadline-fork-experiment"
@@ -586,7 +622,8 @@ def run():
           "simulated human send binding, capture-driven completion and 0 automatic sends; "
           "P3 blind X/Y comparison with pre-verdict hiding, recorded verdict with reveal, "
           "and credential-free self-contained export; P4 K=4 orchestration with four "
-          "prefilled tabs and validated import collision rejection (synthetic-only)")
+          "prefilled tabs and validated import collision rejection (synthetic-only); "
+          "S1b per-branch evidence adoption after reveal with duplicate replay")
 
 
 if __name__ == "__main__":
