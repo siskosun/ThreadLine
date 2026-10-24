@@ -19,7 +19,7 @@
 | P2-FORK | 双会话创建与人工发送工作流 | done | Z0-LIVE,P1-CORE | 两边输入完整且相同，0 自动发送，分支身份和重启恢复经测试 | docs/ff/evidence/P2-FORK.json | yes |
 | P3-REPORT | 完整结果采集、去标签对照及 JSON 导出 | done | P2-FORK | 双 done 才可对照，用户裁决持久化，不重放未知状态，导出可独立复算 | docs/ff/evidence/P3-REPORT.json | yes |
 | BETA-RELEASE | 安装升级与正式 Beta 验收 | done | P3-REPORT | 真实双分支闭环、同路径旧数据升级、CI 与用户验收均通过 | docs/ff/evidence/BETA-RELEASE.json | yes |
-| P4-AUTO | 第二期：K=4 多会话编排、等预算对照、裁判校准（隐藏校准题）与 JSON 导入；自动 Flush 经一期证据改判不可行，以批量预填+人工批量发送替代 | done | BETA-RELEASE | 等预算对照与裁判校准机制落地，K 可配置 2–4，导入经严格验证；0 自动发送不变 | docs/ff/evidence/P4-AUTO.json | yes |
+| P4-AUTO | 第二期：K=4 多会话编排、等预算对照、裁判校准（隐藏校准题）与 JSON 导入；自动 Flush 经一期证据改判不可行，以批量预填+人工批量发送替代 | planned | BETA-RELEASE | 等预算对照与裁判校准机制落地，K 可配置 2–4，导入经严格验证；0 自动发送不变 | - | yes |
 <!-- PLAN_TASKS_END -->
 
 ### 状态与证据契约
@@ -234,7 +234,7 @@ GitHub CI 成功只证明相应分支的现有自动化检查通过，不代表 
 
 ## 十、下一步与维护规则
 
-当前顺序：**计划表 8/8 全部 done**——第一期（第零步+P1+P2+P3+BETA）与第二期（P4-AUTO）均已完成，v0.7.0 已发布。签署：Z0-BASE/Z0-LIVE 挂 PR #10，P2-FORK/P3-REPORT/BETA-RELEASE/P4-AUTO 挂 PR #17/#18/#19/#23（均受托 Agent 代留、所有者会话内授权）。后续维护按 AGENTS.md 执行。
+当前顺序：第一期七项均 done，v0.7.0 已发布；**P4-AUTO 经所有者于 2026-10-24 会话内明确批准（"按照当前库里的开发计划继续开发到完整"）进入执行态**，范围为 K=4 多会话编排、等预算对照、裁判校准（隐藏校准题）与 JSON 导入；自动 Flush 经一期隔离实验证实不可行（站点拒绝非受信/自动化点击的生成，见 docs/ff/evidence/），改判为批量预填+人工批量发送，0 自动发送保持为永久安全不变量。门禁守卫（scripts/check-plan.mjs）随本治理 PR 同步修改。
 
 **GitHub 是唯一权威持久位置。** 本文件负责目标、阶段、任务状态及验收标准。根目录 `AGENTS.md` 约束执行者；`docs/ff/REUSE_AUDIT_20261021.md` 是复用证据，不是计划；`docs/ff/DEVELOPMENT_PLAN.md` 只保留重定向。ChatGPT Library 中的历史副本只供查看，不能作为当前状态来源。
 

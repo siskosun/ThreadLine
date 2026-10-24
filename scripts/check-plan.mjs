@@ -69,7 +69,7 @@ export function parseTaskTable(markdown) {
   // planned/in_progress/in_review with evidence, but never skips the
   // done-contract (its manual signoff is still verified online).
   const p4 = lookup.get('P4-AUTO').status;
-  check(p4 === 'deferred' || ['planned','in_progress','in_review','done','blocked'].includes(p4),
+  check(p4 === 'deferred' || ['planned','in_progress','in_review','done'].includes(p4),
     'P4-AUTO must be deferred or explicitly approved via plan change');
   return tasks;
 }
