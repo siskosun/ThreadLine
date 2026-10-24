@@ -2,6 +2,15 @@
 
 任务定义和正式状态唯一来源：[docs/PLAN.md](../PLAN.md)。本文件只记录发生过的事件与证据，不自行认定任务完成。
 
+## 2026-10-24 调研转开发计划（Draft PR #21 更新）
+
+- 核对 main `a66e9b09f43986c6e2ae1b4219df4a95c2cc317a`、v0.8.0 与现有 8/8 done 登记；同步最新 main，替换旧 Draft 中过期的 v0.7 状态及 v0.8 路线名称。历史进度按当时快照保留。
+- 正式 PLAN 第十一节增加 S0–S5 候选路线，首轮仅建议 S0–S2：来源/结论版本、人工采纳、少量人工依赖和可编辑交接；试点通过后再做影响传播与局部复核。备份恢复前置，不让已采纳依据依赖三天缓存。
+- 新增 `REUSE_AUDIT_20261024.md`：核实 Toolkit MIT、Argdown core MIT、Graphiti Apache-2.0、LangGraph MIT；明确 Toolkit 函数/测试移植与 Argdown 条件采用方案。本次没有第三方代码导入，没有产品实现。
+- CLASSIFICATION=L2（跨模块设计与规划）；后续持久化/兼容/删除实施触发 L3。当前 PLAN_GATE_READY；Global Workflow 的外部计划评审待提供，不把本次文档自检替代该 Gate。机器表、检查器、证据 JSON 与运行时文件相对上述 main 不变。
+- Windows 本机验证：Node v26.10.0、Python 3.12.10、Playwright 1.64.0；`npm run verify` 207/207 PASS，`npm run test:e2e` 三套合成 MV3 PASS，均 exit 0；机器任务表与 main 逐字一致，`git diff --check` 通过。完整日志保存本地工作区，准确提交 CI 以 PR 检查为准。
+- 仓库没有 `tools/verify-run.ps1`，上述为直接命令证据，不伪装成该 helper 的 FRESH Gate 记录。External Plan Gate 的 Required Verification Labels 为 NONE，运行时实施尚未开始。本轮未进行真实 ChatGPT 网页操作、发送、合并 main 或发布。
+
 ## 2026-10-24 P2/P3/BETA 完成登记：真实双分支闭环由所有者执行
 
 - **P2-FORK（PR #17 合并）**：双分支发起/精确预填/会话绑定/重启恢复/显式重预填；8 个后台测试 + 全链路合成 E2E；0 自动发送代码级断言。
