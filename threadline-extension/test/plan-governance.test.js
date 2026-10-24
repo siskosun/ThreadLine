@@ -57,10 +57,14 @@ function mock(body){return {ok:true,status:200,json:async()=>body};}
 test('canonical plan contains all required tasks and no unverified done claims', async()=>{
   const {validatePlan}=await checks();
   const actual=validatePlan(ROOT);
-  assert.equal(actual.tasks.length,8);
+  assert.equal(actual.tasks.length,12);
   // Done claims must stay limited to tasks with real merged-PR evidence JSONs.
   assert.deepEqual(actual.done.map(x=>x.task.id).sort(),
     ['BETA-RELEASE','P1-CORE','P2-FORK','P3-REPORT','P4-AUTO','R-REUSE','Z0-BASE','Z0-LIVE']);
+  // Phase-eleven tasks are registered but not claimable as done yet.
+  assert.deepEqual(actual.tasks.filter(x=>x.id.startsWith('S')).map(x=>x.id),
+    ['S0A-PROTOTYPE','S0B-LOCATE','S1A-PERSIST','S1B-ADOPT']);
+  assert.ok(actual.tasks.filter(x=>x.id.startsWith('S')).every(x=>x.status==='planned'));
 });
 
 test('missing/duplicate plan markers and missing tasks are rejected',async()=>{

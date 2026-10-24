@@ -8,7 +8,8 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ALLOWED = new Set(['planned','in_progress','in_review','blocked','done','deferred']);
 export const REQUIRED = Object.freeze([
-  'R-REUSE','Z0-BASE','Z0-LIVE','P1-CORE','P2-FORK','P3-REPORT','BETA-RELEASE','P4-AUTO'
+  'R-REUSE','Z0-BASE','Z0-LIVE','P1-CORE','P2-FORK','P3-REPORT','BETA-RELEASE','P4-AUTO',
+  'S0A-PROTOTYPE','S0B-LOCATE','S1A-PERSIST','S1B-ADOPT'
 ]);
 const CODE_TASKS = new Set(['Z0-BASE','P1-CORE','P2-FORK','P3-REPORT','BETA-RELEASE','P4-AUTO']);
 const SHA40 = /^[a-f0-9]{40}$/;
