@@ -2,6 +2,12 @@
 
 该文件登记事实及解除条件，不是第二份计划。官方任务状态见 [docs/PLAN.md](../PLAN.md)。
 
+## 2026-10-24 真实站点零发送复验中止于 429
+
+- 已登录 Tabbit 浏览器对 main `b0d470b` 候选的真实站点零发送复验：页面请求报 `SITE_RATE_LIMITED`（429），**按停止规则立即中止，未执行任何预填/回读用例**；0 发送。加载路径已同步为 main 代码（磁盘指纹见 [REAL_SITE_429_20261024.md](evidence/REAL_SITE_429_20261024.md)），但运行中的扩展仍为旧构建，需重启浏览器或手动重载后才运行 main 代码。
+- 解除条件：429 解除后按历史 TABBIT_ZERO_SEND_20261023 方法重跑零发送套件；再次 429 立即停止。真人门禁不变。
+- **Z0-BASE 路径事实**：Draft PR #1 与 main 存在合并冲突（其内容已随 PR #10 以更强形态进入 main）。若继续以 PR #1 作为完成载体，需先解决冲突且解决后 head SHA 变化会使既有 `MANUAL_ACCEPT` 文本失效。建议的替代路径：在 PR #10 上签署 `MANUAL_ACCEPT Z0-BASE <PR10_HEAD_SHA>` 并以 PR #10 为完成 PR 登记 evidence JSON，同时关闭 PR #1 为 superseded。该路径涉及计划表治理变更，须经人工复核后生效。
+
 ## 2026-10-24 P1-CORE 阻塞解除；剩余门禁不变
 
 - **P1-CORE 已解除**：PR [#10](https://github.com/siskosun/ThreadLine/pull/10) 于 2026-10-24T03:56:34Z 合并入 main（merge `b0d470b3d7a386f2243f1bafb26aa54c7fcc26a0`，`verify` success）；`docs/ff/evidence/P1-CORE.json` 已随完成登记 PR 提交，人工门禁为 `no`。下方 2026-10-23 条目中“P1-CORE 未合并/无 JSON”自本条起不再是现状。

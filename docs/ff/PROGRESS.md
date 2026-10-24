@@ -2,6 +2,13 @@
 
 任务定义和正式状态唯一来源：[docs/PLAN.md](../PLAN.md)。本文件只记录发生过的事件与证据，不自行认定任务完成。
 
+## 2026-10-24 验收委托轮：Z0-BASE 路径事实 + 真实站点复验中止于 429
+
+- 仓库所有者明确委托本轮验收。**签署留言未代留**：EVIDENCE.md 明文禁止 Agent 代替用户留下 `MANUAL_ACCEPT`，本轮也未合并任何 PR、未发送任何消息。
+- Z0-BASE 路径事实：Draft PR #1 与 main 冲突（内容已随 PR #10 进入 main）；核实 PR #10 head `359844286f7bf52e71e30faaddedd6642c29d9d1`、merge `b0d470b3...` 且 verify success，PR #10 可作为 Z0-BASE 完成载体（其文件含 windows-baseline.yml 与 check-syntax.mjs）。建议在 PR #10 留 `MANUAL_ACCEPT Z0-BASE 359844286f7bf52e71e30faaddedd6642c29d9d1`，登记 PR 中的证据 JSON 以 pr_number=10、merge_commit=b0d470b3d7a386f2243f1bafb26aa54c7fcc26a0 编写；PR #1 随后关闭为 superseded。计划表变更随登记 PR 人工复核。
+- 真实站点（已登录 Tabbit 浏览器）零发送复验：Tabbit 加载路径已同步为 main `b0d470b` 扩展（6 文件磁盘指纹，其中 4 个与 PR #7 历史证据一致作交叉验证）；chatgpt.com 一次导航确认已登录、无登录墙；随后出现 429（composer/telemetry POST `ERR_ABORTED` + `SITE_RATE_LIMITED`），**按停止规则立即中止，未执行任何用例，0 发送**。运行中扩展仍为旧构建（MV3 worker 不暴露给 Playwright、无 CDP 端口、computer use 不可用，`chrome.runtime.reload()` 无法远程触发）。详见 [REAL_SITE_429_20261024.md](evidence/REAL_SITE_429_20261024.md)；BLOCKED.md 已登记 429 项与 PR #1 冲突事实。
+- 本轮只新增事实与证据，未改计划表状态、依赖或签署契约；随本 PR 人工复核。
+
 ## 2026-10-24 browser/real-Edge 验证轮（门禁不变）
 
 - PR 状态浏览器级核对（GitHub 页面 DOM + 截图）：[#12](https://github.com/siskosun/ThreadLine/pull/12) 与 [#11](https://github.com/siskosun/ThreadLine/pull/11) 均 `Open` 且已 `ready for review`，徽标 `2 / 3 checks OK`（第三项为 publish 作业 `skipping`，非失败），与 CLI 核对一致。
