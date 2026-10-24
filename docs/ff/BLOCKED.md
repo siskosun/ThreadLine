@@ -2,6 +2,12 @@
 
 该文件登记事实及解除条件，不是第二份计划。官方任务状态见 [docs/PLAN.md](../PLAN.md)。
 
+## 2026-10-24 Z0-BASE 登记解除；Z0-LIVE 独立阻塞保留
+
+- Z0-BASE 已具备 PR #10 合并、merge verify success、准确 HEAD 的 Windows 自动化结果及[所有者原始签署](https://github.com/siskosun/ThreadLine/pull/10#issuecomment-6380321705)。新增 `evidence/Z0-BASE.json` 并纠正 PLAN 的旧 PR #1 引用；无需再签署。该治理变更随本次 Draft PR 人工复核。
+- PR #1 已关闭且未合并，历史“PR #1 仍 Draft / 需签署 / 待解决冲突”的待办自本条起不再适用。历史失败、429 与未完成实测记录不改写。
+- Z0-LIVE 仍 **BLOCKED / NOT SIGNED**；Windows/合成 MV3 通过与 Z0-BASE 签署不覆盖真实消息、完整回复、异常并发或真实站点人工验收。P2-FORK 继续不得执行或评审，P3-REPORT 仍依赖 P2-FORK。本次没有现场操作、发送、合并或发布。
+
 ## 2026-10-24 真实站点零发送复验中止于 429
 
 - 已登录 Tabbit 浏览器对 main `b0d470b` 候选的真实站点零发送复验：页面请求报 `SITE_RATE_LIMITED`（429），**按停止规则立即中止，未执行任何预填/回读用例**；0 发送。加载路径已同步为 main 代码（磁盘指纹见 [REAL_SITE_429_20261024.md](evidence/REAL_SITE_429_20261024.md)），但运行中的扩展仍为旧构建，需重启浏览器或手动重载后才运行 main 代码。

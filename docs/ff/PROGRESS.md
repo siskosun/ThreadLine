@@ -2,6 +2,15 @@
 
 任务定义和正式状态唯一来源：[docs/PLAN.md](../PLAN.md)。本文件只记录发生过的事件与证据，不自行认定任务完成。
 
+## 2026-10-24 Z0-BASE 已签署证据登记修复
+
+- 基线 `d7161ea10d4fbf32c652b04179294ff8bce988dc`；PR #1 已关闭未合并，原 PLAN 仍引用 PR#1 导致 [main run 40065653125](https://github.com/siskosun/ThreadLine/actions/runs/40065653125) 在远端计划检查失败。没有重复开发或重签署。
+- 已重新读取 GitHub API：PR #10 merge `b0d470b3d7a386f2243f1bafb26aa54c7fcc26a0` 的 verify success；[OWNER 原始签署](https://github.com/siskosun/ThreadLine/pull/10#issuecomment-6380321705) 精确绑定 HEAD `359844286f7bf52e71e30faaddedd6642c29d9d1`，非 App 代留。该 HEAD [Windows run 39987656457](https://github.com/siskosun/ThreadLine/actions/runs/39987656457) 原始日志有 190 项 Node、非仓库目录扫描及三套合成 MV3 PASS。
+- 新增 `evidence/Z0-BASE.json`；PLAN 将 Z0-BASE 从旧 PR#1 的 in_review 改为 done，并更新当前引用和 BLOCKED。新增 3 项治理回归：缺 canonical/人工字段拒绝、BASE 完成不能解锁 P2、错误 PR/任务/HEAD 签署拒绝。夹具复制已声明测试源，避免负向用例因无关缺文件而误通过；校验器与工作流未改。
+- 本次 dot 云电脑（Linux、Node v24.22.1）执行 `npm --prefix threadline-extension run verify`：**193/193 PASS**。使用既有 `validatePlan` / `checkGithubEvidence` 和真实公开 GitHub API（匿名只读 fetch，不写 Token）复核：**0 linked review PRs、3 externally verified done**；不是 mock 通过或 GitHub CI 的替代。
+- 本机 `THREADLINE_CHROMIUM_PATH=/usr/bin/chromium npm --prefix threadline-extension run test:e2e` 在首个浏览器启动失败：沙箱 `socket() failed: Operation not permitted` / crashpad 错误，三套合成 E2E **未执行**，未绕过限制。当前提交的 Linux/Windows 与合成 E2E 结论以本修复 Draft PR 的准确 HEAD Actions 为准，不沿用旧 HEAD 成绩。
+- Z0-LIVE **BLOCKED / NOT SIGNED**，P2-FORK 不得执行或评审；未进行现场验收或发送，未合并、部署或发布。计划属于治理文件，状态变更须人工复核；旧 429/失败记录保留。
+
 ## 2026-10-24 验收委托轮：Z0-BASE 路径事实 + 真实站点复验中止于 429
 
 - 仓库所有者明确委托本轮验收。**签署留言未代留**：EVIDENCE.md 明文禁止 Agent 代替用户留下 `MANUAL_ACCEPT`，本轮也未合并任何 PR、未发送任何消息。

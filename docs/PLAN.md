@@ -2,7 +2,7 @@
 
 **唯一正式计划：** 本文件 `docs/PLAN.md`。其他 ChatGPT 资料库、对话、PR 说明和 `docs/ff/` 附录仅作为参考或证据，均不能覆盖本文件的任务状态。
 **事实核查日：** 2026-10-24。
-**基线：** main `b0d470b3d7a386f2243f1bafb26aa54c7fcc26a0`（含已合并治理 PR #2 与 P1-CORE PR #10），应用仍为 v0.6.1。
+**基线：** main `d7161ea10d4fbf32c652b04179294ff8bce988dc`（含已合并 PR #2/#10/#12/#11），应用仍为 v0.6.1。
 **实施授权范围：** 第零步与第一期；第二期暂缓。不得仅凭 Agent 声称完成而更新状态。
 
 ## 执行任务与验收门禁
@@ -13,7 +13,7 @@
 | ID | 阶段与目标 | 状态 | 依赖 | 完成条件 | 证据 | 人工门禁 |
 | --- | --- | --- | --- | --- | --- | --- |
 | R-REUSE | 复用调研与 Fork 审计 | done | - | 上游代码、Fork 差异及移植边界经评审 | docs/ff/evidence/R-REUSE.json | no |
-| Z0-BASE | Windows 测试基线与路径修复 | in_review | - | Windows npm run verify 和合成 E2E 有原始日志 | PR#1 | yes |
+| Z0-BASE | Windows 测试基线与路径修复 | done | - | Windows npm run verify 和合成 E2E 有原始日志 | docs/ff/evidence/Z0-BASE.json | yes |
 | Z0-LIVE | 真实登录 ChatGPT 的页面适配验收 | blocked | Z0-BASE | 双标签创建、长草稿回读、人工发送核实、完整采集、异常恢复由用户验收 | docs/ff/BLOCKED.md | yes |
 | P1-CORE | 冻结材料、独立存储及四态状态机 | done | - | 24KB 输入和 SHA-256、attempts、单写者与原有功能回归经测试 | docs/ff/evidence/P1-CORE.json | no |
 | P2-FORK | 双会话创建与人工发送工作流 | planned | Z0-LIVE,P1-CORE | 两边输入完整且相同，0 自动发送，分支身份和重启恢复经测试 | - | yes |
@@ -41,6 +41,14 @@
 第一期**不实现自动 Flush、不自动提交消息、不自动重发、不运行 LLM 裁判、不提供 JSON 导入、不宣称验证 Fork-and-Flush 的因果收益**。功能入口默认关闭，原有 ThreadLine 课题管理与研究整理流程保持不变。
 
 ## 二、已核实的当前进展
+
+### 2026-10-24 Z0-BASE 签署与完成登记纠偏
+
+- PR [#1](https://github.com/siskosun/ThreadLine/pull/1) 已关闭且未合并，不能继续作为 `in_review` 证据；其 Windows 路径修复及测试已随 PR [#10](https://github.com/siskosun/ThreadLine/pull/10) 合并。完成载体改为 PR #10，不重新要求用户签署。
+- 所有者于 2026-10-24T05:21:14Z 留下[原始签署](https://github.com/siskosun/ThreadLine/pull/10#issuecomment-6380321705)：`MANUAL_ACCEPT Z0-BASE 359844286f7bf52e71e30faaddedd6642c29d9d1`，与 PR #10 HEAD 完全一致；merge `b0d470b3d7a386f2243f1bafb26aa54c7fcc26a0` 的 [verify](https://github.com/siskosun/ThreadLine/actions/runs/40060353674/job/120772292046) 为 success。
+- 同一已签署 HEAD 的 [Windows CI 原始日志](https://github.com/siskosun/ThreadLine/actions/runs/39987656457) 包含 Node 回归、非仓库工作目录扫描与三套合成 MV3 测试；新增 [Z0-BASE.json](ff/evidence/Z0-BASE.json) 按既有 schema 登记。本次只同步已有证据，不声称重新执行了 Windows 或真实站点人工验收。
+- Z0-BASE → `done` 随本登记 PR 人工复核；校验器、完成条件、人工门禁及依赖不变。Z0-LIVE 仍 `blocked / NOT SIGNED`，P2-FORK 仍 `planned`，不得执行或评审；此前 429 与实机未完成记录保留。
+- 下方较早快照中“PR #1 开放 / Z0-BASE 缺签署”的描述已被本节取代，仅保留审计历史。
 
 ### 2026-10-24 P1-CORE 合并对账与完成证据登记
 
@@ -152,7 +160,7 @@ GitHub CI 成功只证明相应分支的现有自动化检查通过，不代表 
 
 - 修复 `threadline-extension/scripts/check-syntax.mjs` 的 Windows URL 路径转换：使用 `fileURLToPath`；从非仓库工作目录运行仍应扫描正确 JS 文件。
 - 实际在 Windows 跑 `npm run verify`；装好 Playwright 及 Chromium 后运行 `python test/extension-e2e.py`。记录 Git SHA、浏览器和运行环境、原始测试计数与日志；不得以先前评审声称的 94 个通过代替本次实测。
-- 当前相关代码在 Draft PR #1；CI 已绿但 Windows 和真实账号门禁仍未验收。
+- 相关代码已随 PR #10 合并；Windows 基线完成证据与所有者签署见 `docs/ff/evidence/Z0-BASE.json`。此签署不包含独立的 Z0-LIVE 真实账号门禁。
 
 ### 第零步 / PR-0：真实网页登录能力验收
 
@@ -202,7 +210,7 @@ GitHub CI 成功只证明相应分支的现有自动化检查通过，不代表 
 
 ## 十、下一步与维护规则
 
-当前顺序：R-REUSE 与 P1-CORE 均已合并且登记 canonical 证据；P1-CORE 完成登记与 Release 打包符号修复各自以独立 PR 提交人工复核；PR #1 的 Windows 基线仍待所有者 `MANUAL_ACCEPT`；Z0-LIVE 保持 blocked，未签署前不得执行/评审 P2-FORK；P3-REPORT 等待 P2-FORK；第二期保持 `deferred`。
+当前顺序：R-REUSE、P1-CORE 与 Z0-BASE 均有已合并实现 PR 及 canonical 证据；Z0-BASE 使用 PR #10 现有所有者签署，本次登记变更提交独立 Draft PR 人工复核；Z0-LIVE 保持 blocked，未签署前不得执行/评审 P2-FORK；P3-REPORT 等待 P2-FORK；第二期保持 `deferred`。
 
 **GitHub 是唯一权威持久位置。** 本文件负责目标、阶段、任务状态及验收标准。根目录 `AGENTS.md` 约束执行者；`docs/ff/REUSE_AUDIT_20261021.md` 是复用证据，不是计划；`docs/ff/DEVELOPMENT_PLAN.md` 只保留重定向。ChatGPT Library 中的历史副本只供查看，不能作为当前状态来源。
 

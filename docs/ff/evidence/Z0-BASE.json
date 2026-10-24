@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "task_id": "Z0-BASE",
+  "pr_number": 10,
+  "merge_commit": "b0d470b3d7a386f2243f1bafb26aa54c7fcc26a0",
+  "test_cases": [
+    {
+      "file": "threadline-extension/test/check-syntax-portable.test.js",
+      "name": "syntax scanner resolves extension root independent of working directory"
+    },
+    {
+      "file": "threadline-extension/test/extension-e2e.py",
+      "name": "MV3 persistent Chromium + real panel context + child-frame NEW_CHAT denied before tab creation"
+    }
+  ],
+  "manual": {
+    "comment_id": 6380321705,
+    "accepted_head_sha": "359844286f7bf52e71e30faaddedd6642c29d9d1",
+    "scope": "Z0-BASE Windows 测试基线与路径修复；仅登记 PR #10 的所有者签署及 Windows 自动化证据，不包含真实登录 ChatGPT 的 Z0-LIVE 验收。"
+  }
+}

@@ -13,7 +13,8 @@ const fixtureFiles = [
   'docs/PLAN.md','AGENTS.md','docs/ff/DEVELOPMENT_PLAN.md','docs/ff/BLOCKED.md',
   // Canonical done evidence must travel with PLAN fixtures once a task is done.
   'docs/ff/evidence/R-REUSE.json',
-  'docs/ff/evidence/P1-CORE.json'
+  'docs/ff/evidence/P1-CORE.json',
+  'docs/ff/evidence/Z0-BASE.json'
 ];
 
 async function checks() { return import(pathToFileURL(MOD).href); }
@@ -24,6 +25,15 @@ function fixture() {
     if(!fs.existsSync(source)) continue;
     fs.mkdirSync(path.dirname(path.join(dir,name)),{recursive:true});
     fs.copyFileSync(source,path.join(dir,name));
+  }
+  // Copy the declared test sources so negative controls fail for their intended reason,
+  // not for an unrelated missing test file in an otherwise invalid fixture.
+  for(const name of fixtureFiles.filter(x=>x.endsWith('.json'))){
+    const evidence=JSON.parse(fs.readFileSync(path.join(dir,name),'utf8'));
+    for(const c of evidence.test_cases){
+      fs.mkdirSync(path.dirname(path.join(dir,c.file)),{recursive:true});
+      fs.copyFileSync(path.join(ROOT,c.file),path.join(dir,c.file));
+    }
   }
   return dir;
 }
@@ -45,10 +55,10 @@ test('canonical plan contains all required tasks and no unverified done claims',
   const actual=validatePlan(ROOT);
   assert.equal(actual.tasks.length,8);
   // Done claims must stay limited to tasks with real merged-PR evidence JSONs.
-  assert.deepEqual(actual.done.map(x=>x.task.id).sort(),['P1-CORE','R-REUSE']);
+  assert.deepEqual(actual.done.map(x=>x.task.id).sort(),['P1-CORE','R-REUSE','Z0-BASE']);
   assert.equal(actual.tasks.find(x=>x.id==='Z0-LIVE').status,'blocked');
-  assert.equal(actual.tasks.find(x=>x.id==='Z0-BASE').status,'in_review');
-  assert.notEqual(actual.tasks.find(x=>x.id==='P2-FORK').status,'done');
+  assert.equal(actual.tasks.find(x=>x.id==='Z0-BASE').status,'done');
+  assert.equal(actual.tasks.find(x=>x.id==='P2-FORK').status,'planned');
 });
 
 test('missing/duplicate plan markers and missing tasks are rejected',async()=>{
@@ -75,9 +85,9 @@ test('a task cannot advance while its hard dependencies are incomplete',async()=
 test('marking done without an evidence JSON fails, even if the agent says it passed',async()=>{
   const {validatePlan}=await checks();
   withFixture(dir=>{
-    // P1-CORE is done with a canonical JSON; removing the JSON must fail validation.
+    // Each done claim requires its own canonical JSON.
     fs.rmSync(path.join(dir,'docs/ff/evidence/P1-CORE.json'),{force:true});
-    assert.throws(()=>validatePlan(dir),/missing evidence file/);
+    assert.throws(()=>validatePlan(dir),/missing evidence file: docs\/ff\/evidence\/P1-CORE.json/);
   });
   withFixture(dir=>{
     fs.rmSync(path.join(dir,'docs/ff/evidence/R-REUSE.json'),{force:true});
@@ -157,4 +167,57 @@ test('closed PR without merge is not acceptable review evidence',async()=>{
     ()=>checkGithubEvidence({tasks:[task],done:[]},{repo:'siskosun/ThreadLine',token:'test',fetchImpl}),
     /in_review PR must exist on main or be merged/
   );
+});
+
+
+test('Z0-BASE canonical fixture requires evidence, real test sources and manual fields',async()=>{
+  const {validatePlan}=await checks();
+  withFixture(dir=>{
+    assert.equal(validatePlan(dir).done.length,3);
+    fs.rmSync(path.join(dir,'docs/ff/evidence/Z0-BASE.json'));
+    assert.throws(()=>validatePlan(dir),/missing evidence file: docs\/ff\/evidence\/Z0-BASE.json/);
+  });
+  withFixture(dir=>{
+    edit(dir,'docs/ff/evidence/Z0-BASE.json',s=>{
+      const evidence=JSON.parse(s); delete evidence.manual; return JSON.stringify(evidence);
+    });
+    assert.throws(()=>validatePlan(dir),/manual GitHub comment missing: Z0-BASE/);
+  });
+});
+
+test('Z0-BASE acceptance cannot unlock P2 before independent Z0-LIVE completion',async()=>{
+  const {validatePlan}=await checks();
+  for(const status of ['in_progress','in_review']){
+    withFixture(dir=>{
+      assert.equal(validatePlan(dir).tasks.find(t=>t.id==='Z0-BASE').status,'done');
+      edit(dir,'docs/PLAN.md',s=>rowChange(s,'P2-FORK',line=>{
+        const updated=line.replace(' | planned | ',' | '+status+' | ');
+        return status==='in_review'?updated.replace(' | - | yes |',' | PR#99 | yes |'):updated;
+      }));
+      assert.throws(()=>validatePlan(dir),/dependency is not done: P2-FORK => Z0-LIVE/);
+    });
+  }
+});
+
+test('Z0-BASE registration verifies PR10 and rejects mismatched acceptance evidence',async()=>{
+  const {validatePlan,checkGithubEvidence}=await checks();
+  const entry=validatePlan(ROOT).done.find(x=>x.task.id==='Z0-BASE');
+  assert.equal(entry.evidence.pr_number,10);
+  assert.equal(entry.evidence.manual.comment_id,6380321705);
+  const {evidence,task}=entry;
+  const head=evidence.manual.accepted_head_sha;
+  const comment={user:{login:'siskosun'},issue_url:'https://api.github.com/repos/siskosun/ThreadLine/issues/10',
+    body:'MANUAL_ACCEPT Z0-BASE '+head};
+  const check=override=>checkGithubEvidence({tasks:[task],done:[entry]},
+    {repo:'siskosun/ThreadLine',token:'test',fetchImpl:async url=>{
+      if(url.endsWith('/pulls/10'))return mock({merged_at:'2026-10-24T03:56:34Z',base:{ref:'main'},
+        merge_commit_sha:evidence.merge_commit,head:{sha:head}});
+      if(url.includes('/check-runs?'))return mock({check_runs:[{name:'verify',conclusion:'success',app:{slug:'github-actions'}}]});
+      assert.ok(url.endsWith('/issues/comments/6380321705'),url);
+      return mock({...comment,...override});
+    }});
+  assert.deepEqual(await check({}),{reviewPrs:0,done:1});
+  await assert.rejects(()=>check({issue_url:'https://api.github.com/repos/siskosun/ThreadLine/issues/1'}),/belongs to another PR/);
+  await assert.rejects(()=>check({body:'MANUAL_ACCEPT Z0-LIVE '+head}),/text\/head does not match/);
+  await assert.rejects(()=>check({body:'MANUAL_ACCEPT Z0-BASE '+'a'.repeat(40)}),/text\/head does not match/);
 });
