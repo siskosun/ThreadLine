@@ -21,7 +21,11 @@ async function page(options={}){
      if(payload.type==='FF_CREATE'){
        model.creates.push(payload.operationId);
        const id='ff_'+payload.operationId;
-       if(!model.records.has(id))model.records.set(id,{id,revision:0,frozen:await F.freeze(payload.w0,payload.p)});
+       if(!model.records.has(id)){
+         const record=F.newExperiment(await F.freeze(payload.w0,payload.p),id);
+         record.createOperationId=payload.operationId;
+         model.records.set(id,record);
+       }
        await options.holdCreate;
        armed=true;
        return {id};

@@ -2,6 +2,7 @@
 No authenticated account, real-site adapter, or message sending. Z0-LIVE remains blocked.
 """
 import os
+import time
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from playwright.sync_api import sync_playwright, expect
@@ -16,7 +17,7 @@ SITE = """<!doctype html><title>Offline synthetic tab</title>
 def run():
     with TemporaryDirectory(prefix="threadline-ff-") as profile:
         with sync_playwright() as p:
-            def launch():
+            def launch(handler=None):
                 context = p.chromium.launch_persistent_context(
                     profile,
                     executable_path=os.environ.get("THREADLINE_CHROMIUM_PATH") or None,
@@ -24,8 +25,11 @@ def run():
                         "--no-sandbox", "--disable-dev-shm-usage",
                         f"--disable-extensions-except={EXT}", f"--load-extension={EXT}"
                     ])
-                context.route("https://chatgpt.com/**", lambda route:
-                    route.fulfill(status=200, content_type="text/html", body=SITE))
+                def serve(route):
+                    if handler and handler(route):
+                        return
+                    route.fulfill(status=200, content_type="text/html", body=SITE)
+                context.route("https://chatgpt.com/**", serve)
                 worker = context.service_workers[0] if context.service_workers else \
                     context.wait_for_event("serviceworker", timeout=15000)
                 return context, worker.url.split("/")[2]
@@ -142,7 +146,45 @@ def run():
             assert db is True
             ctx.close()
 
-            ctx2, eid2 = launch()
+            import json as _json
+            fork_convo = _json.dumps({"messages": [
+                {"id": "m1", "message": {"author": {"role": "user"},
+                    "content": {"parts": ["fictional"]}, "status": "finished_successfully"}},
+                {"id": "m2", "message": {"author": {"role": "assistant"},
+                    "content": {"parts": ["好的，OK。"]}, "status": "finished_successfully"}}],
+                "page_info": {"has_previous_page": False}})
+            fork_site = """<!doctype html><title>Offline synthetic fork tab</title>
+            <style>.whitespace-pre-wrap{white-space:pre-wrap}</style><form id="composer"><textarea id="prompt-textarea"></textarea>
+            <button type="submit">Send</button></form><div id="log"></div>
+            <script>
+            // A textarea editor keeps the prefill byte-exact through the
+            // handoff value-setter path; contenteditable fidelity is covered
+            // by handoff-e2e. This scenario exercises the P2 state machine.
+            window.submitCount=0;
+            document.getElementById('composer').onsubmit=e=>{e.preventDefault();window.submitCount++;
+              const text=document.getElementById('prompt-textarea').value;
+              const user=document.createElement('div');
+              user.setAttribute('data-message-author-role','user');
+              user.innerHTML='<div class="whitespace-pre-wrap"></div>';
+              user.querySelector('.whitespace-pre-wrap').textContent=text;
+              document.getElementById('log').appendChild(user);
+              const asst=document.createElement('div');
+              asst.setAttribute('data-message-author-role','assistant');
+              asst.innerHTML='<div class="whitespace-pre-wrap">好的，OK。</div>';
+              document.getElementById('log').appendChild(asst);
+              history.pushState(null,'','/c/fork-e2e-'+Math.random().toString(16).slice(2,10));};
+            </script>"""
+            def fork_handler(route):
+                url = route.request.url
+                print("ROUTE-HIT:", url[:70])
+                if "/backend-api/" in url:
+                    route.fulfill(status=200, content_type="application/json", body=fork_convo)
+                    return True
+                if url.rstrip("/") == "https://chatgpt.com":
+                    route.fulfill(status=200, content_type="text/html", body=fork_site)
+                    return True
+                return False
+            ctx2, eid2 = launch(handler=fork_handler)
             assert eid2 == eid, "Persistent extension ID should not change"
             reopened = ctx2.new_page()
             reopened.goto(f"chrome-extension://{eid2}/ff.html")
@@ -318,10 +360,116 @@ def run():
             }""")
             assert guards["valid"], guards
             assert all(row["rejected"] and row["unchanged"] for row in guards["results"]), guards
+
+            # ---------- P2: dual-branch launch, prefill, simulated human send, capture ----------
+            # Extension-created tabs are not exposed as Playwright pages in
+            # headless persistent contexts, so this scenario observes everything
+            # through the service worker: FF_READ states, chrome.scripting
+            # readbacks, and executeScript-driven user-action simulations.
+            p2create = reopened.evaluate("""() => chrome.runtime.sendMessage(
+              {type:'FF_CREATE',operationId:'op_p2e2e0001',
+               w0:'双分支共同材料 W0',p:'回答同一任务'})""")
+            assert p2create["ok"], p2create
+            p2id = p2create["data"]["id"]
+            launched = reopened.evaluate("""id => chrome.runtime.sendMessage(
+              {type:'FF_LAUNCH',experimentId:id,operationId:'op_p2e2e0002'})""", p2id)
+            assert launched["ok"], launched
+            tabA, tabB = launched["data"]["tabIdA"], launched["data"]["tabIdB"]
+            assert tabA != tabB
+            worker2 = ctx2.service_workers[0]
+            def sw_read(expr, arg=None):
+                return worker2.evaluate("(" + expr + ")", arg) if arg is not None else worker2.evaluate("(" + expr + ")")
+            # Both branch tabs must reach awaiting_send: the handoff ACK is the
+            # extension's own exact composer readback proof.
+            deadline = time.time() + 30
+            row = None
+            while time.time() < deadline:
+                row = sw_read("async id => (await ThreadLineFFDB.read(id))", p2id)
+                if (row["branches"]["A"]["phase"] == "awaiting_send"
+                    and row["branches"]["B"]["phase"] == "awaiting_send"):
+                    break
+                time.sleep(0.5)
+            assert row["branches"]["A"]["phase"] == "awaiting_send", row["branches"]["A"]["phase"]
+            if row["branches"]["B"]["phase"] != "awaiting_send":
+                print("DIAG-B:", sw_read("""async id => {
+                  const [iso] = await chrome.scripting.executeScript({target:{tabId:id},
+                    func:() => ({value:JSON.stringify((document.getElementById('prompt-textarea')||{value:null}).value||null)?.slice(0,30),
+                      banner:(document.querySelector('#tl-handoff-banner')||{innerText:null}).innerText?.slice(0,80)})});
+                  const intent = await chrome.storage.session.get('tl_handoff_'+id);
+                  const bind = await chrome.storage.session.get('tl_ff_bind_'+id);
+                  const err = await chrome.storage.session.get('tl_ff_ack_err_'+id);
+                  return {page:iso.result, intentPending:!!intent['tl_handoff_'+id],
+                    bind:!!bind['tl_ff_bind_'+id], ackErr:err['tl_ff_ack_err_'+id]||null};
+                }""", tabB))
+            assert row["branches"]["B"]["phase"] == "awaiting_send", row["branches"]["B"]["phase"]
+            frozen = row["frozen"]["text"]
+            for tabId in [tabA, tabB]:
+                count = sw_read("""async tabId => {
+                  const [res] = await chrome.scripting.executeScript({target:{tabId},
+                    world:'MAIN', func:() => window.submitCount});
+                  return res.result;
+                }""", tabId)
+                assert count == 0, "0 automatic sends before the human action"
+            # The human (simulated here through the same scripting authority the
+            # extension itself uses) sends branch A only.
+            sent = sw_read("""async tabId => {
+              const [res] = await chrome.scripting.executeScript({target:{tabId},
+                world:'MAIN',
+                func:() => {document.querySelector('#composer button[type=submit]').click();
+                  return window.submitCount;}});
+              return res.result;
+            }""", tabA)
+            assert sent == 1, "exactly the simulated human send"
+            deadline = time.time() + 25
+            astate = None
+            while time.time() < deadline:
+                row = sw_read("async id => (await ThreadLineFFDB.read(id))", p2id)
+                a = row["branches"]["A"]["attempts"][-1]
+                if (row["branches"]["A"]["phase"] == "generating"
+                    and a["evidence"].get("sessionId")
+                    and a["evidence"].get("inputLevel") == "exact"):
+                    astate = a
+                    break
+                time.sleep(0.5)
+            if not astate:
+                print("DIAG-BIND:", sw_read("""async id => {
+                  const t = await chrome.tabs.get(id);
+                  const live = await chrome.storage.session.get('tl_live_'+id);
+                  const row = await ThreadLineFFDB.read('ff_op_p2e2e0001');
+                  return {url:t.url, live:!!live['tl_live_'+id],
+                    phase:row?row.branches.A.phase:null,
+                    ev:row?row.branches.A.attempts.at(-1).evidence:null,
+                    errs:Object.keys(await chrome.storage.session.get(null)).filter(k=>k.includes('err'))};
+                }""", tabA))
+            assert astate, "branch A must bind its conversation and classify the sent input"
+            assert astate["evidence"]["sessionId"].startswith("fork-e2e-")
+            cap = reopened.evaluate("(p) => chrome.runtime.sendMessage(p)",
+              {"type":"FF_CAPTURE","experimentId":p2id,"branch":"A"})
+            assert cap["ok"], cap
+            deadline = time.time() + 30
+            done_row = None
+            while time.time() < deadline:
+                row = sw_read("async id => (await ThreadLineFFDB.read(id))", p2id)
+                if row["branches"]["A"]["status"] == "done":
+                    done_row = row
+                    break
+                time.sleep(0.5)
+            assert done_row, "capture completion must mark the branch done"
+            a = done_row["branches"]["A"]["attempts"][-1]
+            assert a["evidence"]["captureComplete"] is True and a["evidence"]["persisted"] is True
+            assert a["evidence"]["taskCount"] == 1 and a["evidence"]["reply"] == "好的，OK。"
+            assert len(set(a["evidence"]["endSignals"])) >= 2, a["evidence"]["endSignals"]
+            brow = done_row["branches"]["B"]
+            assert brow["status"] == "pending", "branch B stays independent"
+            assert not brow["attempts"][-1]["evidence"].get("sessionId"), "no cross-talk"
+            open_tabs = sw_read("async () => (await chrome.tabs.query({url:'https://chatgpt.com/*'})).length")
+            assert open_tabs == 2, "the extension must not open extra tabs"
             ctx2.close()
     print("PASS: Fork P1 default-off, permission-bound messages, 24KB input, "
           "atomic IDB/CAS and reducer guards, replay-safe attempts, post-ACK display recovery, "
-          "XSS, legacy isolation and restart (synthetic-only)")
+          "XSS, legacy isolation and restart; P2 dual-branch launch with exact prefill, "
+          "simulated human send binding, capture-driven completion and 0 automatic sends "
+          "(synthetic-only)")
 
 
 if __name__ == "__main__":

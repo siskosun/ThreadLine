@@ -41,7 +41,10 @@
     if(!parts.length && typeof m.content==="string") result.push(m.content);
     const content=result.join("\n").trim();
     if(!content&&!nonText)return null;
-    return {id:String(m.id||raw.id||""),role,content,timestamp:Number(m.create_time)||null,hasNonText:nonText};
+    // finished preserves the session data's own end marker for the message;
+    // Fork completion uses it as an independently checkable signal.
+    return {id:String(m.id||raw.id||""),role,content,timestamp:Number(m.create_time)||null,hasNonText:nonText,
+      finished:m.status==="finished_successfully"||m.metadata?.finished===true};
   }
   async function getJSON(url,signal){
     const headers=new Headers({accept:"application/json"});if(lastAuth)headers.set("authorization",lastAuth);
