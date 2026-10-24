@@ -62,6 +62,25 @@
       <div id="ff-branch-a"></div>
       <div id="ff-branch-b"></div>
     </section>
+    <section class="surface" id="ff-compare" hidden aria-label="去标签对照与裁决">
+      <h2>X/Y 去标签对照</h2>
+      <p class="subtle" id="ff-compare-note"></p>
+      <button class="secondary" id="ff-compare-btn" type="button">生成 X/Y 对照（两分支均完成后）</button>
+      <div id="ff-columns"></div>
+      <div id="ff-verdict-form">
+        <label for="ff-preference">你的偏好</label>
+        <select id="ff-preference"><option value="">请选择…</option><option value="X">X 更好</option><option value="Y">Y 更好</option><option value="tie">相当</option><option value="inconclusive">无法判断</option></select>
+        <label for="ff-criteria">判断依据（必填）</label>
+        <textarea id="ff-criteria" rows="2"></textarea>
+        <label for="ff-confidence">置信度</label>
+        <select id="ff-confidence"><option value="medium">中</option><option value="high">高</option><option value="low">低</option></select>
+        <label for="ff-notes">备注</label>
+        <textarea id="ff-notes" rows="2"></textarea>
+        <button id="ff-verdict" type="button">提交裁决并揭盲</button>
+      </div>
+      <p id="ff-reveal" class="mono"></p>
+      <button class="secondary" id="ff-export" type="button" hidden>导出自包含 JSON（仅导出）</button>
+    </section>
   </div>
   <script src="ff-core.js"></script><script src="ff-page.js"></script>
 </body>

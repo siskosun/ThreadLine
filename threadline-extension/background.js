@@ -699,6 +699,49 @@ async function handleFF(payload, sender) {
       return {runId:run.id};
     });
   }
+  if (payload.type === "FF_COMPARE") {
+    // Blind X/Y mapping: only after BOTH branches are done with verified
+    // input and complete captures. The mapping is a pure function of the
+    // recorded seed, so exports can be independently recomputed.
+    if (typeof payload.operationId !== "string" ||
+      !/^[a-zA-Z0-9_-]{6,100}$/.test(payload.operationId))
+      throw new Error("explicit comparison operation ID required");
+    return serialize(async () => {
+      if (!await ffEnabled()) throw new Error("Fork Beta is disabled");
+      const existing = await ThreadLineFFDB.read(payload.experimentId);
+      if (!existing) throw new Error("experiment not found");
+      await ThreadLineFFCore.verifyFrozen(existing.frozen);
+      if (existing.decision?.mapping) return existing.decision;
+      if (!ThreadLineFFCore.eligibleForComparison(existing))
+        throw new Error("both branches must be done with verified input and captures");
+      const mapping = await ThreadLineFFCore.assignMapping(existing, payload.operationId);
+      const saved = await ThreadLineFFDB.update(existing.id, existing.revision,
+        record => ({...record, decision:mapping, revision:record.revision + 1}));
+      return saved.decision;
+    });
+  }
+  if (payload.type === "FF_VERDICT") {
+    return serialize(async () => {
+      if (!await ffEnabled()) throw new Error("Fork Beta is disabled");
+      const existing = await ThreadLineFFDB.read(payload.experimentId);
+      if (!existing) throw new Error("experiment not found");
+      if (!existing.decision?.mapping) throw new Error("no comparison mapping assigned yet");
+      const verdict = ThreadLineFFCore.recordVerdict(existing.decision, {
+        preference:payload.preference, criteria:payload.criteria,
+        confidence:payload.confidence, notes:payload.notes || ""});
+      const saved = await ThreadLineFFDB.update(existing.id, existing.revision,
+        record => ({...record, decision:{...record.decision, verdict},
+          revision:record.revision + 1}));
+      return saved.decision;
+    });
+  }
+  if (payload.type === "FF_EXPORT") {
+    // Read-only, credential-free by construction; export only, never import.
+    const existing = await ThreadLineFFDB.read(payload.experimentId);
+    if (!existing) throw new Error("experiment not found");
+    await ThreadLineFFCore.verifyFrozen(existing.frozen);
+    return ThreadLineFFCore.exportSnapshot(existing);
+  }
   throw new Error("unknown Fork message type");
 }
 chrome.runtime.onInstalled.addListener(() => {

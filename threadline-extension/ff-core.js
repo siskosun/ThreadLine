@@ -214,8 +214,71 @@ const ThreadLineFFCore = (() => {
     next.revision++;
     return next;
   }
-  return {MAX_BYTES, RULE, STATES, PHASES, CHECKS, canonical, compare, byteLength,
-    hash, wellFormed, fingerprints, formatText, freeze, verifyFrozen, classify, newExperiment, advance};
+  // ---------- P3: blind X/Y comparison, verdict and self-contained export ----------
+  const PREFERENCES = Object.freeze(["X", "Y", "tie", "inconclusive"]);
+  function comparableSide(branch) {
+    const attempt = branch.attempts.at(-1);
+    return branch.status === "done" && attempt &&
+      ["exact", "canonical_equivalent"].includes(attempt.evidence?.inputLevel) &&
+      attempt.evidence?.captureComplete === true &&
+      typeof attempt.evidence?.reply === "string" && attempt.evidence.reply.length > 0 &&
+      typeof attempt.evidence?.sessionId === "string";
+  }
+  function eligibleForComparison(exp) {
+    plain(exp);
+    return comparableSide(exp.branches.A) && comparableSide(exp.branches.B) &&
+      exp.branches.A.attempts.at(-1).evidence.sessionId !==
+        exp.branches.B.attempts.at(-1).evidence.sessionId;
+  }
+  async function assignMapping(exp, seed) {
+    plain(exp);
+    assert(exp.decision === null || exp.decision === undefined, "mapping already assigned");
+    assert(eligibleForComparison(exp), "both branches must be done with verified input and captures");
+    assert(typeof seed === "string" && seed.length >= 10, "comparison seed required");
+    // The mapping is a pure function of the recorded seed, so the export can
+    // be independently recomputed without trusting this call.
+    return hash("threadline-xy:" + seed).then(digest => {
+      const xIsA = parseInt(digest[0], 16) % 2 === 0;
+      return Object.freeze({seed, assignedAt:Date.now(),
+        mapping:Object.freeze({X:xIsA ? "A" : "B", Y:xIsA ? "B" : "A"}), verdict:null});
+    });
+  }
+  function recordVerdict(decision, verdict) {
+    plain(decision);
+    assert(decision.mapping, "no comparison mapping assigned yet");
+    assert(decision.verdict === null || decision.verdict === undefined,
+      "verdict already recorded");
+    plain(verdict);
+    assert(PREFERENCES.includes(verdict.preference), "invalid preference");
+    assert(typeof verdict.criteria === "string" && verdict.criteria.trim().length > 0 &&
+      verdict.criteria.length <= 400, "criteria required");
+    assert(typeof verdict.confidence === "string" &&
+      ["low", "medium", "high"].includes(verdict.confidence), "invalid confidence");
+    assert(typeof verdict.notes === "string" && verdict.notes.length <= 4000,
+      "invalid notes");
+    return Object.freeze({preference:verdict.preference, criteria:verdict.criteria.trim(),
+      confidence:verdict.confidence, notes:verdict.notes, decidedAt:Date.now()});
+  }
+  function exportSnapshot(exp) {
+    plain(exp);
+    // Self-contained and credential-free by construction: only experiment
+    // state, hashes, attempts, capture replies and the user verdict.
+    return {
+      schema:1, kind:"threadline-fork-experiment", exportedAt:Date.now(),
+      experiment:{id:exp.id, revision:exp.revision, createdAt:exp.createdAt,
+        createOperationId:exp.createOperationId},
+      frozen:{w0:exp.frozen.w0, p:exp.frozen.p, text:exp.frozen.text,
+        bytes:exp.frozen.bytes, rule:exp.frozen.rule,
+        w0Hashes:exp.frozen.w0Hashes, pHashes:exp.frozen.pHashes,
+        textHashes:exp.frozen.textHashes, frozenAt:exp.frozen.frozenAt},
+      branches:Object.fromEntries(["A", "B"].map(label => [label, {
+        status:exp.branches[label].status, phase:exp.branches[label].phase,
+        attempts:exp.branches[label].attempts}])),
+      decision:exp.decision ? {...exp.decision} : null};
+  }
+  return {MAX_BYTES, RULE, STATES, PHASES, CHECKS, PREFERENCES, canonical, compare, byteLength,
+    hash, wellFormed, fingerprints, formatText, freeze, verifyFrozen, classify, newExperiment, advance,
+    eligibleForComparison, assignMapping, recordVerdict, exportSnapshot};
 })();
 if (typeof globalThis !== "undefined") globalThis.ThreadLineFFCore = ThreadLineFFCore;
 if (typeof module !== "undefined") module.exports = ThreadLineFFCore;
