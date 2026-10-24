@@ -2,6 +2,24 @@
 
 任务定义和正式状态唯一来源：[docs/PLAN.md](../PLAN.md)。本文件只记录发生过的事件与证据，不自行认定任务完成。
 
+## 2026-10-24 外部有条件计划评审采纳
+
+- 收到用户提供的阅读副本评审（有条件通过 S0–S1）；以 PR #21 `de27077b691e9eafd1986940943f989a677e16db` 及 main `a66e9b09f43986c6e2ae1b4219df4a95c2cc317a` 重新核对。外部未直接看源码，回复没有 helper SHA 签名；不虚构 FRESH。ROOT 的四项事实缺口判定为 CONFIRMED，对应建议 ACCEPTED；完整处置见 `PLAN_ADOPTION_20261024.md`。
+- PLAN 补稳定依赖边及上下游版本确认历史、单事务 IDB 权威写入和单向只读 decision 投影、worker 单写者及持久 CAS/操作去重；旧编辑/备份/删除入口也纳入一致性约束。
+- S0a 存储/恢复与采纳摩擦成为关键路径，S0b 定位最多8小时且可降级；S2 预注册完整率≥90%、潜在召回≥90%、精确率≥80%、配对耗时改善中位数≥15%，增加独立冻结真值、2例第二人标注、离线闭包和操作日志。这些为提议的门槛，不是测得结果。
+- 其余建议已补入：分阶段字段、修改类型/结果映射、容量默认值、原文备份提示、工期区间和维护成本比较。根据 Chrome 官方文档纠正普通清除浏览数据会清除扩展 IndexedDB 的事实子项；备份与淘汰验证要求保留。
+- 本次 Windows `npm run verify` 207/207 PASS、`npm run test:e2e` 3/3 合成 MV3 PASS，exit 0；日志位于本地工作区 `work/plan-review-logs`。计划结构、相对链接和机器表不变检查通过；产品源码/权限/工作流/检查器相对 main 无差异。精确提交的远端 CI 以 PR 检查为准。
+- CLASSIFICATION=L2 planning，阶段为 PLAN_ADOPTED（S0–S1 有条件范围）；同一轮评审不重复索取批准。S0 原型、容量/恢复探针、定位小样和 S2 试点均未执行；当前任务仅完成计划修订。S1 仍须 S0a 证据，实施登记及后续 L3/Final Review 门禁保持。未新增产品代码、合并 main、发送真实消息或发布版本。
+
+## 2026-10-24 调研转开发计划（Draft PR #21 更新）
+
+- 核对 main `a66e9b09f43986c6e2ae1b4219df4a95c2cc317a`、v0.8.0 与现有 8/8 done 登记；同步最新 main，替换旧 Draft 中过期的 v0.7 状态及 v0.8 路线名称。历史进度按当时快照保留。
+- 正式 PLAN 第十一节增加 S0–S5 候选路线，首轮仅建议 S0–S2：来源/结论版本、人工采纳、少量人工依赖和可编辑交接；试点通过后再做影响传播与局部复核。备份恢复前置，不让已采纳依据依赖三天缓存。
+- 新增 `REUSE_AUDIT_20261024.md`：核实 Toolkit MIT、Argdown core MIT、Graphiti Apache-2.0、LangGraph MIT；明确 Toolkit 函数/测试移植与 Argdown 条件采用方案。本次没有第三方代码导入，没有产品实现。
+- CLASSIFICATION=L2（跨模块设计与规划）；后续持久化/兼容/删除实施触发 L3。当前 PLAN_GATE_READY；Global Workflow 的外部计划评审待提供，不把本次文档自检替代该 Gate。机器表、检查器、证据 JSON 与运行时文件相对上述 main 不变。
+- Windows 本机验证：Node v26.10.0、Python 3.12.10、Playwright 1.64.0；`npm run verify` 207/207 PASS，`npm run test:e2e` 三套合成 MV3 PASS，均 exit 0；机器任务表与 main 逐字一致，`git diff --check` 通过。完整日志保存本地工作区，准确提交 CI 以 PR 检查为准。
+- 仓库没有 `tools/verify-run.ps1`，上述为直接命令证据，不伪装成该 helper 的 FRESH Gate 记录。External Plan Gate 的 Required Verification Labels 为 NONE，运行时实施尚未开始。本轮未进行真实 ChatGPT 网页操作、发送、合并 main 或发布。
+
 ## 2026-10-24 P2/P3/BETA 完成登记：真实双分支闭环由所有者执行
 
 - **P2-FORK（PR #17 合并）**：双分支发起/精确预填/会话绑定/重启恢复/显式重预填；8 个后台测试 + 全链路合成 E2E；0 自动发送代码级断言。
