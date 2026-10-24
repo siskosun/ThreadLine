@@ -54,7 +54,13 @@
       <p id="ff-meta" class="mono"></p>
       <p id="ff-sha" class="mono"></p>
       <pre id="ff-text"></pre>
-      <p class="subtle">此阶段没有对照、导入、发送或自动恢复功能。</p>
+    </section>
+    <section class="surface" id="ff-branches" hidden aria-label="双分支执行">
+      <h2>双分支执行</h2>
+      <p class="subtle">创建两个独立新聊天标签并填入同一冻结文本；发送由你手动完成。研线永不自动发送、不点击发送按钮、不重放未确认的操作；浏览器重启后可从持久身份恢复。</p>
+      <button class="secondary" id="ff-launch" type="button">发起双分支（两个新标签）</button>
+      <div id="ff-branch-a"></div>
+      <div id="ff-branch-b"></div>
     </section>
   </div>
   <script src="ff-core.js"></script><script src="ff-page.js"></script>

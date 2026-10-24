@@ -12,7 +12,8 @@ const ThreadLineCaptureCore = (() => {
       role:row?.role === "assistant" ? "assistant" : row?.role === "user" ? "user" : "other",
       content:normalize(row?.content),
       timestamp:Number(row?.timestamp) || null,
-      hasNonText:!!row?.hasNonText
+      hasNonText:!!row?.hasNonText,
+      finished:row?.finished === true
     })).filter(x => (x.role === "assistant" || x.role === "user") && (x.content || x.hasNonText));
   }
   // Source pagination arrives newest page first; each page itself is oldest -> newest.

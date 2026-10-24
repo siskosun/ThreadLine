@@ -53,14 +53,75 @@
       " / 24,000 UTF-8 字节" + (size>24000?"（超出限制）":"");
     $("ff-save").disabled = createBusy || size > 24000 || !$("ff-p").value.trim();
   }
+  let currentExperiment = null;
+  async function runOperation(payload, busyButton) {
+    if (busyButton) busyButton.disabled = true;
+    try {
+      await send(payload);
+      if (currentExperiment) await read(currentExperiment);
+      return true;
+    } catch (e) { notice(e.message, true); return false; }
+    finally { if (busyButton) busyButton.disabled = false; }
+  }
+  function branchBox(branch, data) {
+    const info = data.branches[branch], attempt = info.attempts.at(-1), ev = attempt?.evidence || {};
+    const box = document.createElement("div");
+    const head = document.createElement("p");
+    head.className = "mono";
+    head.textContent = "分支 " + branch + "：" + info.status + " · 阶段 " + info.phase +
+      (attempt ? " · 尝试 " + attempt.id.slice(0, 16) : "") +
+      (ev.sessionId ? " · 会话 " + ev.sessionId.slice(0, 16) : "");
+    box.appendChild(head);
+    const detail = document.createElement("p");
+    detail.className = "subtle";
+    const parts = [];
+    if (ev.inputLevel) parts.push("输入一致性 " + ev.inputLevel);
+    if (ev.prefill) parts.push("预填 " + (ev.prefill === "reacked" ? "已重新预填" : "已逐字核对"));
+    if (typeof ev.assistantBytes === "number") parts.push("回复 " + ev.assistantBytes + " 字节");
+    if (Array.isArray(ev.endSignals)) parts.push("完成信号 " + ev.endSignals.join("/"));
+    if (info.status === "pending" && ev.sessionId) parts.push("回复生成后请点击采集");
+    detail.textContent = parts.join("；");
+    box.appendChild(detail);
+    if (info.status === "pending" && attempt && Number.isInteger(ev.tabId)) {
+      const row = document.createElement("p");
+      if (!ev.sessionId) {
+        const re = document.createElement("button");
+        re.type = "button"; re.className = "secondary";
+        re.textContent = "重新预填此分支";
+        re.addEventListener("click", () =>
+          runOperation({type:"FF_REPREFILL", experimentId:data.id, branch,
+            operationId:crypto.randomUUID()}, re));
+        row.appendChild(re);
+      } else if (info.phase !== "capturing") {
+        const cap = document.createElement("button");
+        cap.type = "button"; cap.className = "secondary";
+        cap.textContent = "采集回复（完成后自动核对完成条件）";
+        cap.addEventListener("click", () =>
+          runOperation({type:"FF_CAPTURE", experimentId:data.id, branch}, cap));
+        row.appendChild(cap);
+      }
+      box.appendChild(row);
+    }
+    return box;
+  }
   async function read(id) {
     const value = await send({type:"FF_READ",id});
+    currentExperiment = id;
     $("ff-meta").textContent = "实验 " + value.id + " · revision " + value.revision +
       " · " + value.frozen.bytes + " UTF-8 字节";
     $("ff-sha").textContent = "冻结 SHA-256（canonicalization-v1）：" +
       value.frozen.textHashes.frozen;
     $("ff-text").textContent = value.frozen.text;
     $("ff-detail").hidden = false;
+    const launched = value.branches.A.attempts.length > 0 || value.branches.B.attempts.length > 0;
+    $("ff-branches").hidden = false;
+    $("ff-launch").disabled = launched &&
+      (value.branches.A.status === "pending" || value.branches.A.status === "done" ||
+       value.branches.B.status === "pending" || value.branches.B.status === "done");
+    $("ff-launch").textContent = launched ? "重新发起（仅当两分支都非进行中且未完成）" : "发起双分支（两个新标签）";
+    const boxA = $("ff-branch-a"), boxB = $("ff-branch-b");
+    boxA.replaceChildren(branchBox("A", value));
+    boxB.replaceChildren(branchBox("B", value));
   }
   async function list() {
     const values = await send({type:"FF_LIST"});
@@ -134,5 +195,17 @@
   });
   $("ff-refresh").addEventListener("click", () =>
     list().catch(error => notice(error.message,true)));
+  $("ff-launch").addEventListener("click", async event => {
+    if (!currentExperiment) return;
+    const button = event.target;
+    button.disabled = true;
+    try {
+      await send({type:"FF_LAUNCH", experimentId:currentExperiment,
+        operationId:crypto.randomUUID()});
+      await read(currentExperiment);
+      notice("双分支已创建并预填；请在两个新标签中检查内容后手动发送。研线不会替你发送。");
+    } catch (e) { notice(e.message, true); await read(currentExperiment).catch(()=>{}); }
+    finally { button.disabled = false; }
+  });
   refresh().catch(error => notice(error.message,true));
 })();

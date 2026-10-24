@@ -141,6 +141,7 @@ async function pageContext(sender, payload) {
   if (payload.type === "OBSERVE") {
     const status = {key, title:String(payload.title||"").slice(0,130), streaming:!!payload.streaming, updatedAt:Date.now()};
     await chrome.storage.session.set({[`tl_live_${tabId}`]:status});
+    try { await serialize(() => ffObserveHook(tabId, status, key)); } catch {}
   }
   const newest = payload.type === "OBSERVE" ? await readState() : state;
   const current = ThreadLineCore.getContext(newest,key);
@@ -186,8 +187,11 @@ async function receiveCapture(payload,sender){
     case "CAPTURE_PROGRESS":
       await ThreadLineCaptureDB.modifyRun(run.id,{pageCount:Number(payload.pageCount)||0,messageCount:Number(payload.messageCount)||0,phase:String(payload.phase||"")});return {ok:true};
     case "CAPTURE_END":{
-      await ThreadLineCaptureDB.modifyRun(run.id,{status:"done",complete:payload.complete===true,mode:String(payload.mode||""),pageCount:Number(payload.pageCount)||0,messageCount:Number(payload.count)||0,notice:String(payload.notice||"").slice(0,1200)});
-      captureOwners.delete(run.id);await chrome.storage.session.remove(`${CAPTURE_PREFIX}${run.id}`);await markSuccess("capture");return {ok:true};
+      const finished=await ThreadLineCaptureDB.modifyRun(run.id,{status:"done",complete:payload.complete===true,mode:String(payload.mode||""),pageCount:Number(payload.pageCount)||0,messageCount:Number(payload.count)||0,notice:String(payload.notice||"").slice(0,1200)});
+      captureOwners.delete(run.id);await chrome.storage.session.remove(`${CAPTURE_PREFIX}${run.id}`);await markSuccess("capture");
+      // Fork branches turn a completed capture into their completion evidence.
+      try { await serialize(() => ffCaptureEnded(finished, sender.tab.id)); } catch {}
+      return {ok:true};
     }
     case "CAPTURE_FAIL":
       await ThreadLineCaptureDB.modifyRun(run.id,{status:"error",error:String(payload.message||"采集失败").slice(0,1200)});captureOwners.delete(run.id);await chrome.storage.session.remove(`${CAPTURE_PREFIX}${run.id}`);return {ok:true};
@@ -366,6 +370,152 @@ async function inspectTab(tabId) {
 }
 // P1 only: separate FF storage and explicit local opt-in; no browser automation.
 const FF_ENABLED_KEY = "tl_ff_enabled_v1";
+// P2: dual-branch orchestration. Tab ids are transient pointers; the durable
+// identity lives in ff-db attempt evidence. This layer only prefills through
+// the production handoff path and observes read-only signals: it never clicks
+// Send, never re-submits a form, and never replays an unconfirmed operation.
+const FF_BIND_PREFIX = "tl_ff_bind_";
+const FF_SIG_PREFIX = "tl_ff_sig_";
+async function ffBinding(tabId) {
+  const r = await chrome.storage.session.get(`${FF_BIND_PREFIX}${tabId}`);
+  return r[`${FF_BIND_PREFIX}${tabId}`] || null;
+}
+async function ffSaveBinding(tabId, binding) {
+  await chrome.storage.session.set({[`${FF_BIND_PREFIX}${tabId}`]: binding});
+}
+async function ffClearBinding(tabId) {
+  await chrome.storage.session.remove(`${FF_BIND_PREFIX}${tabId}`, `${FF_SIG_PREFIX}${tabId}`);
+}
+async function ffSignals(tabId) {
+  const r = await chrome.storage.session.get(`${FF_SIG_PREFIX}${tabId}`);
+  return r[`${FF_SIG_PREFIX}${tabId}`] || {sawStreaming:false, lastABytes:-1, stableSince:0, signals:[]};
+}
+function ffExtractFromCapture(pages) {
+  const rows = [...(pages || [])]
+    .sort((a, b) => (a.pageIndex || 0) - (b.pageIndex || 0) || (a.chunkIndex || 0) - (b.chunkIndex || 0))
+    .flatMap(p => p.messages || []);
+  const users = rows.filter(m => m.role === "user");
+  const assistants = rows.filter(m => m.role === "assistant");
+  return {taskCount:users.length,
+    reply:assistants.length ? assistants[assistants.length - 1].content : "",
+    // The session data's own end marker on the final assistant message maps to
+    // the attested "generation" kind (generation ended per session data).
+    lastFinished:assistants.length ? assistants[assistants.length - 1].finished === true : false};
+}
+async function ffAdvance(binding, {status, phase, updates = {}, reason = "", operationId, manualNewAttempt = false}) {
+  const existing = await ThreadLineFFDB.read(binding.experimentId);
+  if (!existing) return null;
+  const attempt = existing.branches[binding.branch]?.attempts.find(a => a.id === binding.attemptId);
+  if (!attempt || attempt.status !== "pending") return null;
+  await ThreadLineFFCore.verifyFrozen(existing.frozen);
+  const event = {branch:binding.branch, expectedRevision:existing.revision,
+    operationId, attemptId:binding.attemptId, status, phase, reason,
+    evidence:{...attempt.evidence, ...updates}, manualNewAttempt};
+  return ThreadLineFFDB.update(existing.id, existing.revision,
+    record => ThreadLineFFCore.advance(record, event));
+}
+async function ffSeedHandoff(tabId, text) {
+  await chrome.storage.session.set({[`tl_handoff_${tabId}`]:{text, createdAt:Date.now()}});
+  chrome.tabs.sendMessage(tabId, {type:"TL_HANDOFF_READY"}).catch(()=>{});
+}
+async function ffHandoffAcked(tabId) {
+  const bind = await ffBinding(tabId);
+  if (!bind) return;
+  const acks = bind.acks || 1;
+  // Called from the HANDOFF_ACK critical section: never serialize here again.
+  await ffAdvance(bind, {status:"pending", phase:"awaiting_send",
+    operationId:`${bind.operationId}_${bind.branch}_ack${acks}`,
+    updates:{inputLevel:"exact", prefill:acks > 1 ? "reacked" : "exact_ack"},
+    reason:"handoff ACK: exact composer readback"});
+}
+async function ffObserveHook(tabId, status, key) {
+  const bind = await ffBinding(tabId);
+  if (!bind) return;
+  const sig = await ffSignals(tabId);
+  if (typeof key === "string" && key.startsWith("chat:")) {
+    const conversationId = key.slice(5);
+    const existing = await ThreadLineFFDB.read(bind.experimentId);
+    const attempt = existing?.branches[bind.branch]?.attempts.find(a => a.id === bind.attemptId);
+    if (attempt && attempt.status === "pending" && !attempt.evidence?.sessionId) {
+      await ffAdvance(bind, {status:"pending", phase:"generating",
+        operationId:`${bind.operationId}_conv_${conversationId}`,
+        updates:{conversationId, sessionId:conversationId},
+        reason:"conversation URL bound to branch"});
+      // Post-send input classification from the conversation's own rendering.
+      chrome.tabs.sendMessage(tabId, {type:"TL_FF_READ_USER_MESSAGE"}).then(async res => {
+        if (!res?.ok || typeof res.data?.text !== "string") return;
+        await serialize(async () => {
+          const row = await ThreadLineFFDB.read(bind.experimentId);
+          const att = row?.branches[bind.branch]?.attempts.find(a => a.id === bind.attemptId);
+          if (!att || att.status !== "pending") return;
+          const level = await ThreadLineFFCore.classify(row.frozen.text, res.data.text,
+            {trusted:true, complete:res.data.complete === true});
+          await ffAdvance(bind, {status:"pending", phase:"generating",
+            operationId:`${bind.operationId}_cls_${conversationId}`,
+            updates:{inputLevel:level.level, sentBytes:res.data.bytes || 0},
+            reason:"post-send user message classification: " + level.level});
+        });
+      }).catch(()=>{});
+    }
+  }
+  if (status.streaming) sig.sawStreaming = true;
+  else if (sig.sawStreaming && !sig.signals.includes("generation")) sig.signals.push("generation");
+  if (Number.isSafeInteger(status.assistantBytes) && status.assistantBytes > 0) {
+    if (status.assistantBytes !== sig.lastABytes) { sig.lastABytes = status.assistantBytes; sig.stableSince = Date.now(); }
+    else if (!sig.signals.includes("stable") && Date.now() - sig.stableSince >= 5000) sig.signals.push("stable");
+  }
+  await chrome.storage.session.set({[`${FF_SIG_PREFIX}${tabId}`]: sig});
+}
+async function ffCaptureEnded(run, tabId) {
+  const bind = await ffBinding(tabId);
+  if (!bind) return;
+  const sig = await ffSignals(tabId);
+  const signals = [...new Set([...(sig.signals || []), "final"])];
+  const pages = await ThreadLineCaptureDB.pages(run.id);
+  const {taskCount, reply, lastFinished} = ffExtractFromCapture(pages);
+  if (lastFinished && !signals.includes("generation")) signals.push("generation");
+  const existing = await ThreadLineFFDB.read(bind.experimentId);
+  const attempt = existing?.branches[bind.branch]?.attempts.find(a => a.id === bind.attemptId);
+  if (!attempt || attempt.status !== "pending") return;
+  const inputLevel = attempt.evidence?.inputLevel;
+  const canComplete = run.complete === true && signals.length >= 2 &&
+    typeof attempt.evidence?.sessionId === "string" &&
+    ["exact", "canonical_equivalent"].includes(inputLevel) &&
+    taskCount === 1 && reply.length > 0;
+  if (canComplete) {
+    await ffAdvance(bind, {status:"done", phase:"capturing",
+      operationId:`${bind.operationId}_${bind.branch}_done`,
+      reason:"capture completed; completion contract satisfied",
+      updates:{captureComplete:true, persisted:true, reply, taskCount, endSignals:signals}});
+  } else {
+    await ffAdvance(bind, {status:"pending", phase:"capturing",
+      operationId:`${bind.operationId}_captry_${run.id}`,
+      reason:"capture finished but completion contract unmet; branch stays pending",
+      updates:{captureComplete:run.complete === true, persisted:true, reply, taskCount, endSignals:signals}});
+  }
+}
+async function ffRecoverBindings() {
+  // Session bindings die with the browser; durable attempt evidence (tabId,
+  // conversationId) does not. Re-bind conversation identity for tabs that
+  // already sent. Never re-seeds a prefill automatically.
+  const rows = await ThreadLineFFDB.list();
+  for (const row of rows) {
+    for (const branch of ["A", "B"]) {
+      const attempt = row.branches[branch].attempts.at(-1);
+      if (!attempt || attempt.status !== "pending" || attempt.evidence?.sessionId) continue;
+      const tabId = attempt.evidence?.tabId;
+      if (!Number.isInteger(tabId)) continue;
+      let tab;
+      try { tab = await chrome.tabs.get(tabId); } catch { continue; }
+      const conv = ThreadLineCaptureCore.conversationId(tab.url || "");
+      if (!conv || attempt.evidence?.conversationId === conv) continue;
+      await serialize(() => ffAdvance({experimentId:row.id, branch, attemptId:attempt.id},
+        {status:"pending", phase:"generating", operationId:`${attempt.id}_recover_${conv}`,
+         updates:{conversationId:conv, sessionId:conv},
+         reason:"startup recovery: conversation identity re-bound from durable tab evidence"})).catch(()=>{});
+    }
+  }
+}
 function trustedFFSender(sender) {
   const own = chrome.runtime.getURL("ff.html");
   return !!(sender && sender.id === chrome.runtime.id && sender.url === own &&
@@ -454,6 +604,101 @@ async function handleFF(payload, sender) {
         }));
     });
   }
+  if (payload.type === "FF_LAUNCH") {
+    // Dual-branch launch: creates two plain new-chat tabs (inactive, no focus
+    // steal) and seeds the production handoff prefill. Prefill-only by
+    // construction: this path contains no click, no submit, and no send.
+    if (typeof payload.operationId !== "string" ||
+      !/^[a-zA-Z0-9_-]{6,100}$/.test(payload.operationId))
+      throw new Error("explicit launch operation ID required");
+    return serialize(async () => {
+      if (!await ffEnabled()) throw new Error("Fork Beta is disabled");
+      let record = await ThreadLineFFDB.read(payload.experimentId);
+      if (!record) throw new Error("experiment not found");
+      await ThreadLineFFCore.verifyFrozen(record.frozen);
+      if (record.branches.A.status === "done" || record.branches.B.status === "done")
+        throw new Error("a completed branch cannot be relaunched; create a new experiment");
+      const tabIds = {}, attemptIds = {}, terminal = {};
+      for (const branch of ["A", "B"]) {
+        const attempts = record.branches[branch].attempts;
+        const active = attempts.at(-1);
+        if (active && active.status === "pending")
+          throw new Error("branch " + branch + " is still running");
+        terminal[branch] = attempts.length > 0;
+      }
+      for (const branch of ["A", "B"]) {
+        // Create the tab idle, then navigate: a create-with-URL navigation can
+        // start before observers attach, escaping interception and injection.
+        const tab = await chrome.tabs.create({active:false});
+        await chrome.tabs.update(tab.id, {url:"https://chatgpt.com/"});
+        const attemptId = "att_" + crypto.randomUUID();
+        tabIds[branch] = tab.id;
+        attemptIds[branch] = attemptId;
+        await ffSaveBinding(tab.id, {experimentId:record.id, branch, attemptId,
+          operationId:payload.operationId, acks:1, tabId:tab.id, createdAt:Date.now()});
+        await chrome.storage.session.set({[`tl_handoff_${tab.id}`]:
+          {text:record.frozen.text, createdAt:Date.now()}});
+        const terminalBranch = terminal[branch];
+        record = await ThreadLineFFDB.update(record.id, record.revision, r =>
+          ThreadLineFFCore.advance(r, {branch, expectedRevision:r.revision,
+            operationId:payload.operationId + "_" + branch,
+            attemptId, status:"pending", phase:"created",
+            reason:terminalBranch ? "explicit re-launch after terminal state"
+              : "P2 launch: plain new-chat tab created",
+            evidence:{tabId:tab.id}, manualNewAttempt:terminalBranch}));
+      }
+      for (const branch of ["A", "B"])
+        ffSeedHandoff(tabIds[branch], record.frozen.text);
+      return {tabIdA:tabIds.A, tabIdB:tabIds.B, attemptIdA:attemptIds.A,
+        attemptIdB:attemptIds.B, revision:record.revision};
+    });
+  }
+  if (payload.type === "FF_REPREFILL") {
+    // User-initiated re-prefill of the same branch after an unconfirmed state
+    // (browser restart cleared the one-shot session intent). Explicit user
+    // action only: the extension never re-prefills on its own.
+    if (typeof payload.operationId !== "string" ||
+      !/^[a-zA-Z0-9_-]{6,100}$/.test(payload.operationId))
+      throw new Error("explicit re-prefill operation ID required");
+    if (!["A", "B"].includes(payload.branch)) throw new Error("invalid branch");
+    return serialize(async () => {
+      if (!await ffEnabled()) throw new Error("Fork Beta is disabled");
+      const existing = await ThreadLineFFDB.read(payload.experimentId);
+      if (!existing) throw new Error("experiment not found");
+      const attempt = existing.branches[payload.branch].attempts.at(-1);
+      if (!attempt || attempt.status !== "pending" || !Number.isInteger(attempt.evidence?.tabId))
+        throw new Error("no running branch attempt to re-prefill");
+      const tabId = attempt.evidence.tabId;
+      let bind = await ffBinding(tabId);
+      if (!bind || bind.experimentId !== existing.id || bind.branch !== payload.branch) {
+        let tab;
+        try { tab = await chrome.tabs.get(tabId); }
+        catch { throw new Error("branch tab no longer exists; launch again"); }
+        if (!/^https:\/\/chatgpt\.com\/?$/.test(tab.url || ""))
+          throw new Error("branch tab already left the new-chat page; check its conversation first");
+        bind = {experimentId:existing.id, branch:payload.branch, attemptId:attempt.id,
+          operationId:payload.operationId, acks:1, tabId, createdAt:Date.now()};
+      }
+      const acks = (bind.acks || 1) + 1;
+      await ffSaveBinding(tabId, {...bind, acks});
+      await ffSeedHandoff(tabId, existing.frozen.text);
+      return {tabId, acks};
+    });
+  }
+  if (payload.type === "FF_CAPTURE") {
+    if (!["A", "B"].includes(payload.branch)) throw new Error("invalid branch");
+    return serialize(async () => {
+      if (!await ffEnabled()) throw new Error("Fork Beta is disabled");
+      const existing = await ThreadLineFFDB.read(payload.experimentId);
+      if (!existing) throw new Error("experiment not found");
+      const attempt = existing.branches[payload.branch].attempts.at(-1);
+      if (!attempt || attempt.status !== "pending" ||
+        !Number.isInteger(attempt.evidence?.tabId) || !attempt.evidence?.sessionId)
+        throw new Error("branch has no bound conversation to capture");
+      const run = await beginCapture(attempt.evidence.tabId);
+      return {runId:run.id};
+    });
+  }
   throw new Error("unknown Fork message type");
 }
 chrome.runtime.onInstalled.addListener(() => {
@@ -462,6 +707,7 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.runtime.onStartup.addListener(() => {
   recoverCaptures().catch(()=>{});
   chrome.sidePanel.setPanelBehavior({openPanelOnActionClick:true}).catch(() => {});
+  ffRecoverBindings().catch(()=>{});
 });
 chrome.tabs.onUpdated.addListener(async(tabId,change)=>{
   if(change.status!=="complete")return;
@@ -471,6 +717,18 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   recoverCaptures(tabId).catch(()=>{});
   chrome.storage.session.remove([`tl_live_${tabId}`,`tl_handoff_${tabId}`]).catch(() => {});
   for(const [id,owner] of captureOwners)if(owner===tabId)captureOwners.delete(id);
+  // A closed Fork branch tab becomes an unknown branch. Never auto-replays.
+  serialize(async () => {
+    const bind = await ffBinding(tabId);
+    if (!bind) return;
+    await ffClearBinding(tabId);
+    const existing = await ThreadLineFFDB.read(bind.experimentId);
+    const attempt = existing?.branches[bind.branch]?.attempts.find(a => a.id === bind.attemptId);
+    if (!attempt || attempt.status !== "pending") return;
+    await ffAdvance(bind, {status:"unknown", phase:attempt.phase,
+      operationId:`${bind.operationId}_closed_${tabId}`,
+      reason:"branch tab closed before completion; no replay without explicit user action"});
+  }).catch(()=>{});
 });
 chrome.runtime.onMessage.addListener((payload,sender,reply) => {
   (async () => {
@@ -526,6 +784,8 @@ chrome.runtime.onMessage.addListener((payload,sender,reply) => {
         if (!Number.isFinite(found[key]?.attemptedAt))
           throw new Error("no reserved handoff attempt to acknowledge");
         await chrome.storage.session.remove(key);
+        // A Fork-bound tab's exact prefill ACK is its branch's input proof.
+        try { await ffHandoffAcked(sender.tab.id); } catch {}
         return {ok:true};
       });
     }

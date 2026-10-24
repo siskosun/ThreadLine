@@ -146,6 +146,19 @@ const ThreadLineFFCore = (() => {
         assert(typeof session === "string" && session.length >= 4, "invalid session identity");
     assert(boundSession === undefined || evidence.sessionId === undefined ||
       boundSession === evidence.sessionId, "attempt session identity cannot change");
+    if (evidence.tabId !== undefined)
+      assert(Number.isSafeInteger(evidence.tabId) && evidence.tabId >= 0, "invalid tab binding");
+    if (evidence.conversationId !== undefined)
+      assert(typeof evidence.conversationId === "string" &&
+        /^[a-z0-9-]{8,80}$/i.test(evidence.conversationId), "invalid conversation identity");
+    if (evidence.inputLevel !== undefined)
+      assert(["exact", "canonical_equivalent", "unverified", "differs"].includes(evidence.inputLevel),
+        "invalid input level");
+    if (evidence.prefill !== undefined)
+      assert(["exact_ack", "reacked"].includes(evidence.prefill), "invalid prefill provenance");
+    if (evidence.assistantBytes !== undefined)
+      assert(Number.isSafeInteger(evidence.assistantBytes) && evidence.assistantBytes >= 0,
+        "invalid reply size");
     // Evidence updates may omit identity, but may never erase a binding and
     // then replace it in a later event. Keep the existing serialized shape.
     const nextEvidence = boundSession === undefined ? evidence : {...evidence,sessionId:boundSession};

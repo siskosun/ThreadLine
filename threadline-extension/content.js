@@ -29,9 +29,23 @@
 
   // UI-only compatibility probe: no fetch, no cookies, no mutation, no message bodies.
   chrome.runtime.onMessage.addListener((msg,_sender,reply) => {
-    if (msg?.type !== 'TL_HEALTH_CHECK') return false;
-    try { reply({ok:true,data:ThreadLineSelectors.probe(document,location.href)}); }
-    catch (error) { reply({ok:false,error:String(error.message||error)}); }
+    if (msg?.type === 'TL_HEALTH_CHECK') {
+      try { reply({ok:true,data:ThreadLineSelectors.probe(document,location.href)}); }
+      catch (error) { reply({ok:false,error:String(error.message||error)}); }
+      return false;
+    }
+    if (msg?.type === 'TL_FF_READ_USER_MESSAGE') {
+      // Fork post-send readback: the conversation's own rendered user message.
+      // Read-only, textContent-based, never the composer and never a send.
+      try {
+        const nodes = [...document.querySelectorAll('[data-message-author-role="user"]')];
+        const texts = nodes.map(n => (n.querySelector('.whitespace-pre-wrap') || n).innerText ?? '');
+        reply({ok:true,data:{text:texts[0] ?? null, userCount:nodes.length,
+          bytes:texts.length ? new TextEncoder().encode(texts[0]).length : 0,
+          complete:nodes.length === 1}});
+      } catch (error) { reply({ok:false,error:String(error.message||error)}); }
+      return false;
+    }
     return false;
   });
   function watch() {
@@ -48,11 +62,19 @@
     }
     const title = ThreadLinePage.extractTitle(document);
     const streaming = ThreadLinePage.isStreaming(document);
-    const fp = `${location.href}||${title}||${streaming}`;
+    // Light reply-size fingerprint for Fork stability signals. Reads only a
+    // byte count of the last rendered assistant message; never its content.
+    const assistantBytes = (() => {
+      try {
+        const a = [...document.querySelectorAll('[data-message-author-role="assistant"]')];
+        return a.length ? new TextEncoder().encode(a[a.length - 1].innerText ?? '').length : -1;
+      } catch { return -1; }
+    })();
+    const fp = `${location.href}||${title}||${streaming}||${assistantBytes}`;
     if (fp === lastFingerprint) return;
     lastFingerprint = fp;
     const requestVersion = navigationVersion;
-    send("OBSERVE",{title,streaming}).then(data => {
+    send("OBSERVE",{title,streaming,assistantBytes:assistantBytes >= 0 ? assistantBytes : undefined}).then(data => {
       if (requestVersion !== navigationVersion || knownHref !== location.href) return;
       applyContext(data);
     }).catch(()=>{});

@@ -210,3 +210,24 @@ test("FF must reject a second attempt ID while a branch is still pending",async(
  assert.equal(x.branches.A.attempts[0].status,"unknown");
  assert.equal(x.branches.A.attempts[1].status,"pending");
 });
+
+test("FF branch evidence accepts P2 bindings and rejects malformed ones",async()=>{
+ const initial=F.newExperiment(await F.freeze("W","P"),"exp_p2evd0001");
+ const base={branch:"A",attemptId:"att_p2evd0001",status:"pending",phase:"created",
+   expectedRevision:0,operationId:"op_p2evd0001"};
+ const launched=F.advance(initial,{...base,
+   evidence:{tabId:42,conversationId:"conv-12345678",inputLevel:"exact",prefill:"exact_ack"}});
+ assert.equal(launched.branches.A.attempts[0].evidence.tabId,42);
+ for(const [field,bad] of [["tabId",-1],["tabId","7"],["conversationId","short"],
+   ["inputLevel","guessed"],["prefill","magic"],["assistantBytes",-3]]){
+   const ev={...launched.branches.A.attempts[0].evidence,[field]:bad};
+   assert.throws(()=>F.advance(launched,{...base,expectedRevision:1,
+     operationId:"op_p2evd0002",evidence:ev}),new RegExp("invalid (tab binding|conversation identity|input level|prefill provenance|reply size)"),
+     field+" must be validated");
+ }
+ // Re-prefill provenance is legal within the same awaiting phase.
+ const reacked=F.advance(launched,{...base,expectedRevision:1,operationId:"op_p2evd0003",
+   status:"pending",phase:"awaiting_send",
+   evidence:{tabId:42,conversationId:"conv-12345678",inputLevel:"exact",prefill:"reacked"}});
+ assert.equal(reacked.branches.A.phase,"awaiting_send");
+});
