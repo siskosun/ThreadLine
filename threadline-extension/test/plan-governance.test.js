@@ -66,7 +66,9 @@ test('canonical plan contains all required tasks and no unverified done claims',
     ['S0A-PROTOTYPE','S0B-LOCATE','S1A-PERSIST','S1B-ADOPT']);
   assert.ok(['in_review','done'].includes(actual.tasks.find(x=>x.id==='S0A-PROTOTYPE').status),
     'S0A progresses only through the review/done contract');
-  assert.ok(actual.tasks.filter(x=>['S0B-LOCATE','S1A-PERSIST','S1B-ADOPT'].includes(x.id))
+  assert.ok(['in_review','done','planned'].includes(actual.tasks.find(x=>x.id==='S0B-LOCATE').status),
+    'S0B progresses only through the review/done contract');
+  assert.ok(actual.tasks.filter(x=>['S1A-PERSIST','S1B-ADOPT'].includes(x.id))
     .every(x=>x.status==='planned'));
 });
 

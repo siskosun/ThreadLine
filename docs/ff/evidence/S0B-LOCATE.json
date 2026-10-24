@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "task_id": "S0B-LOCATE",
+  "date": "2026-10-25",
+  "title": "S0b 来源定位 spike：三方案比较，采纳 Toolkit 固定提交子集 + 注入式适配器",
+  "pr_number": 0,
+  "merge_commit": "0000000000000000000000000000000000000000",
+  "summary": "时间盒约 4 小时。比较 现有适配/Toolkit pinned 子集/最小本地实现 三方案（docs/ff/S0B_LOCATE_20261025.md）：采纳方案 B——vendor/toolkit-scroll.js（上游 GPT Conversation Toolkit commit 119d3728 的坐标算法，滚动根注入化、去全局状态；MIT 登记于 licenses/MIT-GPT-Conversation-Toolkit.txt 与 THIRD_PARTY_NOTICES.md）+ locate-adapter.js（身份优先定位：data-message-id 精确匹配 + 角色/内容复核；弱文本只作候选永不冒充定位成功；AbortSignal 协作取消）。上游三个反向滚动行为用例移植为针对 vendored 文件的测试，另加身份/取消/弱匹配用例；套件 224/224。降级契约（定位不可靠→仅片段+来源链接）写入适配器返回值语义。",
+  "decision": "adopt-vendor-subset",
+  "not_claimed": [
+    "未接入 S1b 采纳/交接 UI（后续任务）",
+    "真实 ChatGPT 虚拟列表上的端到端定位（合成 DOM 契约已测；真实站点随 S1b 真人验收）",
+    "上游 conversation-index.js 等完整模块明确不移植"
+  ],
+  "test_cases": [
+    {
+      "file": "threadline-extension/test/toolkit-scroll.test.js",
+      "name": "reverse timeline coordinates move from newest to older messages"
+    },
+    {
+      "file": "threadline-extension/test/toolkit-scroll.test.js",
+      "name": "direct message jumps permit a negative native scroll position"
+    },
+    {
+      "file": "threadline-extension/test/toolkit-scroll.test.js",
+      "name": "ordinary scroll containers still use positive coordinates"
+    },
+    {
+      "file": "threadline-extension/test/toolkit-scroll.test.js",
+      "name": "identity check: id + role + content prefix must all agree"
+    },
+    {
+      "file": "threadline-extension/test/toolkit-scroll.test.js",
+      "name": "locate finds a lazily rendered message and scrolls it into view"
+    },
+    {
+      "file": "threadline-extension/test/toolkit-scroll.test.js",
+      "name": "cancellation stops the pending retry loop without a result"
+    },
+    {
+      "file": "threadline-extension/test/toolkit-scroll.test.js",
+      "name": "weak text match never counts as verified location"
+    }
+  ],
+  "manual": {
+    "comment_id": 0,
+    "accepted_head_sha": "0000000000000000000000000000000000000000",
+    "scope": "受托代理验收范围：S0b spike 三方案结论与许可登记（THIRD_PARTY_NOTICES + 许可副本 + 上游 SHA）、上游三行为用例针对 vendored 文件移植通过、身份/取消/弱匹配契约测试通过（224/224）。真实站点端到端定位不在本次范围（随 S1b）。"
+  }
+}
