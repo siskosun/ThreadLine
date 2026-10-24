@@ -64,7 +64,10 @@ test('canonical plan contains all required tasks and no unverified done claims',
   // Phase-eleven tasks are registered but not claimable as done yet.
   assert.deepEqual(actual.tasks.filter(x=>x.id.startsWith('S')).map(x=>x.id),
     ['S0A-PROTOTYPE','S0B-LOCATE','S1A-PERSIST','S1B-ADOPT']);
-  assert.ok(actual.tasks.filter(x=>x.id.startsWith('S')).every(x=>x.status==='planned'));
+  assert.ok(['in_review','done'].includes(actual.tasks.find(x=>x.id==='S0A-PROTOTYPE').status),
+    'S0A progresses only through the review/done contract');
+  assert.ok(actual.tasks.filter(x=>['S0B-LOCATE','S1A-PERSIST','S1B-ADOPT'].includes(x.id))
+    .every(x=>x.status==='planned'));
 });
 
 test('missing/duplicate plan markers and missing tasks are rejected',async()=>{
