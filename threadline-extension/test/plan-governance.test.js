@@ -60,8 +60,8 @@ test('canonical plan contains all required tasks and no unverified done claims',
   // Done claims must stay limited to tasks with real merged-PR evidence JSONs.
   assert.deepEqual(actual.done.map(x=>x.task.id).sort(),
     ['BETA-RELEASE','P1-CORE','P2-FORK','P3-REPORT','R-REUSE','Z0-BASE','Z0-LIVE']);
-  // Phase 2 stays deferred without explicit human re-approval.
-  assert.equal(actual.tasks.find(x=>x.id==='P4-AUTO').status,'deferred');
+  // Phase 2 entered execution only via the 2026-10-24 owner approval.
+  assert.equal(actual.tasks.find(x=>x.id==='P4-AUTO').status,'planned');
   assert.notEqual(actual.tasks.find(x=>x.id==='P4-AUTO').status,'done');
 });
 
