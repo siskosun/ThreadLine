@@ -464,12 +464,79 @@ def run():
             assert not brow["attempts"][-1]["evidence"].get("sessionId"), "no cross-talk"
             open_tabs = sw_read("async () => (await chrome.tabs.query({url:'https://chatgpt.com/*'})).length")
             assert open_tabs == 2, "the extension must not open extra tabs"
+
+            # ---------- P3: blind X/Y comparison, verdict, self-contained export ----------
+            sent_b = sw_read("""async tabId => {
+              const [res] = await chrome.scripting.executeScript({target:{tabId},
+                world:'MAIN',
+                func:() => {document.querySelector('#composer button[type=submit]').click();
+                  return window.submitCount;}});
+              return res.result;
+            }""", tabB)
+            assert sent_b == 1, "branch B human send (simulated)"
+            deadline = time.time() + 25
+            bstate = None
+            while time.time() < deadline:
+                row = sw_read("async id => (await ThreadLineFFDB.read(id))", p2id)
+                b = row["branches"]["B"]["attempts"][-1]
+                if (row["branches"]["B"]["phase"] == "generating"
+                    and b["evidence"].get("sessionId")
+                    and b["evidence"].get("inputLevel") == "exact"):
+                    bstate = b
+                    break
+                time.sleep(0.5)
+            assert bstate, "branch B must bind and classify"
+            assert bstate["evidence"]["sessionId"] != astate["evidence"]["sessionId"], (
+                "distinct conversations per branch")
+            capb = reopened.evaluate("(p) => chrome.runtime.sendMessage(p)",
+              {"type":"FF_CAPTURE","experimentId":p2id,"branch":"B"})
+            assert capb["ok"], capb
+            deadline = time.time() + 30
+            while time.time() < deadline:
+                row = sw_read("async id => (await ThreadLineFFDB.read(id))", p2id)
+                if row["branches"]["B"]["status"] == "done":
+                    break
+                time.sleep(0.5)
+            assert row["branches"]["B"]["status"] == "done", "both branches done"
+            compare = reopened.evaluate("(p) => chrome.runtime.sendMessage(p)",
+              {"type":"FF_COMPARE","experimentId":p2id,"operationId":"op_p3e2e0001"})
+            assert compare["ok"] and compare["data"]["mapping"], compare
+            mapping = compare["data"]["mapping"]
+            assert mapping["X"] in ("A", "B") and mapping["Y"] != mapping["X"]
+            # UI: X/Y columns visible WITHOUT the branch labels before the verdict.
+            reopened.reload(wait_until="domcontentloaded")
+            reopened.locator("#ff-list button", has_text=p2id).click()
+            expect(reopened.locator("#ff-reply-X")).to_be_visible(timeout=15000)
+            expect(reopened.locator("#ff-reply-Y")).to_be_visible(timeout=15000)
+            assert reopened.locator("#ff-reply-X").text_content() == "好的，OK。"
+            reveal_before = reopened.locator("#ff-reveal").text_content()
+            assert "分支" not in (reveal_before or ""), "pre-verdict reveal must stay hidden"
+            assert reopened.evaluate(
+                "() => document.getElementById('ff-verdict-form').hidden") is False
+            # Record the verdict through the real form controls.
+            reopened.locator("#ff-preference").select_option("X")
+            reopened.locator("#ff-criteria").fill("X 的回复更完整（E2E 虚构裁决）")
+            reopened.locator("#ff-confidence").select_option("high")
+            reopened.locator("#ff-notes").fill("E2E 自动裁决")
+            reopened.locator("#ff-verdict").click()
+            expect(reopened.locator("#ff-reveal")).to_contain_text("裁决：X", timeout=15000)
+            assert "分支" in reopened.locator("#ff-reveal").text_content(), (
+                "post-verdict reveal shows the mapping")
+            snapshot = reopened.evaluate("(p) => chrome.runtime.sendMessage(p)",
+              {"type":"FF_EXPORT","experimentId":p2id})
+            assert snapshot["ok"] and snapshot["data"]["kind"] == "threadline-fork-experiment"
+            assert snapshot["data"]["decision"]["verdict"]["preference"] == "X"
+            assert snapshot["data"]["decision"]["mapping"] == mapping
+            serialized = _json.dumps(snapshot["data"], ensure_ascii=False)
+            for banned in ["authorization", "cookie", "token"]:
+                assert banned not in serialized.lower(), "export must be credential-free"
             ctx2.close()
     print("PASS: Fork P1 default-off, permission-bound messages, 24KB input, "
           "atomic IDB/CAS and reducer guards, replay-safe attempts, post-ACK display recovery, "
           "XSS, legacy isolation and restart; P2 dual-branch launch with exact prefill, "
-          "simulated human send binding, capture-driven completion and 0 automatic sends "
-          "(synthetic-only)")
+          "simulated human send binding, capture-driven completion and 0 automatic sends; "
+          "P3 blind X/Y comparison with pre-verdict hiding, recorded verdict with reveal, "
+          "and credential-free self-contained export (synthetic-only)")
 
 
 if __name__ == "__main__":

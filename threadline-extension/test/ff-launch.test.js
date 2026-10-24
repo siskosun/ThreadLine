@@ -82,9 +82,9 @@ function system() {
   });}
   const ffSender = {id:'ff-launch-test',url:'chrome-extension://ff-launch-test/ff.html'};
   return {message,ffSender,session,sent,newTabs,updates,events,records,runs,pageStore,
-    async setupExperiment(){
+    async setupExperiment(operationId='create_op_000001'){
       await message({type:'FF_SET_ENABLED',enabled:true,ack:'local-only-no-send'},ffSender);
-      return message({type:'FF_CREATE',operationId:'create_op_000001',
+      return message({type:'FF_CREATE',operationId,
         w0:'虚构共同材料 W0',p:'虚构任务指令 P'},ffSender);
     },
     tabSender(tabId,url){return {id:'ff-launch-test',url,tab:{id:tabId,url}};}
@@ -263,4 +263,60 @@ test('re-prefill re-seeds the same branch only through an explicit user action',
   const sentAfter=s.sent.filter(([tabId,type])=>
     tabId===r.tabIdA && type==='TL_HANDOFF_READY').length;
   assert.equal(sentAfter,before+1,'exactly one new handoff delivery for the re-prefill');
+});
+
+test("FF comparison, verdict and export: gated, blind, deterministic, self-contained",async()=>{
+  const s=system();
+  const created=await s.setupExperiment();
+  const r=await s.message({type:'FF_LAUNCH',experimentId:created.id,
+    operationId:'launch_op_0000010'},s.ffSender);
+  const row0=await s.message({type:'FF_READ',id:created.id},s.ffSender);
+  const frozen=row0.frozen.text;
+  // Complete BOTH branches through the P2 flow with distinct conversations.
+  for(const [branch,tabId] of [['A',r.tabIdA],['B',r.tabIdB]]){
+    await s.message({type:'HANDOFF_BEGIN'},s.tabSender(tabId,'https://chatgpt.com/'));
+    await s.message({type:'HANDOFF_ACK'},s.tabSender(tabId,'https://chatgpt.com/'));
+    const conv='https://chatgpt.com/c/conv-p3-'+branch.toLowerCase();
+    await s.message({type:'OBSERVE',href:conv,title:'会话',streaming:false},
+      s.tabSender(tabId,conv));
+    const runId='cap_p3_'+branch;
+    s.runs.set(runId,{id:runId,tabId,conversationId:'conv-p3-'+branch.toLowerCase(),
+      url:conv,status:'capturing',createdAt:Date.now(),complete:false});
+    s.pageStore.set(`${runId}_0_0`,{id:runId,pageIndex:0,chunkIndex:0,messages:[
+      {id:'m1',role:'user',content:frozen,finished:true},
+      {id:'m2',role:'assistant',content:'回复 '+branch,finished:true}]});
+    await s.message({type:'CAPTURE_END',id:runId,complete:true,mode:'paginated',
+      pageCount:1,count:2},{tab:{id:tabId,url:conv},id:'ff-launch-test',
+      url:'https://chatgpt.com/c/conv-p3-'+branch.toLowerCase()});
+  }
+  // Comparison before both done must be rejected: use a third experiment.
+  const early=await s.setupExperiment('create_op_000002');
+  await assert.rejects(s.message({type:'FF_COMPARE',experimentId:early.id,
+    operationId:'compare_op_00001'},s.ffSender),/both branches/);
+  const decision=await s.message({type:'FF_COMPARE',experimentId:created.id,
+    operationId:'compare_op_00002'},s.ffSender);
+  assert.ok(decision.mapping.X==='A'||decision.mapping.X==='B');
+  const again=await s.message({type:'FF_COMPARE',experimentId:created.id,
+    operationId:'compare_op_00003'},s.ffSender);
+  assert.equal(again.mapping.X,decision.mapping.X,'idempotent mapping');
+  await assert.rejects(s.message({type:'FF_VERDICT',experimentId:created.id,
+    preference:'bogus',criteria:'c',confidence:'low'},s.ffSender),/invalid preference/);
+  const afterVerdict=await s.message({type:'FF_VERDICT',experimentId:created.id,
+    preference:'X',criteria:'回复更完整',confidence:'high',notes:'备注'},
+    s.ffSender);
+  assert.equal(afterVerdict.verdict.preference,'X');
+  assert.ok(afterVerdict.verdict.decidedAt>0);
+  await assert.rejects(s.message({type:'FF_VERDICT',experimentId:created.id,
+    preference:'Y',criteria:'c',confidence:'low'},s.ffSender),/already recorded/);
+  // The mapping remains recomputable from the recorded seed.
+  assert.match(decision.seed,/^[a-zA-Z0-9_-]{10,100}$/);
+  const snapshot=await s.message({type:'FF_EXPORT',experimentId:created.id},s.ffSender);
+  assert.equal(snapshot.kind,'threadline-fork-experiment');
+  assert.equal(snapshot.frozen.text.includes('【共同材料 W₀】'),true);
+  assert.equal(snapshot.branches.A.status,'done');
+  assert.equal(snapshot.decision.mapping.X,decision.mapping.X);
+  assert.equal(snapshot.decision.verdict.preference,'X');
+  const serialized=JSON.stringify(snapshot);
+  for(const banned of ['authorization','cookie','token','sessionStorage'])
+    assert.ok(!serialized.toLowerCase().includes(banned),'no credentials in export');
 });

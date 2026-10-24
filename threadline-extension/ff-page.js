@@ -104,6 +104,65 @@
     }
     return box;
   }
+  function renderCompare(value) {
+    const section = $("ff-compare");
+    const a = value.branches.A, b = value.branches.B;
+    const decision = value.decision || {};
+    const bothDone = a.status === "done" && b.status === "done";
+    section.hidden = !(bothDone || decision.mapping);
+    if (section.hidden) return;
+    const replyOf = label => {
+      const branch = decision.mapping?.[label];
+      const attempt = branch && value.branches[branch].attempts.at(-1);
+      return attempt?.evidence?.reply || "";
+    };
+    const note = $("ff-compare-note");
+    const columns = $("ff-columns");
+    columns.replaceChildren();
+    $("ff-compare-btn").hidden = !!decision.mapping;
+    if (!decision.mapping) {
+      note.textContent = "两个分支均完成后生成 X/Y 去标签对照；对应关系在裁决前不用于展示。";
+      $("ff-verdict-form").hidden = true;
+      $("ff-export").hidden = true;
+      $("ff-reveal").textContent = "";
+      return;
+    }
+    if (!decision.verdict) {
+      note.textContent = "对照已生成。请阅读 X/Y 两栏回复并提交裁决；提交后才显示对应关系。";
+      for (const label of ["X", "Y"]) {
+        const col = document.createElement("div");
+        const head = document.createElement("p");
+        head.className = "mono";
+        head.textContent = "回复 " + label;
+        const body = document.createElement("pre");
+        body.id = "ff-reply-" + label;
+        body.textContent = replyOf(label);
+        col.appendChild(head); col.appendChild(body);
+        columns.appendChild(col);
+      }
+      $("ff-verdict-form").hidden = false;
+      $("ff-export").hidden = true;
+      $("ff-reveal").textContent = "";
+      return;
+    }
+    note.textContent = "已裁决；对应关系已揭盲。";
+    for (const label of ["X", "Y"]) {
+      const col = document.createElement("div");
+      const head = document.createElement("p");
+      head.className = "mono";
+      head.textContent = "回复 " + label + " = 分支 " + decision.mapping[label];
+      const body = document.createElement("pre");
+      body.textContent = replyOf(label);
+      col.appendChild(head); col.appendChild(body);
+      columns.appendChild(col);
+    }
+    const v = decision.verdict;
+    $("ff-verdict-form").hidden = true;
+    $("ff-reveal").textContent = "裁决：" + v.preference + " · 揭盲：X = 分支 " +
+      decision.mapping.X + "，Y = 分支 " + decision.mapping.Y + " · 依据：" + v.criteria +
+      " · 置信度 " + v.confidence + (v.notes ? " · 备注 " + v.notes : "");
+    $("ff-export").hidden = false;
+  }
   async function read(id) {
     const value = await send({type:"FF_READ",id});
     currentExperiment = id;
@@ -122,6 +181,7 @@
     const boxA = $("ff-branch-a"), boxB = $("ff-branch-b");
     boxA.replaceChildren(branchBox("A", value));
     boxB.replaceChildren(branchBox("B", value));
+    renderCompare(value);
   }
   async function list() {
     const values = await send({type:"FF_LIST"});
@@ -205,6 +265,49 @@
       await read(currentExperiment);
       notice("双分支已创建并预填；请在两个新标签中检查内容后手动发送。研线不会替你发送。");
     } catch (e) { notice(e.message, true); await read(currentExperiment).catch(()=>{}); }
+    finally { button.disabled = false; }
+  });
+  $("ff-compare-btn").addEventListener("click", async event => {
+    if (!currentExperiment) return;
+    const button = event.target;
+    button.disabled = true;
+    try {
+      await send({type:"FF_COMPARE", experimentId:currentExperiment,
+        operationId:crypto.randomUUID()});
+      await read(currentExperiment);
+      notice("X/Y 对照已生成；对应关系在裁决前不用于展示。");
+    } catch (e) { notice(e.message, true); await read(currentExperiment).catch(()=>{}); }
+    finally { button.disabled = false; }
+  });
+  $("ff-verdict").addEventListener("click", async event => {
+    if (!currentExperiment) return;
+    const button = event.target;
+    const payload = {type:"FF_VERDICT", experimentId:currentExperiment,
+      preference:$("ff-preference").value, criteria:$("ff-criteria").value,
+      confidence:$("ff-confidence").value, notes:$("ff-notes").value};
+    button.disabled = true;
+    try {
+      await send(payload);
+      await read(currentExperiment);
+      notice("裁决已记录并揭盲。");
+    } catch (e) { notice(e.message, true); await read(currentExperiment).catch(()=>{}); }
+    finally { button.disabled = false; }
+  });
+  $("ff-export").addEventListener("click", async event => {
+    if (!currentExperiment) return;
+    const button = event.target;
+    button.disabled = true;
+    try {
+      const snapshot = await send({type:"FF_EXPORT", experimentId:currentExperiment});
+      const blob = new Blob([JSON.stringify(snapshot, null, 1)],
+        {type:"application/json"});
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url; link.download = snapshot.experiment.id + "-fork-export.json";
+      document.body.appendChild(link); link.click(); link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      notice("已导出自包含 JSON；仅导出，本阶段不支持导入。");
+    } catch (e) { notice(e.message, true); }
     finally { button.disabled = false; }
   });
   refresh().catch(error => notice(error.message,true));

@@ -231,3 +231,49 @@ test("FF branch evidence accepts P2 bindings and rejects malformed ones",async()
    evidence:{tabId:42,conversationId:"conv-12345678",inputLevel:"exact",prefill:"reacked"}});
  assert.equal(reacked.branches.A.phase,"awaiting_send");
 });
+
+test("FF P3 mapping is gated, seed-deterministic, and verdict is validated",async()=>{
+  const frozen=await F.freeze("W0 material","task");
+  const build=async (id)=>{
+    let r=F.newExperiment(frozen,id);
+    for(const branch of ["A","B"]){
+      const tabId=branch==="A"?1:2, conv="conv-"+branch.toLowerCase()+"-0001";
+      const events=[
+        {operationId:"op_"+branch+"_00000001",status:"pending",phase:"created",evidence:{tabId}},
+        {operationId:"op_"+branch+"_ack00001",status:"pending",phase:"awaiting_send",
+         evidence:{tabId,inputLevel:"exact",prefill:"exact_ack",
+           sessionId:"chat-"+branch.toLowerCase(),conversationId:conv}},
+        {operationId:"op_"+branch+"_done00001",status:"done",phase:"capturing",
+         evidence:{tabId,inputLevel:"exact",prefill:"exact_ack",
+           sessionId:"chat-"+branch.toLowerCase(),conversationId:conv,
+           captureComplete:true,persisted:true,taskCount:1,reply:branch+" reply",
+           endSignals:["final","generation"]}}];
+      for(const [i,ev] of events.entries()){
+        r=F.advance(r,{branch,expectedRevision:r.revision,attemptId:"att_"+branch+"_0001",...ev});
+      }
+    }
+    return r;
+  };
+  const pending=F.newExperiment(frozen,"exp_p3map00001");
+  assert.equal(F.eligibleForComparison(pending),false);
+  await assert.rejects(()=>F.assignMapping(pending,"seed0000001"),/both branches/);
+  const done=await build("exp_p3map00002");
+  done.createOperationId="op_create00001";
+  assert.equal(F.eligibleForComparison(done),true);
+  const m1=await F.assignMapping(done,"seed0000001");
+  const m2=await F.assignMapping(done,"seed0000001");
+  assert.equal(m1.mapping.X,m2.mapping.X,"same seed must map identically");
+  assert.ok(m1.mapping.X==="A"||m1.mapping.X==="B");
+  const m3=await F.assignMapping(done,"seed0000002");
+  await assert.rejects(()=>F.assignMapping({...done,decision:m1},"seed0000003"),/already assigned/);
+  const verdict=F.recordVerdict(m1,{preference:"X",criteria:"更完整",confidence:"high",notes:"备注"});
+  assert.equal(verdict.preference,"X");
+  assert.throws(()=>F.recordVerdict({...m1,verdict},{preference:"Y",criteria:"c",confidence:"low"}),/already recorded/);
+  assert.throws(()=>F.recordVerdict(m1,{preference:"bogus",criteria:"c",confidence:"low"}),/invalid preference/);
+  assert.throws(()=>F.recordVerdict(m1,{preference:"X",criteria:"",confidence:"low"}),/criteria required/);
+  const snap=F.exportSnapshot({...done,createOperationId:"op_create00001",decision:{...m1,verdict}});
+  assert.equal(snap.kind,"threadline-fork-experiment");
+  assert.equal(snap.frozen.textHashes.rule,"canonicalization-v1");
+  assert.equal(snap.decision.mapping.X,m1.mapping.X);
+  assert.equal(snap.decision.verdict.preference,"X");
+});
