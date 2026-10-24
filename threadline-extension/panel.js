@@ -23,8 +23,27 @@
       });
     });
   }
+  const FF_PHASE_LABELS = {created:"预填核对中", awaiting_send:"待你发送", generating:"生成中", capturing:"判定中"};
+  const FF_STATUS_LABELS = {done:"已完成", failed:"失败", unknown:"未知"};
+  async function renderFFProgress() {
+    const node = document.getElementById("ff-progress");
+    if (!node) return;
+    try {
+      const data = await message({type:"FF_SUMMARY"});
+      if (!data || data.enabled !== true || !data.latest) { node.hidden = true; return; }
+      const parts = data.latest.branches.map(b => {
+        const label = b.status === "pending"
+          ? (FF_PHASE_LABELS[b.phase] || b.phase)
+          : (FF_STATUS_LABELS[b.status] || b.status);
+        return b.label + "：" + label;
+      });
+      node.hidden = false;
+      node.textContent = "最近实验（" + data.latest.branchCount + " 分支）：" + parts.join(" · ");
+    } catch { node.hidden = true; }
+  }
   async function refresh(force=false) {
     const n = ++latestRequest;
+    renderFFProgress();
     try {
       const data = await message({type:"SNAPSHOT"});
       if (n !== latestRequest) return;
@@ -399,7 +418,7 @@
   chrome.tabs.onUpdated.addListener((id,change)=>{if (change.url || change.title || change.status==='complete') refresh();});
   chrome.tabs.onRemoved.addListener(()=>refresh());
   chrome.windows.onFocusChanged.addListener(()=>refresh());
-  setInterval(()=>refresh(),12000);
+  setInterval(()=>{refresh();renderFFProgress();},12000);
   document.querySelector(".workspace-tabs").addEventListener("keydown", e => {
     if (!["ArrowLeft","ArrowRight"].includes(e.key)) return;
     e.preventDefault();
