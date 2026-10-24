@@ -68,8 +68,9 @@ test('canonical plan contains all required tasks and no unverified done claims',
     'S0A progresses only through the review/done contract');
   assert.ok(['in_review','done','planned'].includes(actual.tasks.find(x=>x.id==='S0B-LOCATE').status),
     'S0B progresses only through the review/done contract');
-  assert.ok(actual.tasks.filter(x=>['S1A-PERSIST','S1B-ADOPT'].includes(x.id))
-    .every(x=>x.status==='planned'));
+  assert.ok(['in_review','done','planned'].includes(actual.tasks.find(x=>x.id==='S1A-PERSIST').status),
+    'S1A progresses only through the review/done contract');
+  assert.ok(['planned','in_review','done'].includes(actual.tasks.find(x=>x.id==='S1B-ADOPT').status));
 });
 
 test('missing/duplicate plan markers and missing tasks are rejected',async()=>{
