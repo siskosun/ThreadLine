@@ -2,6 +2,28 @@
 
 任务定义和正式状态唯一来源：[docs/PLAN.md](../PLAN.md)。本文件只记录发生过的事件与证据，不自行认定任务完成。
 
+## 2026-10-24 验收委托轮：Z0-BASE 路径事实 + 真实站点复验中止于 429
+
+- 仓库所有者明确委托本轮验收。**签署留言未代留**：EVIDENCE.md 明文禁止 Agent 代替用户留下 `MANUAL_ACCEPT`，本轮也未合并任何 PR、未发送任何消息。
+- Z0-BASE 路径事实：Draft PR #1 与 main 冲突（内容已随 PR #10 进入 main）；核实 PR #10 head `359844286f7bf52e71e30faaddedd6642c29d9d1`、merge `b0d470b3...` 且 verify success，PR #10 可作为 Z0-BASE 完成载体（其文件含 windows-baseline.yml 与 check-syntax.mjs）。建议在 PR #10 留 `MANUAL_ACCEPT Z0-BASE 359844286f7bf52e71e30faaddedd6642c29d9d1`，登记 PR 中的证据 JSON 以 pr_number=10、merge_commit=b0d470b3d7a386f2243f1bafb26aa54c7fcc26a0 编写；PR #1 随后关闭为 superseded。计划表变更随登记 PR 人工复核。
+- 真实站点（已登录 Tabbit 浏览器）零发送复验：Tabbit 加载路径已同步为 main `b0d470b` 扩展（6 文件磁盘指纹，其中 4 个与 PR #7 历史证据一致作交叉验证）；chatgpt.com 一次导航确认已登录、无登录墙；随后出现 429（composer/telemetry POST `ERR_ABORTED` + `SITE_RATE_LIMITED`），**按停止规则立即中止，未执行任何用例，0 发送**。运行中扩展仍为旧构建（MV3 worker 不暴露给 Playwright、无 CDP 端口、computer use 不可用，`chrome.runtime.reload()` 无法远程触发）。详见 [REAL_SITE_429_20261024.md](evidence/REAL_SITE_429_20261024.md)；BLOCKED.md 已登记 429 项与 PR #1 冲突事实。
+- 本轮只新增事实与证据，未改计划表状态、依赖或签署契约；随本 PR 人工复核。
+
+## 2026-10-24 browser/real-Edge 验证轮（门禁不变）
+
+- PR 状态浏览器级核对（GitHub 页面 DOM + 截图）：[#12](https://github.com/siskosun/ThreadLine/pull/12) 与 [#11](https://github.com/siskosun/ThreadLine/pull/11) 均 `Open` 且已 `ready for review`，徽标 `2 / 3 checks OK`（第三项为 publish 作业 `skipping`，非失败），与 CLI 核对一致。
+- 真实安装 Edge（155.0.4283.62，`THREADLINE_CHROMIUM_PATH` 覆盖 `executable_path`）运行仓库自有三套合成 MV3 E2E：**3/3 PASS**，与捆绑 Chromium CI 结果一致。零发送、无认证账号、合成页面；日志见 [REAL_EDGE_E2E_20261024.txt](evidence/REAL_EDGE_E2E_20261024.txt)。同树 `npm run verify` 190/190。这不构成 Z0-LIVE 真实站点验收，未改任何门禁。
+- 计算机操作（computer use）通道在本会话由宿主标记不可用（`Computer Use is unavailable for this node_repl session`）；browser use 仅注册 IAB 后端，无法加载 MV3 扩展或 `chrome-extension://` 页面。两者均按技能规则停止，未绕过、未改系统权限。真实登录 ChatGPT 的 Z0-LIVE 仍需用户操作。
+- 本轮仅新增证据与进度记录，不改计划表、依赖或签署契约；随本 PR 人工复核。
+
+## 2026-10-24 P1-CORE 合并对账、完成证据与 Release 符号修复
+
+- 核对 GitHub：PR [#10](https://github.com/siskosun/ThreadLine/pull/10)（P1-CORE，续作自 #9）已于 2026-10-24T03:56:34Z 合并入 main，merge 提交 `b0d470b3d7a386f2243f1bafb26aa54c7fcc26a0`；该提交 GitHub Actions `verify` check-run 结论 success。PR #1 仍 Draft/open；Z0-LIVE 无新签署。
+- Windows 本机实测 main `b0d470b`（Node v26.10.0、Python 3.12.10、Playwright 1.64.0 + Chromium）：`cd threadline-extension && npm run verify` **190/190 Node PASS**；`npm run test:e2e` 三套合成 MV3 全 PASS（持久扩展 + 子框架 NEW_CHAT 拒绝；23,569 字节 exact 零发送；Fork P1 默认关闭、24KB、CAS/重放/XSS/重启）。全程 0 自动发送；合成结果不冒充 Z0-LIVE。
+- 发现并修复合并回归：merge 提交上 publish 作业失败（run 40060353674）——`scripts/build-release.py:44` 仍断言 PR#10 之前的旧符号 `isTrustedPanelSender`。修复分支 `fix/release-marker-20261024`：断言现行 `inspectPanelSender` / `requirePanelSender`，并将 `SHA256SUMS.txt` 写入固定为 LF（Windows 本机此前会写出 CRLF 使 `sha256sum -c` 失败）。本机复验：ZIP 200179 字节、sha256 `76089e37156fbb7d3bdcdea456e0f90b62b3ba15c67a699159b55305bb638c80`、`sha256sum -c` OK；测试后已还原 dist 跟踪文件。以独立修复 PR 提交评审。
+- 新增 [evidence/P1-CORE.json](evidence/P1-CORE.json)：pr_number=10、merge SHA、9 个真实回归用例（ff-core 冻结/24KB/SHA-256/幂等/未知不重放/双信号、ff-db 创建身份与 CAS、ff-background-toggle 过期操作拒绝）。P1-CORE 人工门禁为 `no`；计划表 `in_review` → `done` 随本 PR 人工复核生效。
+- **明确未完成：** Z0-BASE 所有者 `MANUAL_ACCEPT`（PR #1 或按证据契约改挂的 PR）、Z0-LIVE 全部真人项、P2-FORK/P3-REPORT 未启动。本 PR 不解除这些门禁。
+
 ## 2026-10-23 验收对账 + P1 创建身份加固
 
 - 核对 main `f3109ebb6e5e76f4c34670b10654bd0127471bea`：治理 PR [#2](https://github.com/siskosun/ThreadLine/pull/2) 已合并且 merge 提交 verify success；开放 Draft [#1](https://github.com/siskosun/ThreadLine/pull/1)、[#3](https://github.com/siskosun/ThreadLine/pull/3)、[#5](https://github.com/siskosun/ThreadLine/pull/5)、[#6](https://github.com/siskosun/ThreadLine/pull/6)、[#7](https://github.com/siskosun/ThreadLine/pull/7)、[#8](https://github.com/siskosun/ThreadLine/pull/8)、[#9](https://github.com/siskosun/ThreadLine/pull/9) 均仍 Draft。

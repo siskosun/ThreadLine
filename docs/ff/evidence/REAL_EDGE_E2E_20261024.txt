@@ -1,0 +1,14 @@
+=== ThreadLine real-Edge E2E 2026-10-24T12:44:06+08:00 ===
+browser: Microsoft Edge 155.0.4283.62 (installed binary, Windows 11, via THREADLINE_CHROMIUM_PATH)
+method: repo's own synthetic MV3 E2E suites; executable_path overridden to the real installed
+Edge. Same zero-send rules as CI: synthetic ChatGPT page only, no authenticated account,
+0 automatic sends. This is NOT Z0-LIVE real-site acceptance and does not change any gate.
+--- extension-e2e.py ---
+PASS: MV3 persistent Chromium + real panel context + child-frame NEW_CHAT denied before tab creation + real storage.local + real IndexedDB + UI + readonly selector probe + backup + restart
+--- handoff-e2e.py ---
+PASS: real MV3 handoff exact 23569-byte multiline readback; whitespace/normal/native-style attachment drafts untouched; focus race refused; empty upload controls accepted; only exact ACK; removed unknown banner recovered, explicit dismissal respected; 0 sends (synthetic only)
+--- ff-core-e2e.py ---
+PASS: Fork P1 default-off, permission-bound messages, 24KB input, atomic IDB/CAS and reducer guards, replay-safe attempts, post-ACK display recovery, XSS, legacy isolation and restart (synthetic-only)
+--- summary ---
+3/3 suites PASS on real Edge 155 (matches bundled-Chromium CI results).
+Node regression on same tree: 190/190 (npm run verify).

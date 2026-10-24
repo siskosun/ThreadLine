@@ -12,7 +12,8 @@ const MOD = path.join(ROOT, 'scripts', 'check-plan.mjs');
 const fixtureFiles = [
   'docs/PLAN.md','AGENTS.md','docs/ff/DEVELOPMENT_PLAN.md','docs/ff/BLOCKED.md',
   // Canonical done evidence must travel with PLAN fixtures once a task is done.
-  'docs/ff/evidence/R-REUSE.json'
+  'docs/ff/evidence/R-REUSE.json',
+  'docs/ff/evidence/P1-CORE.json'
 ];
 
 async function checks() { return import(pathToFileURL(MOD).href); }
@@ -43,12 +44,11 @@ test('canonical plan contains all required tasks and no unverified done claims',
   const {validatePlan}=await checks();
   const actual=validatePlan(ROOT);
   assert.equal(actual.tasks.length,8);
-  // R-REUSE may be done only with a real merged-PR evidence JSON; nothing else.
-  assert.equal(actual.done.length,1);
-  assert.equal(actual.done[0].task.id,'R-REUSE');
+  // Done claims must stay limited to tasks with real merged-PR evidence JSONs.
+  assert.deepEqual(actual.done.map(x=>x.task.id).sort(),['P1-CORE','R-REUSE']);
   assert.equal(actual.tasks.find(x=>x.id==='Z0-LIVE').status,'blocked');
-  assert.equal(actual.tasks.find(x=>x.id==='P1-CORE').status,'in_review');
-  assert.notEqual(actual.tasks.find(x=>x.id==='P1-CORE').status,'done');
+  assert.equal(actual.tasks.find(x=>x.id==='Z0-BASE').status,'in_review');
+  assert.notEqual(actual.tasks.find(x=>x.id==='P2-FORK').status,'done');
 });
 
 test('missing/duplicate plan markers and missing tasks are rejected',async()=>{
@@ -75,9 +75,8 @@ test('a task cannot advance while its hard dependencies are incomplete',async()=
 test('marking done without an evidence JSON fails, even if the agent says it passed',async()=>{
   const {validatePlan}=await checks();
   withFixture(dir=>{
-    // P1-CORE is a code task still in_review; claiming done without JSON must fail.
-    edit(dir,'docs/PLAN.md',s=>rowChange(s,'P1-CORE',
-      line=>line.replace(' | in_review | ',' | done | ').replace(' | PR#10 | no |',' | docs/ff/evidence/P1-CORE.json | no |')));
+    // P1-CORE is done with a canonical JSON; removing the JSON must fail validation.
+    fs.rmSync(path.join(dir,'docs/ff/evidence/P1-CORE.json'),{force:true});
     assert.throws(()=>validatePlan(dir),/missing evidence file/);
   });
   withFixture(dir=>{
