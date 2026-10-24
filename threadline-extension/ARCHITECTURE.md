@@ -1,4 +1,4 @@
-# ThreadLine v0.6.1 架构
+# ThreadLine v0.7.0 架构
 
 ## 两层工作流
 

@@ -1,4 +1,4 @@
-# ThreadLine v0.6.1 实现及开源复用
+# ThreadLine v0.7.0 实现及开源复用
 
 扩展仍然是 Chromium MV3 原生 HTML/CSS/JavaScript，无 Node 运行依赖、服务器或第三方模型服务作为 Core 的必需组件。Node 22+ 只用于开发和验证。
 
@@ -15,3 +15,7 @@
 ## v0.6.1 修复与打包
 
 面板来源校验 `inspectPanelSender` / `requirePanelSender` 允许合法的扩展 `panel.html` 在侧边栏或独立标签页中访问共享状态，对冲突容器要求浏览器独立证明同一活跃面板文档，拒绝 ChatGPT 网页和伪造来源；新增正反权限测试。`scripts/build-release.py` 使用确定性文件顺序、固定 ZIP 时间和 SHA256 清单，通过 GitHub Actions 自动发布。
+
+## v0.7.0 Fork 双分支对照（P2/P3）
+
+新增独立模块：`ff-core.js`（冻结、规范化比较、四态状态机、X/Y 映射与裁决校验）、`ff-db.js`（独立 IndexedDB、CAS 修订、创建身份不可变）、`ff-page.js`/`ff.html`（Fork 页面 UI）、`background.js` 内 `FF_*` 消息族（发起双分支、重新预填、采集、对照、裁决、导出）。双分支标签经两段式创建（先建空标签再导航）以避免初始文档逃逸；预填复用生产 handoff 通道，ACK 即逐字回读证明；完成判定要求采集完整且两类独立信号。X/Y 映射为记录种子的纯函数；导出为自包含快照，仅导出不导入。
