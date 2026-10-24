@@ -1,4 +1,5 @@
-importScripts("core.js", "backup-core.js", "capture-core.js", "capture-db.js", "organize-core.js", "ff-core.js", "ff-db.js");
+importScripts("core.js", "backup-core.js", "capture-core.js", "capture-db.js", "organize-core.js", "ff-core.js", "ff-db.js",
+  "evidence-core.js", "evidence-db.js");
 const STORE_KEY = "threadline_state_v1";
 const SNAPSHOT_KEY = "threadline_state_snapshots";
 const CAPTURE_PREFIX = "tl_capture_owner_";
@@ -854,9 +855,86 @@ chrome.tabs.onRemoved.addListener((tabId) => {
       reason:"branch tab closed before completion; no replay without explicit user action"});
   }).catch(()=>{});
 });
+/* ---- Evidence store (S0a prototype, plan §十一.6) -----------------------
+ * The service worker is the only evidence writer. Every mutating request is
+ * validated and hashed (evidence-core) BEFORE a single readwrite
+ * transaction applies it (evidence-db), serialized on the same queue the
+ * rest of the worker uses. Extension pages only send commands. */
+let evidenceDbPromise = null;
+function evidenceDb() {
+  if (!evidenceDbPromise) evidenceDbPromise = ThreadLineEvidenceDB.open();
+  return evidenceDbPromise;
+}
+async function handleEvidence(payload, sender) {
+  if (!payload || typeof payload.type !== "string") throw new Error("无效消息");
+  const ownPages = ["evidence-prototype.html", "panel.html", "ff.html"];
+  const senderPath = (() => { try { return new URL(sender.url).pathname.replace(/^\//, ""); } catch { return ""; } })();
+  if (!ownPages.includes(senderPath))
+    throw new Error("证据消息仅限扩展页面");
+  const Core = ThreadLineEvidenceCore;
+  if (payload.type === "EV_ENSURE") {
+    const db = await evidenceDb();
+    const record = await ThreadLineEvidenceDB.ensureProject(db, payload.projectId, Core);
+    return { project: record };
+  }
+  if (payload.type === "EV_LIST") {
+    const db = await evidenceDb();
+    const state = await ThreadLineEvidenceDB.snapshot(db);
+    const rows = Object.values(state.conclusions)
+      .filter(c => c.projectId === payload.projectId)
+      .sort((a, b) => (b.adoptedAt || 0) - (a.adoptedAt || 0))
+      .map(c => {
+        const versions = Object.values(state.versions)
+          .filter(v => v.conclusionId === c.id)
+          .sort((a, b) => b.createdAt - a.createdAt);
+        const fragments = Object.values(state.links)
+          .filter(l => l.versionId === c.currentVersionId)
+          .map(l => ({ relation: l.relation, ...(state.sources[l.sourceId] || {}) }));
+        return { conclusion: c, versions: versions.map(v => v.id), current: versions[0] || null, fragments };
+      });
+    const project = state.projects[payload.projectId] || null;
+    return { project, rows };
+  }
+  if (payload.type === "EV_SUMMARY") {
+    const db = await evidenceDb();
+    const state = await ThreadLineEvidenceDB.snapshot(db);
+    return { summary: Core.projectSummary(state, payload.projectId) };
+  }
+  if (payload.type === "EV_ADOPT" || payload.type === "EV_WITHDRAW" || payload.type === "EV_IMPORT") {
+    return serialize(async () => {
+      const db = await evidenceDb();
+      const state = await ThreadLineEvidenceDB.snapshot(db);
+      let plan;
+      if (payload.type === "EV_ADOPT")
+        plan = await Core.planAdoption(state, {
+          projectId: payload.projectId, text: payload.text,
+          conditions: payload.conditions, fragments: payload.fragments
+        }, payload.operationId);
+      else if (payload.type === "EV_WITHDRAW")
+        plan = await Core.planWithdrawal(state, payload.conclusionId, payload.reason, payload.operationId);
+      else
+        plan = await Core.importPackage(state, payload.pkg, payload.operationId);
+      return ThreadLineEvidenceDB.applyPlan(db, plan);
+    });
+  }
+  if (payload.type === "EV_EXPORT") {
+    const db = await evidenceDb();
+    const state = await ThreadLineEvidenceDB.snapshot(db);
+    return Core.exportPackage(state, payload.projectId);
+  }
+  if (payload.type === "EV_QUOTA") {
+    let estimate = null;
+    try { if (navigator.storage && navigator.storage.estimate) estimate = await navigator.storage.estimate(); } catch {}
+    let persisted = null;
+    try { if (navigator.storage && navigator.storage.persisted) persisted = await navigator.storage.persisted(); } catch {}
+    return { estimate, persisted };
+  }
+  throw new Error("未知证据消息: " + payload.type);
+}
 chrome.runtime.onMessage.addListener((payload,sender,reply) => {
   (async () => {
     if (!payload || typeof payload.type !== "string") throw new Error("无效消息");
+    if (payload.type.startsWith("EV_")) return handleEvidence(payload, sender);
     if (payload.type.startsWith("FF_")) return handleFF(payload, sender);
     if (payload.type === "CAPTURE_START") {
       await requirePanelSender(sender,"只有研线面板可启动采集");

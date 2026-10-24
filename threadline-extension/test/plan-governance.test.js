@@ -57,10 +57,17 @@ function mock(body){return {ok:true,status:200,json:async()=>body};}
 test('canonical plan contains all required tasks and no unverified done claims', async()=>{
   const {validatePlan}=await checks();
   const actual=validatePlan(ROOT);
-  assert.equal(actual.tasks.length,8);
+  assert.equal(actual.tasks.length,12);
   // Done claims must stay limited to tasks with real merged-PR evidence JSONs.
   assert.deepEqual(actual.done.map(x=>x.task.id).sort(),
     ['BETA-RELEASE','P1-CORE','P2-FORK','P3-REPORT','P4-AUTO','R-REUSE','Z0-BASE','Z0-LIVE']);
+  // Phase-eleven tasks are registered but not claimable as done yet.
+  assert.deepEqual(actual.tasks.filter(x=>x.id.startsWith('S')).map(x=>x.id),
+    ['S0A-PROTOTYPE','S0B-LOCATE','S1A-PERSIST','S1B-ADOPT']);
+  assert.ok(['in_review','done'].includes(actual.tasks.find(x=>x.id==='S0A-PROTOTYPE').status),
+    'S0A progresses only through the review/done contract');
+  assert.ok(actual.tasks.filter(x=>['S0B-LOCATE','S1A-PERSIST','S1B-ADOPT'].includes(x.id))
+    .every(x=>x.status==='planned'));
 });
 
 test('missing/duplicate plan markers and missing tasks are rejected',async()=>{
@@ -108,6 +115,11 @@ test('blocked tasks require a concrete blocker and legacy plan must redirect',as
     edit(dir,'docs/PLAN.md',s=>rowChange(s,'P4-AUTO',
       line=>line.replace(' | done | ',' | blocked | ')
                 .replace('docs/ff/evidence/P4-AUTO.json','docs/ff/BLOCKED.md')));
+    // S0A depends on P4-AUTO; drop it back to planned so the blocked-rule
+    // itself is what the gate must report.
+    edit(dir,'docs/PLAN.md',s=>rowChange(s,'S0A-PROTOTYPE',
+      line=>line.replace(' | in_review | ',' | planned | ')
+                .replace(' | PR#28 | ',' | - | ')));
     edit(dir,'docs/ff/BLOCKED.md',s=>s.replaceAll('P4-AUTO','not-on-list'));
     assert.throws(()=>validatePlan(dir),/blocked task not explained/);
   });
