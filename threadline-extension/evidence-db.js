@@ -102,6 +102,35 @@
     });
   }
 
+  /* Projection bookkeeping: after a projection has been written from the
+   * committed store, bump projectionRevision and clear the todo in the SAME
+   * transaction, CAS-guarded on evidenceRevision (a newer commit must keep
+   * the todo set for the next pass). */
+  function clearProjectionTodo(db, projectId, expectedRevision) {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const done = v => { if (!settled) { settled = true; resolve(v); } };
+      const fail = e => { if (!settled) { settled = true; reject(e); } };
+      let tx;
+      try { tx = db.transaction(["projects"], "readwrite"); }
+      catch (e) { return fail(e); }
+      tx.oncomplete = () => done({ cleared: true });
+      tx.onabort = () => fail(tx.error || new Error("投影事务中止"));
+      tx.onerror = () => fail(tx.error || new Error("投影事务失败"));
+      const req = tx.objectStore("projects").get(projectId);
+      req.onsuccess = () => {
+        const current = req.result;
+        if (!current || current.evidenceRevision !== expectedRevision) {
+          try { tx.abort(); } catch { }
+          return done({ cleared: false, stale: true });
+        }
+        tx.objectStore("projects").put({ ...current,
+          projectionRevision: current.projectionRevision + 1, projectionTodo: false });
+      };
+      req.onerror = () => fail(req.error);
+    });
+  }
+
   async function ensureProject(db, projectId, Core) {
     const tx = db.transaction(["projects"], "readwrite");
     return new Promise((resolve, reject) => {
@@ -116,7 +145,7 @@
     });
   }
 
-  const DB = { DB_NAME, DB_VERSION, STORES, open, snapshot, applyPlan, ensureProject };
+  const DB = { DB_NAME, DB_VERSION, STORES, open, snapshot, applyPlan, ensureProject, clearProjectionTodo };
   if (typeof module !== "undefined" && module.exports) module.exports = DB;
   else globalThis.ThreadLineEvidenceDB = DB;
 })();

@@ -833,6 +833,7 @@ chrome.runtime.onStartup.addListener(() => {
   recoverCaptures().catch(()=>{});
   chrome.sidePanel.setPanelBehavior({openPanelOnActionClick:true}).catch(() => {});
   ffRecoverBindings().catch(()=>{});
+  consumeAllPendingProjections().catch(()=>{});
 });
 chrome.tabs.onUpdated.addListener(async(tabId,change)=>{
   if(change.status!=="complete")return;
@@ -865,6 +866,53 @@ function evidenceDb() {
   if (!evidenceDbPromise) evidenceDbPromise = ThreadLineEvidenceDB.open();
   return evidenceDbPromise;
 }
+/* One-way projection: recompute the read-only summary from the COMMITTED
+ * authority store only, write it to chrome.storage, re-check the revision
+ * after the write, then clear the durable todo in the same CAS transaction.
+ * Interrupted todos survive restarts and are recomputed idempotently. */
+async function consumeEvidenceProjection(projectId) {
+  return serialize(async () => {
+    const db = await evidenceDb();
+    const state = await ThreadLineEvidenceDB.snapshot(db);
+    const project = state.projects[projectId];
+    if (!project) return { ok: false, reason: "no-project" };
+    const summary = ThreadLineEvidenceCore.projectSummary(state, projectId);
+    const key = "tl_evidence_summary_" + projectId;
+    await chrome.storage.local.set({ [key]: {
+      summary, evidenceRevision: project.evidenceRevision,
+      projectionRevision: project.projectionRevision + 1, updatedAt: Date.now()
+    } });
+    const fresh = await ThreadLineEvidenceDB.snapshot(db);
+    const freshProject = fresh.projects[projectId];
+    if (!freshProject || freshProject.evidenceRevision !== project.evidenceRevision)
+      return { ok: true, stale: true, reason: "newer commit landed; todo stays" };
+    await ThreadLineEvidenceDB.clearProjectionTodo(db, projectId, project.evidenceRevision);
+    return { ok: true };
+  });
+}
+async function consumeAllPendingProjections() {
+  try {
+    const db = await evidenceDb();
+    const state = await ThreadLineEvidenceDB.snapshot(db);
+    for (const project of Object.values(state.projects))
+      if (project.projectionTodo) await consumeEvidenceProjection(project.projectId).catch(() => {});
+  } catch { /* authority store missing fails loudly elsewhere, not here */ }
+}
+async function evidenceTakeover(projectId) {
+  try {
+    const db = await evidenceDb();
+    const state = await ThreadLineEvidenceDB.snapshot(db);
+    return state.projects[projectId]?.takeover === true;
+  } catch { return false; }
+}
+/* Message-level sealing of the legacy decision edit path (plan §十一.6-5):
+ * once a project is taken over, direct decision edits, old-backup restores
+ * and rollbacks are refused with an explicit error — not just hidden UI. */
+async function assertDecisionEditable(projectId, what) {
+  if (await evidenceTakeover(projectId))
+    throw new Error("该课题已由证据库接管：旧“有效结论”为只读投影。请在证据库中采纳/修订结论（" + what + " 被拒绝）");
+}
+
 async function handleEvidence(payload, sender) {
   if (!payload || typeof payload.type !== "string") throw new Error("无效消息");
   const ownPages = ["evidence-prototype.html", "panel.html", "ff.html"];
@@ -898,24 +946,46 @@ async function handleEvidence(payload, sender) {
   if (payload.type === "EV_SUMMARY") {
     const db = await evidenceDb();
     const state = await ThreadLineEvidenceDB.snapshot(db);
+    if (state.projects[payload.projectId]?.projectionTodo)
+      consumeEvidenceProjection(payload.projectId).catch(() => {});
     return { summary: Core.projectSummary(state, payload.projectId) };
   }
   if (payload.type === "EV_ADOPT" || payload.type === "EV_WITHDRAW" || payload.type === "EV_IMPORT") {
-    return serialize(async () => {
+    const result = await serialize(async () => {
       const db = await evidenceDb();
       const state = await ThreadLineEvidenceDB.snapshot(db);
       let plan;
-      if (payload.type === "EV_ADOPT")
+      if (payload.type === "EV_ADOPT") {
+        // Capture the legacy decision text verbatim at takeover time.
+        const alreadyTaken = state.projects[payload.projectId]?.takeover === true;
+        let legacyDecision = "";
+        if (!alreadyTaken) {
+          try {
+            const topicState = await readState();
+            legacyDecision = topicState.projects
+              .find(x => x.id === payload.projectId)?.decision || "";
+          } catch { /* legacy topic store unavailable: no note */ }
+        }
         plan = await Core.planAdoption(state, {
           projectId: payload.projectId, text: payload.text,
-          conditions: payload.conditions, fragments: payload.fragments
+          conditions: payload.conditions, fragments: payload.fragments,
+          legacyDecision
         }, payload.operationId);
+      }
       else if (payload.type === "EV_WITHDRAW")
         plan = await Core.planWithdrawal(state, payload.conclusionId, payload.reason, payload.operationId);
       else
         plan = await Core.importPackage(state, payload.pkg, payload.operationId);
       return ThreadLineEvidenceDB.applyPlan(db, plan);
     });
+    let touchedProject = payload.projectId;
+    if (!touchedProject && payload.type === "EV_WITHDRAW" && result?.conclusionId) {
+      const db = await evidenceDb();
+      const state = await ThreadLineEvidenceDB.snapshot(db);
+      touchedProject = state.conclusions[result.conclusionId]?.projectId;
+    }
+    if (touchedProject) consumeEvidenceProjection(touchedProject).catch(() => {});
+    return result;
   }
   if (payload.type === "EV_EXPORT") {
     const db = await evidenceDb();
@@ -1009,6 +1079,9 @@ chrome.runtime.onMessage.addListener((payload,sender,reply) => {
     }
     if (payload.type === "BACKUP_IMPORT") {
       await requirePanelSender(sender,'只能由研线侧栏导入');
+      const restored = ThreadLineBackup.parse(payload.json);
+      for (const project of restored.projects || [])
+        await assertDecisionEditable(project.id, "旧备份恢复将覆盖只读摘要");
       return importBackup(payload.json);
     }
     if (payload.type === "BACKUP_SNAPSHOTS") {
@@ -1018,6 +1091,11 @@ chrome.runtime.onMessage.addListener((payload,sender,reply) => {
     }
     if (payload.type === "BACKUP_ROLLBACK") {
       await requirePanelSender(sender,'只能由研线侧栏恢复');
+      const record = await chrome.storage.local.get(SNAPSHOT_KEY);
+      const snap = (record[SNAPSHOT_KEY] || [])[payload.index];
+      if (snap?.state?.projects)
+        for (const project of snap.state.projects)
+          await assertDecisionEditable(project.id, "快照回滚将覆盖只读摘要");
       return restoreSnapshot(payload.index);
     }
     if (payload.type === "HEALTH_CHECK") {
@@ -1033,7 +1111,10 @@ chrome.runtime.onMessage.addListener((payload,sender,reply) => {
     }
     if (payload.type === "MUTATE") {
       await requirePanelSender(sender,"只能在扩展面板中修改课题状态");
-      return mutate(payload.action);
+      const action = payload.action || {};
+      const patchesDecision = action.patch && Object.prototype.hasOwnProperty.call(action.patch, "decision");
+      if (patchesDecision) await assertDecisionEditable(action.projectId, "直接修改 decision");
+      return mutate(action);
     }
     if (["PAGE_CONTEXT","OBSERVE"].includes(payload.type)) {
       if (!sender.tab || !ThreadLineCore.isChatURL(sender.tab.url)) throw new Error("仅支持 ChatGPT 页面");

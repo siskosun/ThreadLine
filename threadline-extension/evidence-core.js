@@ -96,6 +96,11 @@
       .filter(c => c.projectId === input.projectId && c.status === "adopted");
     if (conclusions.length >= LIMITS.conclusionsPerProject)
       throw new Error("课题结论数达上限（200）：请导出或清理后再采纳");
+    // First adoption takes the project over: the legacy decision text is
+    // preserved verbatim as an unverified legacy-note (plan §十一.6-5) and
+    // the legacy edit path is sealed from then on, even after full withdrawal.
+    const firstAdoption = Object.keys(state.conclusions)
+      .every(id => state.conclusions[id].projectId !== input.projectId);
     const conclusionId = "con_" + uuid();
     const versionId = "ver_" + uuid();
     const at = now();
@@ -132,11 +137,17 @@
     return {
       replay: null, result, writes: {
         conclusion, version, sources, links,
-        project: {
+          project: {
           ...project,
           evidenceRevision: project.evidenceRevision + 1,
           projectionRevision: project.projectionRevision,
-          projectionTodo: true
+          projectionTodo: true,
+          ...(firstAdoption ? {
+            takeover: true,
+            ...(typeof input.legacyDecision === "string" && input.legacyDecision.trim() ? {
+              legacyNote: { text: input.legacyDecision, capturedAt: now(), verified: false }
+            } : {})
+          } : {})
         },
         ledger: { operationId, requestHash, result, at }
       }
