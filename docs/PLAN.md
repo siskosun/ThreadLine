@@ -20,7 +20,7 @@
 | P3-REPORT | 完整结果采集、去标签对照及 JSON 导出 | done | P2-FORK | 双 done 才可对照，用户裁决持久化，不重放未知状态，导出可独立复算 | docs/ff/evidence/P3-REPORT.json | yes |
 | BETA-RELEASE | 安装升级与正式 Beta 验收 | done | P3-REPORT | 真实双分支闭环、同路径旧数据升级、CI 与用户验收均通过 | docs/ff/evidence/BETA-RELEASE.json | yes |
 | P4-AUTO | 第二期：K=4 多会话编排、等预算对照、裁判校准（隐藏校准题）与 JSON 导入；自动 Flush 经一期证据改判不可行，以批量预填+人工批量发送替代 | done | BETA-RELEASE | 等预算对照与裁判校准机制落地，K 可配置 2–4，导入经严格验证；0 自动发送不变 | docs/ff/evidence/P4-AUTO.json | yes |
-| S0A-PROTOTYPE | 第十一章 S0a：证据存储与采纳原型（单事务权威写入、投影、崩溃点/恢复设计、容量探针与工期估算） | in_review | P4-AUTO | 单事务采纳/撤回+幂等/CAS 经测试；崩溃点表与恢复顺序无待定项；首期默认容量经探针冻结；12 次有效采纳操作至少 11 次无帮助完成、耗时中位 ≤30s、P90 ≤60s（受托代理执行须在证据 scope 声明） | PR#28 | yes |
+| S0A-PROTOTYPE | 第十一章 S0a：证据存储与采纳原型（单事务权威写入、投影、崩溃点/恢复设计、容量探针与工期估算） | done | P4-AUTO | 单事务采纳/撤回+幂等/CAS 经测试；崩溃点表与恢复顺序无待定项；首期默认容量经探针冻结；12 次有效采纳操作至少 11 次无帮助完成、耗时中位 ≤30s、P90 ≤60s（受托代理执行须在证据 scope 声明） | docs/ff/evidence/S0A-PROTOTYPE.json | yes |
 | S0B-LOCATE | 第十一章 S0b：来源定位 spike（限 1 人日/8 小时：现有适配 vs Toolkit vendor 子集 vs 最小实现） | planned | S0A-PROTOTYPE | 三方案维护/包体/测试成本结论落档；采纳的代码须通过身份与取消测试并保留许可标注，失败则记录原因并降级“片段+来源链接” | - | no |
 | S1A-PERSIST | 第十一章 S1a：结论/证据持久化与恢复（chrome.storage 单向投影、旧 decision 编辑封口、备份恢复与错误处理） | planned | S0A-PROTOTYPE | 跨重启/清缓存保存完整；崩溃点与旧数据兼容通过；持久化/删除实施经 L3 审查与人工风险确认 | - | yes |
 | S1B-ADOPT | 第十一章 S1b：逐条采纳与可编辑交接（普通整理与 Fork 揭盲共用） | planned | S1A-PERSIST,S0B-LOCATE | 主要操作只要求正文与依据确认；重复采纳不重复创建；旧分支可见更正/撤回；定位不可靠时显示“仅片段”不误跳转 | - | yes |
