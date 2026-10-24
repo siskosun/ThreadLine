@@ -82,7 +82,7 @@ function system() {
     });
   });}
   const ffSender = {id:'ff-launch-test',url:'chrome-extension://ff-launch-test/ff.html'};
-  return {message,ffSender,session,sent,newTabs,updates,events,records,runs,pageStore,
+  return {message,ffSender,session,sent,newTabs,updates,events,records,runs,pageStore,tabsById,
     async setupExperiment(operationId='create_op_000001'){
       await message({type:'FF_SET_ENABLED',enabled:true,ack:'local-only-no-send'},ffSender);
       return message({type:'FF_CREATE',operationId,
@@ -427,4 +427,36 @@ test("FF_SUMMARY is a panel-only read-only progress digest",async()=>{
   const snap=JSON.stringify(summary);
   for(const banned of ['w0','frozen','reply','sessionId'])
     assert.ok(!snap.includes('"' + banned + '"'),'summary must not carry experiment content');
+});
+
+// Live K=4 acceptance run (2026-10-24, v0.8.0) found that FF_CAPTURE and
+// FF_REPREFILL still carried a hardcoded A/B guard, so branches C/D of a
+// K=4 experiment could never be completed. These tests pin the fix.
+test('K=4: FF_CAPTURE and FF_REPREFILL address every branch of the experiment',async()=>{
+  const s=system();
+  await s.message({type:'FF_SET_ENABLED',enabled:true,ack:'local-only-no-send'},s.ffSender);
+  const created=await s.message({type:'FF_CREATE',operationId:'k4cr_00000001',
+    w0:'虚构共同材料 W0',p:'虚构任务指令 P',branchCount:4},s.ffSender);
+  const r=await s.message({type:'FF_LAUNCH',experimentId:created.id,
+    operationId:'k4launch_000001'},s.ffSender);
+  assert.deepEqual(Object.keys(r.tabIds).sort(),['A','B','C','D']);
+  // Branch C: prefill ACK, then conversation binding via OBSERVE.
+  const cConv='https://chatgpt.com/c/conv-c-0000001';
+  await s.message({type:'HANDOFF_BEGIN'},s.tabSender(r.tabIds.C,'https://chatgpt.com/'));
+  await s.message({type:'HANDOFF_ACK'},s.tabSender(r.tabIds.C,'https://chatgpt.com/'));
+  await s.message({type:'OBSERVE',href:cConv,title:'会话',streaming:false,
+    assistantBytes:33},s.tabSender(r.tabIds.C,cConv));
+  s.tabsById.get(r.tabIds.C).url=cConv;
+  const cap=await s.message({type:'FF_CAPTURE',experimentId:created.id,
+    branch:'C'},s.ffSender);
+  assert.match(cap.runId,/^cap_/,'branch C capture must be accepted');
+  // Branch D: re-prefill while its tab is still the plain new chat.
+  const rep=await s.message({type:'FF_REPREFILL',experimentId:created.id,
+    branch:'D',operationId:'k4re_000000001'},s.ffSender);
+  assert.equal(rep.acks,2,'branch D re-prefill must be accepted');
+  // A branch outside THIS experiment is still rejected.
+  await assert.rejects(s.message({type:'FF_CAPTURE',experimentId:created.id,
+    branch:'E'},s.ffSender),/invalid branch/);
+  await assert.rejects(s.message({type:'FF_REPREFILL',experimentId:created.id,
+    branch:'E',operationId:'k4re_000000002'},s.ffSender),/invalid branch/);
 });

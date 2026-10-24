@@ -685,11 +685,14 @@ async function handleFF(payload, sender) {
     if (typeof payload.operationId !== "string" ||
       !/^[a-zA-Z0-9_-]{6,100}$/.test(payload.operationId))
       throw new Error("explicit re-prefill operation ID required");
-    if (!["A", "B"].includes(payload.branch)) throw new Error("invalid branch");
     return serialize(async () => {
       if (!await ffEnabled()) throw new Error("Fork Beta is disabled");
       const existing = await ThreadLineFFDB.read(payload.experimentId);
       if (!existing) throw new Error("experiment not found");
+      // K=2-4 (live K=4 finding): every branch of THIS experiment is
+      // addressable; a hardcoded A/B list made C/D unreachable.
+      if (!Object.prototype.hasOwnProperty.call(existing.branches, payload.branch))
+        throw new Error("invalid branch");
       const attempt = existing.branches[payload.branch].attempts.at(-1);
       if (!attempt || attempt.status !== "pending" || !Number.isInteger(attempt.evidence?.tabId))
         throw new Error("no running branch attempt to re-prefill");
@@ -711,14 +714,17 @@ async function handleFF(payload, sender) {
     });
   }
   if (payload.type === "FF_CAPTURE") {
-    if (!["A", "B"].includes(payload.branch)) throw new Error("invalid branch");
     return serialize(async () => {
       if (!await ffEnabled()) throw new Error("Fork Beta is disabled");
       const existing = await ThreadLineFFDB.read(payload.experimentId);
       if (!existing) throw new Error("experiment not found");
+      // K=2-4 (live K=4 finding): capture must be addressable for every
+      // branch; the previous A/B guard made C/D completion impossible.
+      if (!Object.prototype.hasOwnProperty.call(existing.branches, payload.branch))
+        throw new Error("invalid branch");
       const attempt = existing.branches[payload.branch].attempts.at(-1);
       if (!attempt || attempt.status !== "pending" ||
-        !Number.isInteger(attempt.evidence?.tabId) || !attempt.evidence?.sessionId)
+        !Number.isInteger(attempt.evidence?.tabId) || !attempt.evidence.sessionId)
         throw new Error("branch has no bound conversation to capture");
       const run = await beginCapture(attempt.evidence.tabId);
       return {runId:run.id};

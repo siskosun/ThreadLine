@@ -1,8 +1,11 @@
 # ThreadLine CHANGELOG
 
-# ThreadLine CHANGELOG
+## v0.8.1 — 真人 K=4 实测修复
 
-# ThreadLine CHANGELOG
+- 修复 K=4 采集阻断：`FF_CAPTURE`/`FF_REPREFILL` 不再硬编码 A/B 分支白名单，改为校验目标分支属于当前实验（真人实测发现 C/D 分支永远无法完成，见 `docs/ff/evidence/P4-LIVE-K4-V080.json`）。
+- Fork 页面：未选中实验时点击“发起”从静默空操作改为明确提示；采集启动后延迟回读状态，完成结果无需手动刷新即可见。
+- 新增 K=4 分支可寻址与页面提示回归测试（209/209）。
+- 已知问题：分支采集点击后无推进且无报错的静默停滞（F3）待复现定位，登记于 `docs/ff/BLOCKED.md`。
 
 ## v0.8.0 — 验收修复与 P4 贯通
 

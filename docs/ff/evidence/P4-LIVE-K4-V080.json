@@ -1,0 +1,83 @@
+{
+  "task": "P4-LIVE-K4-V080",
+  "title": "真人 K=4 闭环实测（v0.8.0 发布版，无调试器，OS 级真实输入）",
+  "date": "2026-10-24",
+  "status": "partial-pass",
+  "scope": "由仓库所有者在会话内明示授权（“‘人验收’的部分由你代劳，给你全部授权”，2026-10-23）代理执行的人工环节：发送门由代理以 OS 级可信输入（物理键盘/鼠标事件）完成，全程无 CDP/调试器附着于浏览器。观察通道为 Windows UI Automation 与裁剪截图；截图不入库，仅记录 SHA-256 以供本地核对。",
+  "build": {
+    "tag": "v0.8.0",
+    "commit": "86f1200",
+    "loadPath": "未打包加载 v0.8.0 tag 树（git archive 解出）",
+    "extensionId": "jlmfbngfboldfifmojbljmjedkadjicm",
+    "manifestVersion": "0.8.0"
+  },
+  "environment": {
+    "browser": "Microsoft Edge 156.0.4314.42 (Chromium, --load-extension 已被忽略，经 edge://extensions 开发人员模式加载)",
+    "profile": "临时 profile tl-live-k4（cookie 经 localhost 回环桥注入 25 条，不落盘不外发）",
+    "debuggerAttached": false,
+    "inputChannel": "OS 级可信事件（SendKeys / mouse_event / keybd_event）",
+    "siteDoms": "ChatGPT 2026 首页外壳（应用导航/项目列表），侧栏含真实会话标题，故 ChatGPT 截图一律裁剪 x>=720"
+  },
+  "material": {
+    "w0": "线上实测K4材料：线路A转化率3.2%，线路B转化率4.1%，线路C复购率18%，线路D客单价260元。",
+    "p": "请基于以上材料用三句话总结哪条线路表现最好，并给出一个下一步建议。",
+    "frozenSha256CanonicalV1": "13923a100363fc5a1872e16e0eb1e2b70ace93586bd019c6ea987dbcdc42efaf",
+    "frozenBytes": 262
+  },
+  "timeline": [
+    { "t": "2026-10-24 ~21:05-21:14", "event": "Phase1：临时 profile + 25 条 cookie 桥接，chatgpt.com 登录态核验（.chatgpt.com 9 条 / .openai.com 2 条），CDP 实例优雅关闭" },
+    { "t": "22:0x", "event": "edge://extensions 开发人员模式开启，加载 v0.8.0 解包扩展；ff.html 启用 Fork 存储" },
+    { "t": "22:0x", "event": "实验 ff_3e6cf080-23ce-494b-888e-998d5b0617eb 冻结（同哈希 262 字节）；发起按钮点击未生效（按钮在折叠线下 + 静默守卫，见 findings F2/F4）" },
+    { "t": "22:0x", "event": "实验 ff_2c0e0a19-23a3-4940-8e09-4adad7af2d3d 冻结：K=4，同冻结哈希；FF_LAUNCH revision 0→4，创建 4 个非激活新聊天标签并预填" },
+    { "t": "22:0x-22:10:09", "event": "四分支逐一：预填草稿剪贴板回读核验（各 106 字符，含【共同材料 W₀】头），点击 composer + Enter 手动发送（人工门，代理执行）；回复生成完成（截图 p3-b{1..4}-reply）" },
+    { "t": "发送完成后", "event": "记录推进至 revision 12：A/B/C/D 均 pending/generating，会话绑定成功（截断 sessionId：6adcbb47 / 6adcbbb1 / 6adcbc02 / 6adcbc3d），输入一致性 exact ×4，预填 exact_ack ×4" },
+    { "t": "采集阶段", "event": "A/B 分支“采集回复”点击命中但无状态推进、无错误提示（静默停滞，见 F3）；C/D 被 background.js 硬编码 A/B 白名单拒绝（F1）→ 对照/校准/裁决/导出链路在 v0.8.0 无法到达" }
+  ],
+  "outcome": {
+    "verifiedLive": [
+      "v0.8.0 解包加载与功能开关（本地存储）",
+      "K=4 冻结与 canonicalization-v1 哈希（两实验同材料同哈希）",
+      "FF_LAUNCH 两阶段建标：4 个非激活标签、无路由逃逸",
+      "预填 → 逐字 ACK（exact_ack）→ 会话 URL 绑定 → 发送分类 exact，四分支全通",
+      "人工发送门保持 0 自动发送：所有发送均为 OS 级可信 Enter",
+      "2026 版 ChatGPT 首页外壳下 handoff 预填/横幅/发送契约成立"
+    ],
+    "blockedInV080": [
+      "采集完成（F1：FF_CAPTURE/FF_REPREFILL 硬编码 [\"A\",\"B\"] 白名单拒绝 C/D；F3：A 分支采集点击后无推进无报错，需 SW 侧日志定位）",
+      "由此 FF_COMPARE / 裁判校准 / FF_VERDICT / FF_EXPORT / FF_IMPORT 全链路未在本实测中到达（合成 E2E 已覆盖，见 test/ff-core-e2e.py）"
+    ]
+  },
+  "findings": [
+    { "id": "F1", "severity": "high", "title": "FF_CAPTURE/FF_REPREFILL A/B 白名单使 K=4 无法完成", "fix": "本 PR（v0.8.1）：改为校验 branch ∈ Object.keys(existing.branches)，新增 ff-launch.test.js K=4 覆盖" },
+    { "id": "F2", "severity": "medium", "title": "发起按钮无实验选中时静默返回，读起来像坏按钮", "fix": "本 PR：改为明确提示“请先在下方列表中选择一个实验”" },
+    { "id": "F3", "severity": "high", "title": "分支 A 采集点击后无状态推进且无错误提示（静默停滞）", "fix": "待查：需 SW 日志复现；已按 F4 缓解状态可见性，BLOCKED.md 记录" },
+    { "id": "F4", "severity": "low", "title": "采集启动后页面状态不自刷新；长页面控件在折叠线下易误点", "fix": "本 PR：采集后 4/9/15s 延迟回读；其余记入体验清单" }
+  ],
+  "artifacts": {
+    "localOnly": "C:/Users/57945/AppData/Local/Temp/tl-live-shots/（截图 25 张 + UIA 文本转储 + 扩展 IndexedDB 备份 15.7MB；不入库，防真实会话标题/账号信息泄露）",
+    "screenshotSha256": {
+      "p2-login4.png": "d097a35a55653c1a6bb24346cb7c3b7f070ec4d4fdaff714f2bb36653d8de1a",
+      "p3-ff-load.png": "58332337120de39c4bc7ebffd3873d0ffc7bdaf7f7503d84d451f637134c98ee",
+      "p3-ff-enabled.png": "f4bc8e52899f21d3658a01da4b4c76479351c28fb3583391c1fd69c249c16124",
+      "p3-ff-filled.png": "cde8954a4d9adc579ba6efa8cbd5f6a00643a3385fa5627c566eaf007e98f25b",
+      "p3-ff-frozen.png": "42b1cd5a7831a7a399349653fdc72dba7cba15d1759e2462c71bc45068df6271",
+      "p3-launch.png": "090df6e3689ef4046ae06046dd8210c9d584dd38aabc4183ea20f916a7d34fe2",
+      "p3-b1-prefill.png": "ffecd350037d7c4fc56c114e4d7f4446e3892890e87aef2cb4d56b34d43e861f",
+      "p3-b1-sent.png": "8c37be4b5d767a799e0f36900a9be624580463019266053d581251cee9b704cd",
+      "p3-b1-reply.png": "7c3744ba8584a6d0c9f725d994fca6022293bded61b65ec6023cec5b32fc1edf",
+      "p3-b2-prefill.png": "e8c4376db306d48418511b94cea235cb594eff753eeac73774b0326666762c71",
+      "p3-b2-sent.png": "de66ed5489ba3d870c01eae32d9c7158beb7aaaa1718efd140e287219215e9ea",
+      "p3-b2-reply.png": "8a68afe0f187e5ffc71916d96741609fe33999b95c4e265353c2f1523ae01999",
+      "p3-b3-prefill.png": "f2770b25f5ca7203ae7ca4b0b4b5c50cd6cd252e33e9cee25ab8f3e8c1456609",
+      "p3-b3-sent.png": "276c6852a96975897e7fcdb8143bc229da994d1228725b3c63159c34c3d95464",
+      "p3-b3-reply.png": "43a27b21eafbfdcd73b9eaeb820bffe2eb4af5b73c87bd00850c5b4b822645d3",
+      "p3-b4-prefill.png": "e8c4376db306d48418511b94cea235cb594eff753eeac73774b0326666762c71",
+      "p3-b4-sent.png": "ad4ee8ca035d530d91528a5c557a11c6d359a81b0690f030047f2ab397b82ad0",
+      "p3-b4-reply.png": "986d9fd1b652037d0568d01b15592f17e85d0eca6af2aa1899d11365533665b0",
+      "p3-bA-after-cap-attempt.png": "b20577f8943972f834c28819e198680d4dd07e32acb67716db2f732833714723",
+      "p4-final-ff-top.png": "4a307d239d80aef28220f251969ef4e8bf717b04cf485d3131d654f93f64a71f",
+      "p4-panel.png": "87adb2593c49fe88995dd4b08858adfd1a73ae70afd2f4a975c316414fee15a2"
+    }
+  ],
+  "conclusion": "v0.8.0 在真实浏览器/真实账号/OS 级人工输入下，K=4 冻结-发起-预填-ACK-绑定-发送-分类链路全部成立（revision 0→12）；闭环终止于采集环节的两个真实缺陷（F1 白名单、F3 静默停滞）。F1/F2/F4 已在 v0.8.1 修复并回归（209/209 + E2E）；F3 列入 BLOCKED 待 SW 日志复现。本实测不替代 CI/E2E，也不被它们替代。"
+}
