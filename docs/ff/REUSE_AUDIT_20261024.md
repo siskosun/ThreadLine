@@ -12,7 +12,7 @@
 
 | 项目 | 本次固定提交 | 已读许可与源码 | 决策 |
 | --- | --- | --- | --- |
-| GPT Conversation Toolkit | `119d3728bc4cb583d75da72b067a74b1dce90d60` | [MIT](https://github.com/bujue3709/GPT-Conversation-Toolkit/blob/119d3728bc4cb583d75da72b067a74b1dce90d60/LICENSE)；`utils/dom.js`、`features/virtualized-jump.js`、`features/timeline.js`、`features/conversation-index.js`、`features/export-dom-fallback.js`、反向滚动测试 | 计划直接摘取 DOM 滚动函数与测试并适配；不引入完整扩展 |
+| GPT Conversation Toolkit | `119d3728bc4cb583d75da72b067a74b1dce90d60` | [MIT](https://github.com/bujue3709/GPT-Conversation-Toolkit/blob/119d3728bc4cb583d75da72b067a74b1dce90d60/LICENSE)；`utils/dom.js`、`features/virtualized-jump.js`、`features/timeline.js`、`features/conversation-index.js`、`features/export-dom-fallback.js`、反向滚动测试 | S0b 时间盒内验证 DOM 函数与测试，适配通过后直接采用；不引入完整扩展 |
 | Argdown | `27f412a68f7f4c23ea3afc13793c151ad22d534e` | [core MIT](https://github.com/argdown/argdown/blob/27f412a68f7f4c23ea3afc13793c151ad22d534e/packages/argdown-core/License)；[package.json](https://github.com/argdown/argdown/blob/27f412a68f7f4c23ea3afc13793c151ad22d534e/packages/argdown-core/package.json)，源码包版本 2.0.2，声明 Node >=22.11.0 | 有格式互通需求时直接用 core 包，不自写语法解析器；源码版本不等于已验证 npm 发布或浏览器可运行 |
 | Graphiti | `8ce6d633bdcd3d178b3a47bc25b105dce106a754` | [Apache-2.0](https://github.com/getzep/graphiti/blob/8ce6d633bdcd3d178b3a47bc25b105dce106a754/LICENSE)；[graphiti_core/edges.py](https://github.com/getzep/graphiti/blob/8ce6d633bdcd3d178b3a47bc25b105dce106a754/graphiti_core/edges.py) | 参考实体边的 created_at、valid_at、invalid_at、expired_at 区分；本轮无代码复制或框架集成 |
 | LangGraph | `4c52e129eb1ab69a3da58b799f67929f77d81149` | [MIT](https://github.com/langchain-ai/langgraph/blob/4c52e129eb1ab69a3da58b799f67929f77d81149/LICENSE)；仓库目录及检查点模块位置 | 当前对象是研究状态而非 Agent 执行图；保留检查点/分支身份设计参考，不集成执行引擎 |
@@ -23,7 +23,7 @@
 
 上游 [utils/dom.js](https://github.com/bujue3709/GPT-Conversation-Toolkit/blob/119d3728bc4cb583d75da72b067a74b1dce90d60/utils/dom.js) 的 `isConversationDocumentScrollRoot`、`isConversationReverseScrollRoot`、`scrollElementIntoConversationView`，以及 [virtualized-jump.js](https://github.com/bujue3709/GPT-Conversation-Toolkit/blob/119d3728bc4cb583d75da72b067a74b1dce90d60/features/virtualized-jump.js) 的 `getVirtualJumpScrollController` 可构成候选小模块。上游处理 column-reverse 的负 scrollTop；研线不必另写一套未经验证的坐标算法。
 
-拟移植到 `threadline-extension/vendor/toolkit-scroll.js`，由新增薄适配器提供滚动根和 DOM 能力。路径为候选设计，不表示文件已存在。直接带入并适配 [tests/timeline-reverse-scroll.test.js](https://github.com/bujue3709/GPT-Conversation-Toolkit/blob/119d3728bc4cb583d75da72b067a74b1dce90d60/tests/timeline-reverse-scroll.test.js) 的三个行为用例：反向坐标、负滚动位置、普通滚动坐标；测试必须运行实际移植模块，不能仅测试另写的模型。
+候选移植位置为 `threadline-extension/vendor/toolkit-scroll.js`，由新增薄适配器提供滚动根和 DOM 能力。路径为候选设计，不表示文件已存在。直接带入并适配 [tests/timeline-reverse-scroll.test.js](https://github.com/bujue3709/GPT-Conversation-Toolkit/blob/119d3728bc4cb583d75da72b067a74b1dce90d60/tests/timeline-reverse-scroll.test.js) 的三个行为用例：反向坐标、负滚动位置、普通滚动坐标；测试必须运行实际移植模块，不能仅测试另写的模型。
 
 适配时必须完成：
 
@@ -59,6 +59,6 @@ Graphiti 的边模型可存储时间字段，但事实自动失效与必要前�
 
 ## 6. 开始复制代码前的清单
 
-S0 产出固定版本清单、源码与许可哈希、依赖边界、候选小样测试结果；S1 实施时将真正采用的内容登记到 THIRD_PARTY_NOTICES。上游升级先看差异与许可，再跑本地契约测试，避免跟随 main 自动更新。新增域名权限、私有端点、远程脚本加载和后台服务不属于本路线。
+S0b 最多 8 小时，比较现有适配、固定 Toolkit 子集和小型本地实现的接入/维护/测试成本；不为比较而实现三套，也不以“约 100 行”代替维护估算。优先复用，只有边界/回归/维护成本有证据不合适时才记录不采用理由。超时或失败降级“片段+来源链接”，不阻塞 S1a。采用时产出固定版本清单、源码与许可哈希、依赖边界及小样测试结果；S1 实施时将真正采用的内容登记到 THIRD_PARTY_NOTICES。上游升级先看差异与许可，再跑本地契约测试，避免跟随 main 自动更新。新增域名权限、私有端点、远程脚本加载和后台服务不属于本路线。
 
 规划完成不等于移植完成。本次状态：源码/许可审计完成；Toolkit 接入小样未执行；Argdown 包安装、浏览器验证未执行；Graphiti/LangGraph 集成未立项。
