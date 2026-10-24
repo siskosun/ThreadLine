@@ -3,8 +3,8 @@
   "task_id": "S0B-LOCATE",
   "date": "2026-10-25",
   "title": "S0b 来源定位 spike：三方案比较，采纳 Toolkit 固定提交子集 + 注入式适配器",
-  "pr_number": 0,
-  "merge_commit": "0000000000000000000000000000000000000000",
+  "pr_number": 30,
+  "merge_commit": "19f6c5a5e2a542adaddf3be2a835ca4026dd915c",
   "summary": "时间盒约 4 小时。比较 现有适配/Toolkit pinned 子集/最小本地实现 三方案（docs/ff/S0B_LOCATE_20261025.md）：采纳方案 B——vendor/toolkit-scroll.js（上游 GPT Conversation Toolkit commit 119d3728 的坐标算法，滚动根注入化、去全局状态；MIT 登记于 licenses/MIT-GPT-Conversation-Toolkit.txt 与 THIRD_PARTY_NOTICES.md）+ locate-adapter.js（身份优先定位：data-message-id 精确匹配 + 角色/内容复核；弱文本只作候选永不冒充定位成功；AbortSignal 协作取消）。上游三个反向滚动行为用例移植为针对 vendored 文件的测试，另加身份/取消/弱匹配用例；套件 224/224。降级契约（定位不可靠→仅片段+来源链接）写入适配器返回值语义。",
   "decision": "adopt-vendor-subset",
   "not_claimed": [
