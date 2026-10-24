@@ -309,13 +309,15 @@ const ThreadLineFFCore = (() => {
         bytes:exp.frozen.bytes, rule:exp.frozen.rule,
         w0Hashes:exp.frozen.w0Hashes, pHashes:exp.frozen.pHashes,
         textHashes:exp.frozen.textHashes, frozenAt:exp.frozen.frozenAt},
-      branches:Object.fromEntries(Object.keys(exp.branches).map(label => [label, {
-        status:exp.branches[label].status, phase:exp.branches[label].phase,
-        attempts:exp.branches[label].attempts}])),
+      branches:Object.fromEntries(Object.keys(exp.branches).map(label => [label,
+        structuredClone(exp.branches[label])])),
       branchCount:exp.branchCount || Object.keys(exp.branches).length,
       decision:exp.decision ? {...exp.decision} : null};
   }
   // ---------- P4: hidden judge calibration and validated JSON import ----------
+  // Expected answers live in this private map and are never exposed through
+  // CALIBRATION_ITEMS; only judgeCalibration surfaces them in the result.
+  const CALIBRATION_EXPECTED = Object.freeze({"cal-econ-0001":1, "cal-logic-0001":1});
   const CALIBRATION_ITEMS = Object.freeze([
     Object.freeze({
       id:"cal-econ-0001",
@@ -327,9 +329,7 @@ const ThreadLineFFCore = (() => {
       material:"虚构材料：所有已执行的测试用例通过，但仅覆盖了 10% 的代码路径。",
       question:"这一结论是否成立：系统已得到完全验证？",
       options:["成立", "不成立", "无法判断"]})
-  ].map(item => Object.freeze({...item,
-    // Expected answers stay inside the module: the page only sees options.
-    expectedIndex:1})));
+  ]);
   function judgeCalibration(responses) {
     assert(Array.isArray(responses) && responses.length === CALIBRATION_ITEMS.length,
       "respond to every calibration item");
@@ -338,8 +338,9 @@ const ThreadLineFFCore = (() => {
       assert(r, "missing calibration response");
       assert(Number.isSafeInteger(r.choice) && r.choice >= 0 &&
         r.choice < item.options.length, "invalid calibration choice");
-      return {id:item.id, correct:r.choice === item.expectedIndex,
-        expected:item.options[item.expectedIndex]};
+      const expected = CALIBRATION_EXPECTED[item.id];
+      return {id:item.id, correct:r.choice === expected,
+        expected:item.options[expected]};
     });
     const score = per.filter(x => x.correct).length;
     return {per, score, total:CALIBRATION_ITEMS.length,
@@ -364,11 +365,29 @@ const ThreadLineFFCore = (() => {
       plain(branch);
       assert(STATES.includes(branch.status) && PHASES.includes(branch.phase),
         "invalid branch state");
-      for (const a of branch.attempts || []) {
+      assert(Number.isSafeInteger(branch.revision), "invalid branch revision");
+      assert(Array.isArray(branch.history) && Array.isArray(branch.attempts),
+        "imported branches must carry history and attempts");
+      assert(branch.isolation && typeof branch.isolation === "object",
+        "imported branches must carry isolation checks");
+      for (const a of branch.attempts) {
         validId(a.id);
         assert(STATES.includes(a.status) && PHASES.includes(a.phase), "invalid attempt state");
         plain(a.evidence || {});
-        for (const h of a.history || []) plain(h);
+        if (a.status === "done") {
+          // A snapshot may not claim done without the full completion evidence.
+          const ev = a.evidence || {};
+          assert(["exact", "canonical_equivalent"].includes(ev.inputLevel),
+            "done attempt input unverified");
+          assert(typeof ev.sessionId === "string" && ev.sessionId.length >= 4,
+            "done attempt missing session identity");
+          assert(ev.captureComplete === true && typeof ev.reply === "string" &&
+            ev.reply.length > 0, "done attempt response incomplete");
+          assert(Array.isArray(ev.endSignals) &&
+            new Set(ev.endSignals).size >= 2, "done attempt signals insufficient");
+          assert(ev.persisted === true && ev.taskCount === 1,
+            "done attempt not persisted");
+        }
       }
     }
     let decision = null;

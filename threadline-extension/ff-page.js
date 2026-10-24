@@ -129,10 +129,10 @@
       return;
     }
     const labels = Object.keys(decision.mapping);
-    const budgets = decision.budgets || {};
+    const timings = decision.timings || {};
     if (!decision.verdict) {
       const parity = decision.budgetParity === false
-        ? "（注意：各分支预算差异较大，对照时请自行考虑）" : "";
+        ? "（注意：各分支配置不一致，等预算前提不成立，请谨慎解读）" : "";
       note.textContent = "对照已生成" + parity + "。请先完成裁判校准（全部答对后开放裁决），再阅读各栏回复并提交裁决；提交后才显示对应关系。";
       for (const label of labels) {
         const col = document.createElement("div");
@@ -142,12 +142,12 @@
         const body = document.createElement("pre");
         body.id = "ff-reply-" + label;
         body.textContent = replyOf(label);
-        const budget = budgets[decision.mapping[label]];
-        if (budget && budget.sentMs !== null) {
+        const timing = timings[decision.mapping[label]];
+        if (timing && timing.sentMs !== null) {
           const b = document.createElement("p");
           b.className = "subtle";
-          b.textContent = "预算：发送至采集 " + Math.round(budget.sentMs/1000) + " 秒 · 回复 " +
-            (budget.replyBytes ?? "?") + " 字节";
+          b.textContent = "耗时（仅供参考）：发送至采集 " + Math.round(timing.sentMs/1000) +
+            " 秒 · 回复 " + (timing.replyBytes ?? "?") + " 字节";
           col.appendChild(b);
         }
         col.appendChild(head); col.appendChild(body);
@@ -225,15 +225,18 @@
       value.frozen.textHashes.frozen;
     $("ff-text").textContent = value.frozen.text;
     $("ff-detail").hidden = false;
-    const launched = value.branches.A.attempts.length > 0 || value.branches.B.attempts.length > 0;
+    const launched = Object.values(value.branches).some(b => b.attempts.length > 0);
+    const blocked = Object.values(value.branches).some(b =>
+      b.status === "pending" || b.status === "done");
     $("ff-branches").hidden = false;
-    $("ff-launch").disabled = launched &&
-      (value.branches.A.status === "pending" || value.branches.A.status === "done" ||
-       value.branches.B.status === "pending" || value.branches.B.status === "done");
-    $("ff-launch").textContent = launched ? "重新发起（仅当两分支都非进行中且未完成）" : "发起双分支（两个新标签）";
-    const boxA = $("ff-branch-a"), boxB = $("ff-branch-b");
-    boxA.replaceChildren(branchBox("A", value));
-    boxB.replaceChildren(branchBox("B", value));
+    $("ff-launch").disabled = launched && blocked;
+    $("ff-launch").textContent = launched ? "重新发起（仅当所有分支都非进行中且未完成）" : "发起双分支（K 个新标签）";
+    // P4: render every branch's operations, not just A/B.
+    const branchBoxes = $("ff-branch-boxes");
+    branchBoxes.replaceChildren();
+    for (const label of Object.keys(value.branches)) {
+      branchBoxes.appendChild(branchBox(label, value));
+    }
     renderCompare(value);
   }
   async function list() {
