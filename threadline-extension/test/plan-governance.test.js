@@ -20,6 +20,7 @@ const fixtureFiles = [
   'docs/ff/evidence/P2-FORK.json',
   'docs/ff/evidence/P3-REPORT.json',
   'docs/ff/evidence/BETA-RELEASE.json',
+  'docs/ff/evidence/P4-AUTO.json',
   'threadline-extension/test/ff-core.test.js',
   'threadline-extension/test/ff-db.test.js',
   'threadline-extension/test/ff-background-toggle.test.js',
@@ -59,10 +60,7 @@ test('canonical plan contains all required tasks and no unverified done claims',
   assert.equal(actual.tasks.length,8);
   // Done claims must stay limited to tasks with real merged-PR evidence JSONs.
   assert.deepEqual(actual.done.map(x=>x.task.id).sort(),
-    ['BETA-RELEASE','P1-CORE','P2-FORK','P3-REPORT','R-REUSE','Z0-BASE','Z0-LIVE']);
-  // Phase 2 entered execution only via the 2026-10-24 owner approval.
-  assert.equal(actual.tasks.find(x=>x.id==='P4-AUTO').status,'planned');
-  assert.notEqual(actual.tasks.find(x=>x.id==='P4-AUTO').status,'done');
+    ['BETA-RELEASE','P1-CORE','P2-FORK','P3-REPORT','P4-AUTO','R-REUSE','Z0-BASE','Z0-LIVE']);
 });
 
 test('missing/duplicate plan markers and missing tasks are rejected',async()=>{
@@ -81,10 +79,10 @@ test('a task cannot advance while its hard dependencies are incomplete',async()=
   const {validatePlan}=await checks();
   withFixture(dir=>{
     // Manufacture an unfinished dependency on a done task's row.
-    edit(dir,'docs/PLAN.md',s=>rowChange(s,'P2-FORK',
-      line=>line.replace(' | Z0-LIVE,P1-CORE | ',' | Z0-LIVE,P4-AUTO | ')
+    edit(dir,'docs/PLAN.md',s=>rowChange(s,'BETA-RELEASE',
+      line=>line.replace(' | P3-REPORT | ',' | P4-AUTO | ')
                 .replace(' | done | ',' | in_review | ')
-                .replace('docs/ff/evidence/P2-FORK.json','PR#99')));
+                .replace('docs/ff/evidence/BETA-RELEASE.json','PR#99')));
     assert.throws(()=>validatePlan(dir),/dependency is not done/);
   });
 });
@@ -107,10 +105,10 @@ test('blocked tasks require a concrete blocker and legacy plan must redirect',as
   withFixture(dir=>{
     // Manufacture a blocked task from a done row that nothing depends on,
     // then remove its explanation: must fail.
-    edit(dir,'docs/PLAN.md',s=>rowChange(s,'BETA-RELEASE',
+    edit(dir,'docs/PLAN.md',s=>rowChange(s,'P4-AUTO',
       line=>line.replace(' | done | ',' | blocked | ')
-                .replace('docs/ff/evidence/BETA-RELEASE.json','docs/ff/BLOCKED.md')));
-    edit(dir,'docs/ff/BLOCKED.md',s=>s.replaceAll('BETA-RELEASE','not-on-list'));
+                .replace('docs/ff/evidence/P4-AUTO.json','docs/ff/BLOCKED.md')));
+    edit(dir,'docs/ff/BLOCKED.md',s=>s.replaceAll('P4-AUTO','not-on-list'));
     assert.throws(()=>validatePlan(dir),/blocked task not explained/);
   });
   withFixture(dir=>{
