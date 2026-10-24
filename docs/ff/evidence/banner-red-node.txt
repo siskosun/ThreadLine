@@ -1,0 +1,89 @@
+Derived diagnostic log; local paths redacted and trailing display whitespace removed. Original SHA-256: 846de963a15d3199a007592408f743c993a91538aa221f0064c59730615e74a6
+
+✖ removed unknown-state banner recovers without another handoff operation (9.5265ms)
+✔ explicitly dismissed banner stays dismissed after unrelated page mutations (5.8662ms)
+✖ banner restoration is capped at three removals and never retries a handoff (1.1833ms)
+✖ an exact-success banner can recover without repeated insertion or ACK (1.4929ms)
+✔ ACK only for exact full continuation draft, no prefix-only success (2.0215ms)
+✔ pre-existing whitespace-only draft remains untouched and unacknowledged (0.8837ms)
+✔ ProseMirror empty trailing break is not mistaken for a user draft (0.9121ms)
+✔ a newline text node or multi-paragraph blank draft is still protected (1.3665ms)
+✔ structural ProseMirror readback ignores visual blank lines between paragraphs (1.4719ms)
+✔ handoff refuses Project, Temporary, saved chat, unknown query and foreign pages (4.6445ms)
+✔ CRLF-only normalization stays unacknowledged and gets a diagnostic (1.5195ms)
+✔ extra blank lines in a code fence are not canonicalized or ACKed (0.984ms)
+✔ one ProseMirror trailing BR is an empty paragraph, not an extra newline (0.8383ms)
+✔ a real additional blank paragraph remains a real difference, never ACKs (0.8404ms)
+✔ a non-placeholder P with a BR must not be erased by structural readback (0.8419ms)
+✔ non-text image inside an otherwise visually empty composer is owned by the user (0.8092ms)
+✔ noneditable inline attachment chip is never considered a blank placeholder (0.9362ms)
+✔ sole empty ProseMirror paragraph with placeholder BR is safe to fill (2.2754ms)
+✔ an already attempted handoff never re-inserts automatically on reload (0.9759ms)
+✔ a denied reservation must not insert or acknowledge a draft (0.808ms)
+✔ external native attachment remove control protects the entire form (1.4911ms)
+✔ external previews, file identifiers and removal controls prohibit prefill (4.0829ms)
+✔ ordinary upload controls without selected files permit prefill (0.8337ms)
+✔ attachment arriving during reservation or focus blocks the final insertion (1.4148ms)
+✔ missing form or unreadable selected-file state fails closed (1.8817ms)
+✔ redirected focus never invokes document-wide insertion into another draft (0.7458ms)
+ℹ tests 26
+ℹ suites 0
+ℹ pass 23
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 154.3747
+
+✖ failing tests:
+
+test at test\handoff.test.js:90:1
+✖ removed unknown-state banner recovers without another handoff operation (9.5265ms)
+  AssertionError [ERR_ASSERTION]: external page removal must not lose the recovery warning
+
+  false !== true
+
+      at TestContext.<anonymous> (<REPOSITORY>\threadline-extension\test\handoff.test.js:95:9)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\handoff.test.js:114:1
+✖ banner restoration is capped at three removals and never retries a handoff (1.1833ms)
+  AssertionError [ERR_ASSERTION]: restoration 1
+
+  false !== true
+
+      at TestContext.<anonymous> (<REPOSITORY>\threadline-extension\test\handoff.test.js:119:11)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\handoff.test.js:129:1
+✖ an exact-success banner can recover without repeated insertion or ACK (1.4929ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  false !== true
+
+      at TestContext.<anonymous> (<REPOSITORY>\threadline-extension\test\handoff.test.js:133:9)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

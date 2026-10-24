@@ -1,18 +1,64 @@
-importScripts("core.js", "backup-core.js", "capture-core.js", "capture-db.js", "organize-core.js");
+importScripts("core.js", "backup-core.js", "capture-core.js", "capture-db.js", "organize-core.js", "ff-core.js", "ff-db.js");
 const STORE_KEY = "threadline_state_v1";
 const SNAPSHOT_KEY = "threadline_state_snapshots";
 const CAPTURE_PREFIX = "tl_capture_owner_";
 let mutations = Promise.resolve();
 
-// The side panel normally sends messages without sender.tab. Chrome also
-// attaches sender.tab when the same extension-owned panel.html is opened in a
-// regular tab (e.g. full-width review and actual persistent-context E2E).
-// Trust that exact internal page, never a ChatGPT content script/tab URL.
-function isTrustedPanelSender(sender) {
-  if (!sender?.tab) return true;
-  const expected = chrome.runtime.getURL?.('panel.html');
-  return !!(expected && sender.id === chrome.runtime.id &&
-    sender.url === expected && (!sender.tab.url || sender.tab.url === expected));
+// The sending document is the principal, not its container tab. Never trust
+// a missing tab alone. A conflicting container requires independent browser
+// attestation of the exact live extension panel document, not payload claims.
+async function inspectPanelSender(sender) {
+  const expected = chrome.runtime.getURL('panel.html');
+  const origin = `chrome-extension://${chrome.runtime.id}`;
+  const tabURL = sender?.tab?.url;
+  const check = {
+    ok:false,reason:'ID_MISMATCH',hasTab:!!sender?.tab,
+    idMatches:!!chrome.runtime.id && sender?.id === chrome.runtime.id,
+    urlMatches:sender?.url === expected,
+    originMatches:sender?.origin === undefined || sender.origin === origin,
+    frameMatches:sender?.frameId === undefined || sender.frameId === 0,
+    tabUrlPresent:tabURL !== undefined && tabURL !== '',
+    tabUrlMatches:tabURL === undefined || tabURL === '' || tabURL === expected,
+    contextStatus:'not_checked'
+  };
+  if(!check.idMatches)return check;
+  if(!check.urlMatches)return {...check,reason:'DOCUMENT_URL_MISMATCH'};
+  if(!check.originMatches)return {...check,reason:'ORIGIN_MISMATCH'};
+  if(!check.frameMatches)return {...check,reason:'FRAME_MISMATCH'};
+  if(check.tabUrlMatches)return {...check,ok:true,reason:'EXACT_PANEL'};
+  if(typeof tabURL !== 'string')return {...check,reason:'INVALID_TAB_URL'};
+  if(typeof sender.documentId !== 'string' || !sender.documentId)
+    return {...check,reason:'DOCUMENT_ID_MISSING'};
+  if(typeof chrome.runtime.getContexts !== 'function')
+    return {...check,reason:'CONTEXT_UNAVAILABLE',contextStatus:'unavailable'};
+  let timer;
+  try {
+    const contexts = await Promise.race([
+      chrome.runtime.getContexts({contextTypes:['SIDE_PANEL','TAB'],
+        documentIds:[sender.documentId],documentUrls:[expected]}),
+      new Promise(resolve=>{timer=setTimeout(()=>resolve(null),1000);})
+    ]);
+    if(contexts === null)return {...check,reason:'CONTEXT_TIMEOUT',contextStatus:'timeout'};
+    const verified = Array.isArray(contexts) && contexts.length === 1 && contexts.every(c=>
+      c.documentId === sender.documentId && c.documentUrl === expected &&
+      c.documentOrigin === origin && (c.frameId === 0 || c.frameId === -1) &&
+      (c.contextType === 'SIDE_PANEL' ||
+        (c.contextType === 'TAB' && Number.isInteger(sender.tab?.id) &&
+          sender.tab.id >= 0 && c.tabId === sender.tab.id)));
+    return {...check,ok:verified,reason:verified?'ATTESTED_PANEL':'CONTEXT_NOT_VERIFIED',
+      contextStatus:verified?'verified':'not_matched'};
+  } catch {
+    // Never disclose raw API errors, browsing URLs, extension IDs or document IDs.
+    return {...check,reason:'CONTEXT_ERROR',contextStatus:'error'};
+  } finally {clearTimeout(timer);}
+}
+async function requirePanelSender(sender,message) {
+  const check = await inspectPanelSender(sender);
+  if(!check.ok){
+    const error = new Error(message);
+    error.code='PANEL_SOURCE_REJECTED';error.sourceCheck=check;
+    throw error;
+  }
 }
 
 
@@ -318,6 +364,98 @@ async function inspectTab(tabId) {
   if (result?.ok && result.data) return result.data;
   throw new Error('未能完成只读自检');
 }
+// P1 only: separate FF storage and explicit local opt-in; no browser automation.
+const FF_ENABLED_KEY = "tl_ff_enabled_v1";
+function trustedFFSender(sender) {
+  const own = chrome.runtime.getURL("ff.html");
+  return !!(sender && sender.id === chrome.runtime.id && sender.url === own &&
+    (!sender.tab || sender.tab.url === own));
+}
+async function ffEnabled() {
+  const state = await chrome.storage.local.get(FF_ENABLED_KEY);
+  return state[FF_ENABLED_KEY] === true;
+}
+async function handleFF(payload, sender) {
+  if (!trustedFFSender(sender)) throw new Error("only Fork extension page may access FF data");
+  if (payload.type === "FF_STATUS")
+    return {enabled:await ffEnabled(), phase:"core_only", sendsAutomatically:false};
+  if (payload.type === "FF_SET_ENABLED") {
+    if (typeof payload.enabled !== "boolean" || payload.ack !== "local-only-no-send")
+      throw new Error("explicit local-only acknowledgement required");
+    return serialize(async () => {
+      await chrome.storage.local.set({[FF_ENABLED_KEY]:payload.enabled});
+      return {enabled:payload.enabled};
+    });
+  }
+  if (!await ffEnabled()) throw new Error("Fork Beta is disabled");
+  if (payload.type === "FF_CREATE") {
+    // The caller owns a stable operation ID for this deliberate create action.
+    // A lost acknowledgement must not silently create a second experiment.
+    return serialize(async () => {
+      // The enabled flag must be checked within the serialized critical
+      // section too. An earlier pre-queue read can become stale behind OFF.
+      if (!await ffEnabled()) throw new Error("Fork Beta is disabled");
+      const operationId = payload.operationId;
+      if (typeof operationId !== "string" ||
+        !/^[a-zA-Z0-9_-]{6,100}$/.test(operationId))
+        throw new Error("explicit create operation ID required");
+      const frozen = await ThreadLineFFCore.freeze(payload.w0, payload.p);
+      const id = "ff_" + operationId;
+      const record = ThreadLineFFCore.newExperiment(frozen, id);
+      record.createOperationId = operationId;
+      let saved = record;
+      try {
+        await ThreadLineFFDB.create(record);
+      } catch (error) {
+        const existing = await ThreadLineFFDB.read(id);
+        if (!existing) throw error; // Storage failure, not a duplicate.
+        await ThreadLineFFCore.verifyFrozen(existing.frozen);
+        if (existing.createOperationId !== operationId ||
+          existing.frozen.w0 !== frozen.w0 || existing.frozen.p !== frozen.p)
+          throw new Error("create operation ID reused with different input");
+        saved = existing;
+      }
+      return {id, revision:saved.revision, bytes:saved.frozen.bytes,
+        sha256:saved.frozen.textHashes.frozen, createdAt:saved.createdAt};
+    });
+  }
+  if (payload.type === "FF_LIST") {
+    const rows = await ThreadLineFFDB.list();
+    return rows.map(x => ({id:x.id, revision:x.revision, createdAt:x.createdAt,
+      bytes:x.frozen?.bytes, statusA:x.branches?.A?.status,
+      statusB:x.branches?.B?.status})).sort((a,b) => b.createdAt-a.createdAt);
+  }
+  if (payload.type === "FF_READ") {
+    const row = await ThreadLineFFDB.read(payload.id);
+    if (!row) throw new Error("experiment not found");
+    await ThreadLineFFCore.verifyFrozen(row.frozen);
+    return row;
+  }
+  if (payload.type === "FF_RECORD") {
+    // P1 has no way to establish a trusted final message or a completed send.
+    // Never allow the UI to mark a branch done; that authority belongs to P2/P3.
+    if (!["pending", "failed", "unknown"].includes(payload.status))
+      throw new Error("completion is not available in P1");
+    if (payload.evidence !== undefined && (payload.evidence === null ||
+      Array.isArray(payload.evidence) || typeof payload.evidence !== "object" ||
+      Object.keys(payload.evidence).length > 0))
+      throw new Error("P1 cannot accept webpage evidence");
+    return serialize(async () => {
+      if (!await ffEnabled()) throw new Error("Fork Beta is disabled");
+      const existing = await ThreadLineFFDB.read(payload.experimentId);
+      if (!existing) throw new Error("experiment not found");
+      await ThreadLineFFCore.verifyFrozen(existing.frozen);
+      return ThreadLineFFDB.update(existing.id, payload.expectedRevision,
+        record => ThreadLineFFCore.advance(record, {
+          branch:payload.branch, expectedRevision:payload.expectedRevision,
+          operationId:payload.operationId, attemptId:payload.attemptId,
+          status:payload.status, phase:payload.phase, reason:payload.reason || "",
+          evidence:{}, manualNewAttempt:payload.manualNewAttempt === true
+        }));
+    });
+  }
+  throw new Error("unknown Fork message type");
+}
 chrome.runtime.onInstalled.addListener(() => {
   chrome.sidePanel.setPanelBehavior({openPanelOnActionClick:true}).catch(() => {});
 });
@@ -337,27 +475,59 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 chrome.runtime.onMessage.addListener((payload,sender,reply) => {
   (async () => {
     if (!payload || typeof payload.type !== "string") throw new Error("无效消息");
+    if (payload.type.startsWith("FF_")) return handleFF(payload, sender);
     if (payload.type === "CAPTURE_START") {
-      if(!isTrustedPanelSender(sender))throw new Error("只有研线面板可启动采集");
+      await requirePanelSender(sender,"只有研线面板可启动采集");
       return beginCapture(payload.tabId);
     }
     if (["CAPTURE_RESET","CAPTURE_PAGE","CAPTURE_PROGRESS","CAPTURE_END","CAPTURE_FAIL"].includes(payload.type))return receiveCapture(payload,sender);
     if(payload.type === "WEB_ORGANIZE"){
-      if(!isTrustedPanelSender(sender))throw new Error('只有研线面板可以管理网页版项目与归档');
+      await requirePanelSender(sender,'只有研线面板可以管理网页版项目与归档');
       return organizeWeb(payload);
     }
     if(payload.type === "NEW_CHAT"){
-      if(!isTrustedPanelSender(sender))throw new Error("只有研线面板可接续研究");
+      await requirePanelSender(sender,"只有研线面板可接续研究");
       return openChatWithDraft(payload.handoff,payload.windowId,payload.projectId);
     }
-    if(payload.type === "HANDOFF_GET"){
-      if(!sender.tab?.id||!ThreadLineCore.isChatURL(sender.tab.url))throw new Error("只允许新 ChatGPT 页面访问其接续提示");
-      const record=await chrome.storage.session.get(`tl_handoff_${sender.tab.id}`);
-      return record[`tl_handoff_${sender.tab.id}`]||null;
-    }
-    if(payload.type === "HANDOFF_ACK"){
-      if(!sender.tab?.id)throw new Error("无法确认目标标签页");
-      await chrome.storage.session.remove(`tl_handoff_${sender.tab.id}`);return {ok:true};
+    if(["HANDOFF_GET","HANDOFF_BEGIN","HANDOFF_ACK"].includes(payload.type)){
+      // A stale tab, Project/Temporary redirect or background page cannot
+      // consume a draft reservation from another ChatGPT document.
+      const eligible = input => {
+        try {
+          const u = new URL(input);
+          return u.protocol === "https:" &&
+            ["chatgpt.com","chat.openai.com"].includes(u.hostname) &&
+            u.pathname === "/" && !u.search && !u.hash;
+        } catch {return false;}
+      };
+      if (!Number.isInteger(sender.tab?.id) ||
+          !eligible(sender.tab.url) || !eligible(sender.url))
+        throw new Error("only a plain new ChatGPT document may access handoff");
+      const key = `tl_handoff_${sender.tab.id}`;
+      if (payload.type === "HANDOFF_GET") {
+        const found = await chrome.storage.session.get(key);
+        const record = found[key];
+        return record ? {...record,autoAttempted:Number.isFinite(record.attemptedAt)} : null;
+      }
+      if (payload.type === "HANDOFF_BEGIN") {
+        // Reserve the only automatic insertion BEFORE touching the composer.
+        // Serialize against duplicate content-script or worker invocations.
+        return serialize(async () => {
+          const found = await chrome.storage.session.get(key);
+          const record = found[key];
+          if (!record?.text || Number.isFinite(record.attemptedAt))
+            return {autoFill:false};
+          await chrome.storage.session.set({[key]:{...record,attemptedAt:Date.now()}});
+          return {autoFill:true};
+        });
+      }
+      return serialize(async () => {
+        const found = await chrome.storage.session.get(key);
+        if (!Number.isFinite(found[key]?.attemptedAt))
+          throw new Error("no reserved handoff attempt to acknowledge");
+        await chrome.storage.session.remove(key);
+        return {ok:true};
+      });
     }
     if (payload.type === "ACK_PAGE") {
       // A content script can only acknowledge the page that sent the message.
@@ -370,37 +540,37 @@ chrome.runtime.onMessage.addListener((payload,sender,reply) => {
       return {key,...ThreadLineCore.getContext(state,key)};
     }
     if (payload.type === "BACKUP_EXPORT") {
-      if(!isTrustedPanelSender(sender))throw new Error('只能由研线侧栏导出');
+      await requirePanelSender(sender,'只能由研线侧栏导出');
       const state=await readState();
       const record=await chrome.storage.local.get(SNAPSHOT_KEY);
       return ThreadLineBackup.create(state,record[SNAPSHOT_KEY]||[]);
     }
     if (payload.type === "BACKUP_IMPORT") {
-      if(!isTrustedPanelSender(sender))throw new Error('只能由研线侧栏导入');
+      await requirePanelSender(sender,'只能由研线侧栏导入');
       return importBackup(payload.json);
     }
     if (payload.type === "BACKUP_SNAPSHOTS") {
-      if(!isTrustedPanelSender(sender))throw new Error('只能由研线侧栏读取');
+      await requirePanelSender(sender,'只能由研线侧栏读取');
       const record=await chrome.storage.local.get(SNAPSHOT_KEY);
       return (record[SNAPSHOT_KEY]||[]).map((r,index)=>({index,at:r.at,reason:r.reason,revision:r.state?.revision}));
     }
     if (payload.type === "BACKUP_ROLLBACK") {
-      if(!isTrustedPanelSender(sender))throw new Error('只能由研线侧栏恢复');
+      await requirePanelSender(sender,'只能由研线侧栏恢复');
       return restoreSnapshot(payload.index);
     }
     if (payload.type === "HEALTH_CHECK") {
-      if(!isTrustedPanelSender(sender))throw new Error('只能由研线侧栏自检');
+      await requirePanelSender(sender,'只能由研线侧栏自检');
       const result=await inspectTab(payload.tabId);
       const record=await chrome.storage.local.get(PAGE_HEALTH_KEY);
       return {page:result,lastSuccess:record[PAGE_HEALTH_KEY]||{},at:Date.now()};
     }
     if (payload.type === "SNAPSHOT") {
-      if (!isTrustedPanelSender(sender)) throw new Error("无权访问面板数据");
+      await requirePanelSender(sender,"无权访问面板数据");
       await recoverCaptures();
       return snapshot();
     }
     if (payload.type === "MUTATE") {
-      if (!isTrustedPanelSender(sender)) throw new Error("只能在扩展面板中修改课题状态");
+      await requirePanelSender(sender,"只能在扩展面板中修改课题状态");
       return mutate(payload.action);
     }
     if (["PAGE_CONTEXT","OBSERVE"].includes(payload.type)) {
@@ -408,6 +578,7 @@ chrome.runtime.onMessage.addListener((payload,sender,reply) => {
       return pageContext(sender,payload);
     }
     throw new Error("无效消息类型");
-  })().then(data=>reply({ok:true,data}),err=>reply({ok:false,error:String(err.message||err)}));
+  })().then(data=>reply({ok:true,data}),err=>reply({ok:false,error:String(err.message||err),
+    ...(err.code==='PANEL_SOURCE_REJECTED'?{code:err.code,sourceCheck:err.sourceCheck}:{})}));
   return true;
 });

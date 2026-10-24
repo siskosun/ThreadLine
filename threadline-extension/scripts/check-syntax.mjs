@@ -1,7 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {execFileSync} from 'node:child_process';
-const dir=path.resolve(new URL('..',import.meta.url).pathname);
+const dir=path.resolve(fileURLToPath(new URL('..',import.meta.url)));
 let count=0;
 function check(folder){
   for (const name of fs.readdirSync(folder)){

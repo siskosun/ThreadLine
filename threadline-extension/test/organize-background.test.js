@@ -5,7 +5,7 @@ function setup(options={}){
  const tabMap=new Map([[7,{id:7,status:'complete',url:'https://chatgpt.com/c/source-123',windowId:3,title:'来源对话'}]]);
  const run={id:'cap_1',tabId:7,conversationId:'source-123',status:'done',url:'https://chatgpt.com/c/source-123'};runs.set(run.id,run);
  const db={async getRun(id){return runs.get(id)},async modifyRun(id,patch){const row={...runs.get(id),...patch};runs.set(id,row);return row}};
- const chrome={runtime:{onInstalled:{addListener(){}},onStartup:{addListener(){}},onMessage:{addListener(fn){callbacks.message=fn}}},
+ const chrome={runtime:{id:'organize-test',getURL:p=>'chrome-extension://organize-test/'+p,onInstalled:{addListener(){}},onStartup:{addListener(){}},onMessage:{addListener(fn){callbacks.message=fn}}},
   tabs:{onUpdated:{addListener(){}},onRemoved:{addListener(){}},async get(id){const t=tabMap.get(id);if(!t)throw Error('missing tab');return {...t}},
    async query(){return[]},async create(options){const newTab={id:84,status:'complete',url:'https://chatgpt.com/',windowId:3};tabMap.set(84,newTab);records.push(['create',options]);return newTab},
    async sendMessage(id,msg){records.push(['send',id,msg.type]);if(msg.type==='TL_ORG_CREATE'){const helper=tabMap.get(id);helper.url='https://chatgpt.com/g/g-p-999/project';if(options.createLosesResponse)throw Error('connection dropped on SPA navigation');return{ok:true,data:{status:'created',name:msg.name,id:'g-p-999',url:helper.url}};}
@@ -14,7 +14,7 @@ function setup(options={}){
      return {ok:true};},async remove(id){records.push(['remove',id]);tabMap.delete(id)}},
   scripting:{async executeScript(arg){records.push(['script',arg.target.tabId]);}},sidePanel:{setPanelBehavior:async()=>{}},storage:{local:{async get(k){return{[k]:local.get(k)}},async set(o){for(const [k,v]of Object.entries(o))local.set(k,v)}},session:{async get(k){return{[k]:session.get(k)}},async set(o){for(const [k,v]of Object.entries(o))session.set(k,v)},async remove(k){for(const key of Array.isArray(k)?k:[k])session.delete(key)}}}};
  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'..','background.js'),'utf8'),{importScripts:()=>{},ThreadLineCore:Core,ThreadLineCaptureCore:CaptureCore,ThreadLineCaptureDB:db,ThreadLineOrganizeCore:OrgCore,chrome,crypto:globalThis.crypto,console,Date,Promise,URL,setTimeout,clearTimeout});
- const message=(input,sender={})=>new Promise((resolve,reject)=>{callbacks.message(input,sender,r=>r.ok?resolve(r.data):reject(Error(r.error)))});
+ const message=(input,sender={id:'organize-test',url:'chrome-extension://organize-test/panel.html'})=>new Promise((resolve,reject)=>{callbacks.message(input,sender,r=>r.ok?resolve(r.data):reject(Error(r.error)))});
  return {message,runs,records,tabMap};
 }
 test('create project and move exact source chat, close helper after success',async()=>{

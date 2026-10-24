@@ -1,8 +1,8 @@
 # ThreadLine 开发计划
 
 **唯一正式计划：** 本文件 `docs/PLAN.md`。其他 ChatGPT 资料库、对话、PR 说明和 `docs/ff/` 附录仅作为参考或证据，均不能覆盖本文件的任务状态。
-**事实核查日：** 2026-10-21。
-**基线：** main `d40d13f2918c33961ced333a9884af9c853157ad`，v0.6.1。
+**事实核查日：** 2026-10-23。
+**基线：** main `f3109ebb6e5e76f4c34670b10654bd0127471bea`（含已合并治理 PR #2），应用仍为 v0.6.1。
 **实施授权范围：** 第零步与第一期；第二期暂缓。不得仅凭 Agent 声称完成而更新状态。
 
 ## 执行任务与验收门禁
@@ -12,10 +12,10 @@
 <!-- PLAN_TASKS_START -->
 | ID | 阶段与目标 | 状态 | 依赖 | 完成条件 | 证据 | 人工门禁 |
 | --- | --- | --- | --- | --- | --- | --- |
-| R-REUSE | 复用调研与 Fork 审计 | in_review | - | 上游代码、Fork 差异及移植边界经评审 | PR#2 | no |
+| R-REUSE | 复用调研与 Fork 审计 | done | - | 上游代码、Fork 差异及移植边界经评审 | docs/ff/evidence/R-REUSE.json | no |
 | Z0-BASE | Windows 测试基线与路径修复 | in_review | - | Windows npm run verify 和合成 E2E 有原始日志 | PR#1 | yes |
 | Z0-LIVE | 真实登录 ChatGPT 的页面适配验收 | blocked | Z0-BASE | 双标签创建、长草稿回读、人工发送核实、完整采集、异常恢复由用户验收 | docs/ff/BLOCKED.md | yes |
-| P1-CORE | 冻结材料、独立存储及四态状态机 | planned | - | 24KB 输入和 SHA-256、attempts、单写者与原有功能回归经测试 | - | no |
+| P1-CORE | 冻结材料、独立存储及四态状态机 | in_review | - | 24KB 输入和 SHA-256、attempts、单写者与原有功能回归经测试 | PR#10 | no |
 | P2-FORK | 双会话创建与人工发送工作流 | planned | Z0-LIVE,P1-CORE | 两边输入完整且相同，0 自动发送，分支身份和重启恢复经测试 | - | yes |
 | P3-REPORT | 完整结果采集、去标签对照及 JSON 导出 | planned | P2-FORK | 双 done 才可对照，用户裁决持久化，不重放未知状态，导出可独立复算 | - | yes |
 | BETA-RELEASE | 安装升级与正式 Beta 验收 | planned | P3-REPORT | 真实双分支闭环、同路径旧数据升级、CI 与用户验收均通过 | - | yes |
@@ -42,18 +42,51 @@
 
 ## 二、已核实的当前进展
 
-截至 2026-10-21 本次检查：
+### 2026-10-23 验收对账（main 与开放 Draft PR）
+
+独立核对 GitHub 事实后的结论（不信任聊天快照）：
+
+| 项目 | 事实 | 计划表状态 |
+| --- | --- | --- |
+| main | `f3109ebb6e5e76f4c34670b10654bd0127471bea`；治理 PR [#2](https://github.com/siskosun/ThreadLine/pull/2) 已于 2026-10-21 合并；merge 提交 verify CI success | R-REUSE → `done`（新增 canonical JSON） |
+| Z0-BASE | Draft [#1](https://github.com/siskosun/ThreadLine/pull/1) 仍 open；Windows runner + 合成 E2E CI 绿；所有者 `MANUAL_ACCEPT` 未出现 | 保持 `in_review` / PR#1 |
+| Z0-LIVE | 仅有部分脱敏 Edge/Tabbit 零发送记录；无绑定 HEAD 的完整真人签署 | 保持 `blocked`；**不得标 done** |
+| P1-CORE | Draft [#3](https://github.com/siskosun/ThreadLine/pull/3)、收敛 [#9](https://github.com/siskosun/ThreadLine/pull/9)、续作 [#10](https://github.com/siskosun/ThreadLine/pull/10) 均有冻结/IDB/四态/单写者实现与测试 | 保持 `in_review` / PR#10（未合并 ≠ done） |
+| 叠加修复 Draft | [#5](https://github.com/siskosun/ThreadLine/pull/5) 附件草稿、[#6](https://github.com/siskosun/ThreadLine/pull/6) 面板来源、[#7](https://github.com/siskosun/ThreadLine/pull/7) 恢复不变量、[#8](https://github.com/siskosun/ThreadLine/pull/8) 提示恢复；均 Draft、CI 绿、已并入 #9 候选 | 不单独改任务表；以 #9 为 main 目标评审面 |
+| P2/P3/P4 | 无授权实现；依赖 Z0-LIVE/P1 正式完成 | 保持 planned / deferred |
+
+自动测试通过 ≠ 真人 Windows 签署 ≠ 真实登录 ChatGPT 验收 ≠ 任务 `done`。本轮继续在 #9 血统上加固 P1（创建身份不可篡改）并提交 Draft 评审；不启动 P2-FORK / P3-REPORT / P4-AUTO。
+
+### 2026-10-23 已验收修复与 P1 核心的 main 集成候选
+
+- 用户已明确确认验收范围为“当前所有修复与 P1 核心验收”。这份确认作为用户报告记录；此前 Agent 未能完成的 Edge 控制预检日志保留，未改写为 Agent 实测成功。
+- [Draft PR9](https://github.com/siskosun/ThreadLine/pull/9) 收敛 PR1/3/5/6/7/8；续作 [Draft PR10](https://github.com/siskosun/ThreadLine/pull/10) 增加 IndexedDB 创建身份不可变保护与本次对账。集成回归见 [集成记录](ff/evidence/ACCEPTED_INTEGRATION_20261023.md)。
+- P1-CORE 保持 `in_review` 并关联 PR10；仍需授权合并后的准确提交、CI 与 `P1-CORE.json` 才能按证据契约登记 `done`。Z0-LIVE 维持 blocked。
+- 下一步：评审 Draft PR10；人审决定是否合并；合并后补 P1 完成证据；完整 Z0-LIVE 签署前不进入 P2-FORK。计划表变更须随 PR 人工复核。
+
+### 2026-10-23 开发接续核对（证据更新，任务状态未放行）
+
+- GitHub 本次核对：main `f3109ebb6e5e76f4c34670b10654bd0127471bea`；PR #1/#3/#5/#6/#7 均仍 Draft/open、未合并。下方 2026-10-21 表格是历史快照，不代表最新 PR 开发情况。
+- PR #7 代码候选 `07b37731326517fa8c70fca3c7676eaaac526edd` 已组合 P1 核心与来源/草稿保护修复；对应 Windows 本机 183/183 Node、3/3 合成 Chromium E2E 通过。准确提交的 [Linux CI](https://github.com/siskosun/ThreadLine/actions/runs/39957077821) 与 [Windows CI](https://github.com/siskosun/ThreadLine/actions/runs/39957077788) 均通过。这些结果不替代正式合并或真人验收。
+- 实际 Tabbit 对该代码的六个资源指纹、普通预填、外置原生附件保护及移除后显式恢复已有脱敏证据。长文本 23,569 字节逐字/哈希一致，附件拒绝预留/ACK 为 0/0，恢复成功为 1/1；新增发送 0 次。详见 [本次实测与剩余门禁](ff/evidence/TABBIT_ZERO_SEND_20261023.md)。Edge 当前候选 NOT RUN，Z0-LIVE 仍 BLOCKED / NOT SIGNED。
+- 本阶段只归档证据和更新进度，未新增 P2/P3 代码。此文档提交的回归与 CI 以 [PR #7](https://github.com/siskosun/ThreadLine/pull/7) 最终 HEAD 检查为准；旧代码提交的测试不会冒充新 HEAD 验证。
+- 下一步：完成剩余真实验收及用户最终风险确认，明确授权集成/合并并收集合并 SHA 证据；在 Z0-LIVE 和 P1-CORE 满足正式完成契约前，P2-FORK 不启动，P3-REPORT 继续依赖 P2-FORK。状态表、依赖、签署与发布规则均未修改。本计划新增的事实记录须随 PR 人工复核。
+
+### 2026-10-23 真实测试驱动的提示恢复修复
+
+后续零发送验收确认纯空白、多行草稿与未知预填不重放，但发现未知状态提示被页面移除后丢失。已先红后绿补充最小、有次数上限的提示恢复，Windows 189/189 Node、3/3 合成 MV3 通过；不改变预填/来源/存储规则。[Draft PR8](https://github.com/siskosun/ThreadLine/pull/8) 代码提交 `1f7578f` 的双平台 CI 通过。真实修复版复测受扩展检查器激活失败、Tabbit 扩展 URL 导航拒绝阻塞；仅磁盘更新不算加载验证。证据及红绿日志见 [提示恢复记录](ff/evidence/HANDOFF_NOTICE_RECOVERY_20261023.md)。下一步是恢复可验证的扩展控制通道并复测、完成剩余真人门禁；真实 Edge 和完整 Z0-LIVE 仍未签署，P2/P3 不放行。本段只更新实际进度，不修改任务表或依赖，计划文件变动仍需人工复核。
+
+以下为 2026-10-21 历史快照（**已被上方 2026-10-23 对账取代**；保留供审计，勿当现状）：
 
 | 项目 | 状态 | 证据 |
 | --- | --- | --- |
-| 主仓基线 | main `d40d13f2918c33961ced333a9884af9c853157ad`，v0.6.1 | GitHub main |
-| Windows 修复及第零步文档 | Draft PR #1，尚未合并；CI success | https://github.com/siskosun/ThreadLine/pull/1 |
-| 开发前开源复用/Fork 审计 | Draft PR #2，尚未合并；CI success | https://github.com/siskosun/ThreadLine/pull/2 |
-| PR-1 功能开发 | 仅创建 `feat/ff-core-pr1-20261021` 分支，未提交功能代码 | GitHub 分支 |
-| 真实登录 ChatGPT 网页验收 | **未执行、未通过** | PR #1 `docs/ff/VERIFY.md` |
-| PR-2/PR-3、正式发布 | 尚未开始 | 阶段门禁 |
+| 主仓基线 | 当时 main `d40d13f`，v0.6.1 | 历史 |
+| Windows 修复及第零步文档 | Draft PR #1 | https://github.com/siskosun/ThreadLine/pull/1 |
+| 开发前开源复用/Fork 审计 | 当时 Draft PR #2；现已合并 | https://github.com/siskosun/ThreadLine/pull/2 |
+| PR-1 功能开发 | 当时仅分支；现见 Draft #3/#9 | 历史 |
+| 真实登录 ChatGPT 网页验收 | **未通过（仍成立）** | docs/ff/BLOCKED.md |
 
-GitHub CI 成功只证明相应分支的现有自动化检查通过，不代表 Windows 本地验收、真实网页登录验收或新功能可用。远程设备目前离线；不得把无法执行的人工环节写成通过。
+GitHub CI 成功只证明相应分支的现有自动化检查通过，不代表 Windows 本地验收、真实网页登录验收或新功能可用。不得把无法执行的人工环节写成通过。
 
 ## 三、复用结论：扩展现有项目，避免造轮子
 
@@ -156,7 +189,7 @@ GitHub CI 成功只证明相应分支的现有自动化检查通过，不代表 
 
 ## 十、下一步与维护规则
 
-当前顺序：审核开源复用调查和 Draft PR #2；PR #1 的 Windows 路径修复虽 CI 通过，但 Windows 实机与登录网页均未完成人工确认；PR-1 可以独立推进冻结与状态基础；PR-2 必须等待 Z0-LIVE 和 P1-CORE 满足放行；PR-3 等待 P2-FORK；第二期保持 `deferred`。
+当前顺序：R-REUSE 已合并并登记证据；评审 Draft PR #10（续作自 #9）作为 P1-CORE 集成面；PR #1 的 Windows 基线仍待所有者 `MANUAL_ACCEPT`；Z0-LIVE 保持 blocked，未签署前不得执行/评审 P2-FORK；P3-REPORT 等待 P2-FORK；第二期保持 `deferred`。
 
 **GitHub 是唯一权威持久位置。** 本文件负责目标、阶段、任务状态及验收标准。根目录 `AGENTS.md` 约束执行者；`docs/ff/REUSE_AUDIT_20261021.md` 是复用证据，不是计划；`docs/ff/DEVELOPMENT_PLAN.md` 只保留重定向。ChatGPT Library 中的历史副本只供查看，不能作为当前状态来源。
 

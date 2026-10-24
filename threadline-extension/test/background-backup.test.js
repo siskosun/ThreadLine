@@ -3,7 +3,7 @@ function env(){
  const root=path.resolve(__dirname,'..');let listener;const local={},session={};
  const get=(store,key)=>key===null?{...store}:{[key]:store[key]};
  const chrome={
- runtime:{onMessage:{addListener(fn){listener=fn}},onInstalled:{addListener(){}},onStartup:{addListener(){}}},
+ runtime:{id:'backup-test',getURL:p=>'chrome-extension://backup-test/'+p,onMessage:{addListener(fn){listener=fn}},onInstalled:{addListener(){}},onStartup:{addListener(){}}},
  sidePanel:{setPanelBehavior:async()=>{}},
  tabs:{query:async()=>[],onUpdated:{addListener(){}},onRemoved:{addListener(){}}},
  storage:{local:{get:async key=>get(local,key),set:async val=>Object.assign(local,val)},
@@ -12,7 +12,7 @@ function env(){
  const sandbox={chrome,URL,Date,Promise,structuredClone,crypto:globalThis.crypto,console,importScripts:()=>{}};
  vm.createContext(sandbox);
  for(const file of ['core.js','backup-core.js','background.js'])vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),sandbox);
- const send=input=>new Promise(resolve=>listener(input,{},resolve));
+ const send=input=>new Promise(resolve=>listener(input,{id:'backup-test',url:'chrome-extension://backup-test/panel.html'},resolve));
  return {send,local,session};
 }
 test('export/import restores project and preserves previous state snapshot',async()=>{

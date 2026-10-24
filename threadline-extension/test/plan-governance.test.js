@@ -9,14 +9,20 @@ const {pathToFileURL} = require('node:url');
 
 const ROOT = path.resolve(__dirname, '../..');
 const MOD = path.join(ROOT, 'scripts', 'check-plan.mjs');
-const fixtureFiles = ['docs/PLAN.md','AGENTS.md','docs/ff/DEVELOPMENT_PLAN.md','docs/ff/BLOCKED.md'];
+const fixtureFiles = [
+  'docs/PLAN.md','AGENTS.md','docs/ff/DEVELOPMENT_PLAN.md','docs/ff/BLOCKED.md',
+  // Canonical done evidence must travel with PLAN fixtures once a task is done.
+  'docs/ff/evidence/R-REUSE.json'
+];
 
 async function checks() { return import(pathToFileURL(MOD).href); }
 function fixture() {
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'threadline-plan-'));
   for(const name of fixtureFiles){
+    const source=path.join(ROOT,name);
+    if(!fs.existsSync(source)) continue;
     fs.mkdirSync(path.dirname(path.join(dir,name)),{recursive:true});
-    fs.copyFileSync(path.join(ROOT,name),path.join(dir,name));
+    fs.copyFileSync(source,path.join(dir,name));
   }
   return dir;
 }
@@ -37,8 +43,12 @@ test('canonical plan contains all required tasks and no unverified done claims',
   const {validatePlan}=await checks();
   const actual=validatePlan(ROOT);
   assert.equal(actual.tasks.length,8);
-  assert.equal(actual.done.length,0);
+  // R-REUSE may be done only with a real merged-PR evidence JSON; nothing else.
+  assert.equal(actual.done.length,1);
+  assert.equal(actual.done[0].task.id,'R-REUSE');
   assert.equal(actual.tasks.find(x=>x.id==='Z0-LIVE').status,'blocked');
+  assert.equal(actual.tasks.find(x=>x.id==='P1-CORE').status,'in_review');
+  assert.notEqual(actual.tasks.find(x=>x.id==='P1-CORE').status,'done');
 });
 
 test('missing/duplicate plan markers and missing tasks are rejected',async()=>{
@@ -48,7 +58,7 @@ test('missing/duplicate plan markers and missing tasks are rejected',async()=>{
     assert.throws(()=>validatePlan(dir),/markers/);
   });
   withFixture(dir=>{
-    edit(dir,'docs/PLAN.md',s=>s.replace(/^\| P2-FORK \|.*\n/m,''));
+    edit(dir,'docs/PLAN.md',s=>s.replace(/^\| P2-FORK \|[^\r\n]*(?:\r?\n|$)/m,''));
     assert.throws(()=>validatePlan(dir),/required task IDs/);
   });
 });
@@ -65,8 +75,13 @@ test('a task cannot advance while its hard dependencies are incomplete',async()=
 test('marking done without an evidence JSON fails, even if the agent says it passed',async()=>{
   const {validatePlan}=await checks();
   withFixture(dir=>{
-    edit(dir,'docs/PLAN.md',s=>rowChange(s,'R-REUSE',
-      line=>line.replace(' | in_review | ',' | done | ').replace(' | PR#2 | no |',' | docs/ff/evidence/R-REUSE.json | no |')));
+    // P1-CORE is a code task still in_review; claiming done without JSON must fail.
+    edit(dir,'docs/PLAN.md',s=>rowChange(s,'P1-CORE',
+      line=>line.replace(' | in_review | ',' | done | ').replace(' | PR#10 | no |',' | docs/ff/evidence/P1-CORE.json | no |')));
+    assert.throws(()=>validatePlan(dir),/missing evidence file/);
+  });
+  withFixture(dir=>{
+    fs.rmSync(path.join(dir,'docs/ff/evidence/R-REUSE.json'),{force:true});
     assert.throws(()=>validatePlan(dir),/missing evidence file/);
   });
 });

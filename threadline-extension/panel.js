@@ -293,7 +293,7 @@
       const data=await message({type:'HEALTH_CHECK',tabId:current.id});
       const parts=data.page.parts;
       host.innerHTML=`<p><strong>${data.page.status==='basic_ready'?'基本页面可识别':'可能已降级'}</strong> · ${escape(data.page.notes)}</p>`+
-        Object.entries(parts).map(([k,v])=>`<p>${escape({composer:'输入框',sendButton:'发送控件',sidebar:'侧栏',conversation:'消息区域'}[k]||k)}：${v.available?'已识别':'未识别'}</p>`).join('')+
+        Object.entries(parts).map(([k,v])=>`<p>${escape({composer:'输入框',sendButton:'发送控件',sidebar:'侧栏',conversation:'消息区域'}[k]||k)}：${v.available?'已识别':v.candidate?'发现文本候选（角色未确认）':'未识别'}</p>`).join('')+
         Object.entries({capture:'完整采集',move:'移入项目',archive:'归档'}).map(([k,name])=>`<p>${name}上次真实成功：${escape(formatHealthTime(data.lastSuccess[k]))}</p>`).join('')+
         '<p>仅通过 DOM 识别不能证明项目创建、归档、分页接口和自动分析可用；这些仍需真实任务验证。</p>';
     } catch(e){host.textContent='网页自检失败：'+e.message;}

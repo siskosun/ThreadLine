@@ -1,0 +1,141 @@
+# Fork 双分支 - 第零步验收（未通过）
+基线：main d40d13f2918c33961ced333a9884af9c853157ad，v0.6.1。
+本分支原始工作为修复 Windows 上 check-syntax.mjs 的 file: URL 路径处理与异目录回归；2026-10-22 追加只读网页选择器兼容、隐藏停止按钮修复与合成回归。
+CI 是合成 ChatGPT 页面，不是已登录网页。
+
+## 2026-10-23 NEW_CHAT 来源授权回归（不代表真实故障已恢复）
+
+- 基线 PR #5 `93a88d8` 的 Windows Node 138/138。新 `test/panel-source.test.js` 先对旧 background.js 红灯：11 个分组测试，4 pass / 7 fail；同一断言随后验证严格主体、独立上下文证明、超时及敏感信息不泄漏。
+- 修复后 `npm run verify`：149/149，41 个 JS 语法文件，版本 0.6.1 和正式计划结构检查通过。普通无 tab 侧栏、完整 panel tab、缺 tab.url 的合法面板可用；错 ID/URL/origin/子框架、未知来源、伪造 payload、缺失/错误/过期/重复上下文、API 缺失/异常/超时均拒绝；全部十种面板特权操作共用相同检查。
+- `npm run test:e2e`：两套合成 MV3 通过。真实 Chromium `runtime.getContexts()` 校验面板上下文；真实子框架调用被拒绝，无新标签；storage/IndexedDB/UI/backup/restart 原功能通过；handoff 23,569 字节 exact、附件草稿保护、无附件正常预填及刷新不重放保持。零真实发送，合成 submit 计数 0。
+- 首轮 ACK 竞态失败日志保留。正向 exact 用例改为有界只读核对实际 ACK 完成，不以横幅代替成功，也不重复写入；5 秒无 ACK 必须失败。既有不匹配/已有草稿不 ACK 断言不变。
+- 来源兼容路径的冲突容器元数据在 Node 中合成；没有实际 Tabbit sender 元数据，不能声称 Tabbit/Edge 来源故障已修复。所有真实网页验收仍 BLOCKED，等待人工风险确认，见 [证据](evidence/PANEL_SOURCE_20261023.md)。
+
+## 2026-10-23 原生附件草稿保护回归
+
+- 基线：PR #1 `93199fbee134f74ff45fc21df86674025f833be0`，Windows `npm run verify` 132/132。新附件用例先在未修改的生产代码上运行：21 个定向测试，17 通过、4 失败，失败均为不应插入却插入。未放宽保护断言。
+- 最终：`npm run verify` 138/138，40 个 JS 语法检查、版本与正式计划检查通过；`npm run test:e2e` 两套合成 MV3 PASS。新增附件/预览/选中文件及迟到附件测试明确要求零写入、无 ACK；初检已有附件要求无 HANDOFF_BEGIN。空 file input 与普通上传按钮继续可预填。
+- 保留原有全文 exact/23,569 字节、空段落、不丢真实额外换行、已有文字/空白/非文字、BEGIN 并发登记、未知状态刷新不重放、Project/Temporary/旧会话拒绝测试。实际浏览器选区转移的合成回归额外要求另一草稿保持 `USER DRAFT`。
+- 旧 E2E 故障注入采用 contenteditable=false；新代码正确在登记前拒绝该节点，首次完整 E2E 因原预期“未确认成功”失败。保留失败日志，改用隐藏但可编辑的输入框模拟登记后无法取得焦点，仍严格要求 attemptedAt、无 ACK、刷新后零写入且停止重试。不是删除原安全断言。
+- 真实 Edge 新版本验证 BLOCKED / NOT RUN；Z0-LIVE `blocked / NOT SIGNED`。详见 [源码指纹与脱敏证据](evidence/NATIVE_ATTACHMENT_20261023.md)。
+
+## 真实网页门禁
+状态：BLOCKED / PARTIAL / NOT SIGNED。2026-10-21 尚未执行真实网页登录；2026-10-22 已收到 S1 和后续 A/B 双标签页面级核对（按来源归属的文字比较、无跨页标记）；但原始日志/截图、生成重叠窗口、可信原始角色与消息哈希及异常门禁未全部复核或完成。远程设备 sunzc 离线。**严禁把本项标记为通过。**
+待用户参与的检查：新建普通会话；短文本及近 24 KB 的 Unicode/Markdown 草稿回读；人工发送后实际用户消息准确性（exact、canonical_equivalent、unverified、differs）；生成结束双信号；结果身份绑定；双标签交错完成；Project/Temporary 拒绝；限流/断网/重启；非文本回复保守 unknown。
+完整输入比对仅在可信非有损文本源可用时可认定 exact；采集本身的 trim/规范化不得用于声称字节一致。
+观察到停止生成控件消失 + 文本稳定 5s 仍不能单独证明完成，需结合可验证的会话数据和完整性。
+采集 legacy 和 DOM 回退必须保留来源和 incomplete 风险。
+PR-2/3 在用户签署此门禁通过前不得开展真实网页自动化集成。
+
+
+## 2026-10-21 Windows GitHub Runner 实测（不等于真人网页验收）
+- PR #1 HEAD：`81597d5c169c48226c09adb661f7a09041fded86`。
+- [GitHub Windows Actions run 39612233835](https://github.com/siskosun/ThreadLine/actions/runs/39612233835)，Windows runner + Node 22 + Python 3.12 + Playwright Chromium。
+- 执行 `npm run verify`：105 项 Node 测试，105 通过、0 失败；从非仓库目录执行 `node scripts/check-syntax.mjs`：39 个 JS 文件通过扫描。
+- 执行 `npm run test:e2e`：合成 ChatGPT 网页下真实 MV3 Chromium 持久配置测试成功，包括本地存储、侧栏 UI、IDB、重启恢复和只读探针。**并未登录真实 ChatGPT，也未人工发送。**
+- [原始 Windows 日志附件](https://github.com/siskosun/ThreadLine/actions/runs/39612233835/artifacts/12350647387)；CI 自动保留 30 天。
+- 首次 Windows run 39611864566 曾因计划负向测试的 CRLF fixture 不兼容失败，随后在 PR 分支引入最新 main 并修正行匹配，未放宽正式计划校验断言；此修订之后的完整 Windows 测试全部通过。
+- 尚缺：用户自己的 Windows 环境与真实 ChatGPT 已登录双标签验收；Z0-BASE 仍为 `in_review`（人工门禁未签署），Z0-LIVE 为 `blocked`。不得标为 `done`。
+
+
+## 2026-10-22 补充验收记录与后续操作（仍未签署）
+
+详见 [单会话真实网页验收初步记录](evidence/Z0-LIVE-20261022-preliminary.md)。该记录基于操作者提交的脱敏摘要；本次未读取本机原始日志/截图。**不是签署、不是 Z0-LIVE done，不能用于解锁 P2/P3。**
+
+### 修复后需要先核对
+
+- 使用 PR #1 最新 HEAD 而非先前 `cd04e46` 验收代码；重新加载真实 Edge 扩展，先运行「网页适配自检」，确认输入框所属 form 内的普通提交按钮能被识别。仅有用户气泡 `div.whitespace-pre-wrap` 和助手 `main p` 时只标「消息文本候选」，不把普通文字当可信完整回复。
+- 隐藏的停止按钮应被忽略，但「停止按钮不可见」仍不证明生成完成；聊天 URL /c/ 只证明会话路由，不是结束标记。
+- 填写既有草稿后的预填检查以 **不覆盖既有草稿、没有自动发送** 为成功条件；近 24,000 UTF-8 字节与代码块/换行用 execCommand 预填并原样回读；失败不自动重试。
+- 独立用本机 Python + Playwright 验证合成 MV3，不以 GitHub Windows runner 成功代替本人设备环境。在 `threadline-extension` 目录运行：
+  
+  ```powershell
+  python -m pip install playwright==1.60.0
+  python -m playwright install chromium
+  npm run test:e2e
+  ```
+
+### 双标签 S2-A/B 操作结果（2026-10-22，预算已用尽）
+
+- 操作者已在人手控制下先 A 后 B 各发送一次，共计 2 次；连同 S1 共 **3/3**，本轮不追加发送。
+- 两个普通对话 URL 的 /c/ 标识不同。操作者报告 A 的输入 83/83 字节 exact，B 的输入 84/84 字节 exact；每个页面只出现其对应的标记及回复，没有跨页内容混合。
+- 双方快照均显示无可见停止控件、回复稳定约 5.2 秒并带定稿操作行；**未取得 A/B 真正同时生成的机器证据**，完整终止标记也未由可信数据源直接复核。
+- Playwright 本机合成 E2E 已由操作者以 v1.64.0 执行成功。需继续完成真实网页已有草稿保护、扩展自身近 24KB 文本路径、Project/Temporary 拒绝、异常恢复、可信消息来源/哈希及用户签署。
+- `div.whitespace-pre-wrap` 可能先选中欢迎语；禁止将 `querySelector` 第一项或 `querySelectorAll` 最后一项直接作为可信用户消息。应使用具有会话与角色归属的来源，读取完整未损原文。角色不可验证时保持 `unverified / unknown`。
+
+### 重要判定边界
+
+- DOM 文本回读与历史分页摘要不是天然独立的字节级证据，除非保留原始用户消息、同规则的哈希和来源字段。
+- 网页分页「全部返回」只能证明历史提取的覆盖范围，不单独证明该轮助手回答已经最终结束。
+- 「停止按钮消失」「回复稳定 5.2 秒」「获得 /c/ URL」不能简单累加成三个独立的最终完成证明。至少还要核查可信完成信号、同一会话、一次任务、回复完整性与持久化。
+- v0.6.1 没有 Project/Temporary 进入限制；应记录为未实现/未验收，不可将这两项签为通过。
+- Edge 自带 Copilot 侧栏抢占显示时，可在单独标签打开扩展自身 `panel.html` 作为只读/操作面板的替代路径，但仍需确认它没有向 ChatGPT 自动发送。
+
+若后续各项通过，由用户将对应脱敏证据、具体 PR HEAD 和验收范围在 GitHub 留言签署；再按唯一 `docs/PLAN.md` 的证据门禁推进。
+
+## 2026-10-22 接续草稿无发送门禁的 CI 增补（合成，非真实账号）
+- `handoff.js` 的填入成功判定由原“长度达到前 40 字符”改为“编辑器完整原始文本与预填内容逐字相同”；遇到已有草稿（包括纯空白）、部分插入、连续空行变形均不得误报成功或 ACK，也不得自动发送。
+- `test/handoff.test.js` 验证前缀 40 字符假成功被拒绝；`test/handoff-e2e.py` 在真实 MV3 扩展 + 离线合成 ChatGPT 编辑器下验证 23,569 字节含 Unicode、NBSP、代码块及换行的 exact 预填/回读；已有草稿保持原状、自动发送为 0。
+- [Linux 39711053880](https://github.com/siskosun/ThreadLine/actions/runs/39711053880) 与 [Windows 39711053863](https://github.com/siskosun/ThreadLine/actions/runs/39711053863)：112/112 Node 与两项合成扩展 E2E 通过。没有真实用户账号操作。
+- Z0-LIVE 当前仍是 `blocked / NOT SIGNED`。操作者已经使用 3/3 人工发送测试预算，不增加发送；余下真实网页无发送验收和适用人工签署仍要完成。
+
+## 2026-10-22 真机 Edge 无发送复测（代码提交 03cd6285，未签署）
+- 代码：基于 PR #1 HEAD `1ba4465` 的 `03cd6285`；`handoff.js` SHA-256 `872c7b96...`，`selectors.js` `0bdeb077...`。Edge 加载目录与测试树逐字节一致；重载后自检返回新增 `pageType/forkAllowed` 字段，证明新 content script 生效。
+- 本机自动测试：`npm run verify` **119/119**；`npm run test:e2e` **2/2 PASS**（原 MV3 持久配置 + handoff 23,569 字节合成 E2E）。基线 1ba4465 为 112/112。Playwright 本机可用。
+- 真实 Edge 155.0.4283.45，全部操作无发送：
+  - 页面类型：普通新聊天 `plain_chat / forkAllowed=true`；Temporary Chat `temporary_chat / false`；Project 路径 `project_chat / false`；未知路径默认拒绝。
+  - 空 ProseMirror 的 `innerText="\n"` 不再被误判为已有草稿；空格、换行文本节点和多段空白仍不覆盖。
+  - 小文本结构回读 exact：15 字符 / 21 字节，SHA-256 `91484607...`，ACK=true。
+  - 近 24KB 简单多行结构回读 exact：23,558 字符 / 23,569 字节，SHA-256 `f219a528...`，ACK=true，URL 根路径，roles=0。
+  - 近 24KB 综合载荷（代码围栏、CRLF、连续空行、首尾空白）：预期 SHA-256 `4b9abbff...`；实际结构回读 23,559 字符、SHA-256 `dfac2fd5...`；CRLF 被归一化、代码围栏/空行产生额外空行；分类 `differs`，ACK=false，未发送。
+- 证据边界：`innerText` 是渲染文本，不能作为字节原文；结构回读使用多个顶层块级节点的文本按单换行连接，本次简单多行 exact 成立，但不证明服务端上下文、消息角色、最终回复完整性或并发重叠。`roles=0` 时不得用 `div.whitespace-pre-wrap` 推断用户/助手身份。
+- 仍未完成：Service Worker 单点暂停、旧监听器重复注入、标签关闭重开、真实断网/限流、可信分页消息/哈希、最终回复完整性、实际 Fork 端到端（P2）、远程设备在线和用户签署。Z0-LIVE 保持 `blocked / NOT SIGNED`，`docs/PLAN.md` 状态不变。
+
+## 2026-10-22 新增的执行端门禁与综合文本差异复核
+
+- 测试版本代码提交：`78d6d6f9cca26a4e8af0d286059d5b81f1702b03`。 `handoff.js` 在读取预填内容及向编辑器写入前，验证当前仍是无查询和片段的普通新聊天根路径；跳转到 Temporary / Project / 旧会话 / 未知路径，必须不取 handoff、不中途写草稿、不 ACK、不发送。
+- 新增 Node 测试复现用户报告中的 CRLF 仅规范化、代码围栏与连续空行引入额外换行两类差异；只能列出安全的长度、换行数量和差异类别，不得把后者自动认定为 exact 或 canonical_equivalent。原有正常预填测试不得回归。
+- [Linux CI 39732527414](https://github.com/siskosun/ThreadLine/actions/runs/39732527414) 与 [Windows CI 39732527403](https://github.com/siskosun/ThreadLine/actions/runs/39732527403) 已通过：122/122 Node，原 MV3 及 handoff 合成 E2E 全绿。
+- **真实 Edge 组合格式依旧未通过。** 后续可在用户创建的无发送测试标签中收集去内容化 DOM 结构差异，并完成修复后全文/规范化哈希对比；不得直接删除额外空行、不可擅自添加新规范化规则或消耗已用尽的人工发送额度。人工签署仍缺失。
+
+
+## 2026-10-22 空 P 换行双计的自动化回归（非真人 Edge）
+
+- 红灯复现：[Linux CI 39775625769](https://github.com/siskosun/ThreadLine/actions/runs/39775625769)：125 Node 测试中唯一失败是空 ProseMirror 段落双计 LF 的新增测试，未改变旧断言。
+- 修复：`handoff.js` 只对顶层多块结构中的 `P`、内含**唯一一个** `BR` 元素节点、无文本内容且 `innerText === "\\n"` 的占位段落做 `"\\n" → ""` 映射。真正的额外空 P、两个或更多 BR、PRE 和嵌套节点不能被这条逻辑吞掉。
+- 绿灯：[Linux CI 39775655808](https://github.com/siskosun/ThreadLine/actions/runs/39775655808) 和 [Windows CI 39775655955](https://github.com/siskosun/ThreadLine/actions/runs/39775655955) success；Windows 125/125 Node + 两套合成 Chromium E2E 通过，0 自动发送。
+- 不代表已在登录 Edge 验证这个提交。实际网页应先比对加载扩展文件 SHA-256 与 PR 提交中的内容，再重测最小样例和**重新生成的**综合样例；原历史 T6 原文不可找回，保持 NOT RUN。项目/临时聊天拒绝、草稿保护、重放安全、真实消息身份/最终回复完整性仍单独验收。
+
+
+## 2026-10-22 接续预填一次性尝试与非文字草稿保护（合成门禁）
+
+- `handoff.js` 只把已知空编辑器骨架视为可填；文本为空但具有图片、芯片、非编辑节点或未知结构时应保持 occupied，不覆盖。重载后的编辑器是否为空，不能使此前失败的预填自动重试。
+- `HANDOFF_BEGIN` 必须在真正填入前、经后台单写队列完成一次持久预留；两条并发请求至多一条获许可。`HANDOFF_GET` 允许只读/手动复制，已尝试返回 `autoAttempted=true`；`HANDOFF_ACK` 只有已登记的普通新聊天根路径可执行。
+- 回归覆盖：旧误覆盖负向用例红灯；非文字草稿保护；空 P 占位允许；并发预留互斥；错误文档源拒绝；空 ACK 拒绝；失效输入框引发失败后重载的自动填入次数为 0；实际发送次数始终为 0。
+- [Linux 39779493270](https://github.com/siskosun/ThreadLine/actions/runs/39779493270)、[Windows 39779493156](https://github.com/siskosun/ThreadLine/actions/runs/39779493156)：132/132 Node 与两套合成 MV3 E2E 通过。真实 Edge 尚须由用户在已登录的测试标签、加载准确 SHA 后复验，Z0-LIVE 不升级。
+
+## 2026-10-23 当前安全分支 + P1 修复组合
+
+- 本机 Windows：`npm run verify` 183/183；`npm run test:e2e` 三套全通过，包含原 MV3、handoff 和 ff-core。0 实际发送。
+- 新增负向验证覆盖成功保存后的列表/详情错误及刷新恢复、身份替换/省略后替换、非法结束信号、真实 IDB reducer 修改冻结字段/revision/伪装幂等返回。负向断言在原代码上失败，修复后原样保留。
+- [本次脱敏证据](evidence/P1_RECOVERY_20261023.md) 区分本机通过、准确 HEAD 的 CI、真实 Edge 和人工风险接受；旧失败日志保留。真实网页不在此次执行范围，Z0-LIVE 仍未签署。
+
+## 2026-10-23 后续实际 Tabbit 零发送验收
+
+- [PR7 零发送脱敏证据](evidence/TABBIT_ZERO_SEND_20261023.md) 绑定代码 `07b37731326517fa8c70fca3c7676eaaac526edd`，包含六个扩展资源 SHA-256、实际 NEW_CHAT/文字草稿保护、正常多行预填、外置原生附件阻止预留/ACK、移除后显式恢复和 23,569 字节哈希一致。
+- 正确的持久化计数：附件拒绝 **0 次预留 / 0 次 ACK**，恢复成功 **1 次预留 / 1 次 ACK**；不将派生字段 autoAttempted 的早期错误观察器作为证据。计数是状态转换，不是全部消息调用的拦截计数。
+- 0 新增发送。最后一次 HTTP 429 后停止网页操作；此前一次批量操作停止偏差在证据中保留。附件试验采用受控意图与未修改的正式处理器，未完成全研究整理 UI 流程。
+- 该真实结果来自 Tabbit；当前候选 Edge NOT RUN，旧 T6 NOT RUN，完整 Z0-LIVE BLOCKED / NOT SIGNED。剩余实时与人工验收项见证据末节，不能凭此启动 P2/P3 或发布 Beta。
+
+## 2026-10-23 接续提示恢复回归（PR8）
+
+- 六个新增 Node 用例调用正式 handoff.js：未知/成功提示被移除后的恢复、显式关闭、异步复制回执、body 替换、三次上限。原生产源码初始四用例中三项失败；合成 MV3 在移除未知提示后明确红灯。
+- Windows `npm run verify`：189/189；`npm run test:e2e`：3/3。实际 MV3 断言同一节点恢复、存储意图不变、input=0、submit=0；原长文本/附件/空段落/一次性登记及 P1 回归保持通过。
+- 代码提交 `1f7578f` 双平台 CI 通过；各命令、红绿原始日志哈希和可公开复核的脱敏全文见 [证据](evidence/HANDOFF_NOTICE_RECOVERY_20261023.md)。后续最新 HEAD 另核 CI。
+- 修复前真实 Tabbit 空白/多行保护及未知状态无重放 PASS，提示持久性 FAIL；修复后实机复测因控制通道阻塞为 BLOCKED，不能将磁盘更新或合成测试称为真实通过。0 新增发送，Edge NOT RUN，Z0-LIVE NOT SIGNED。
+
+## 2026-10-23 用户验收后的 main 集成验证（PR9）
+
+- 用户报告已验收当前所有修复与 P1 核心；记录与机器实测分别保留出处，详见 [集成证据](evidence/ACCEPTED_INTEGRATION_20261023.md)。此前 Agent 未完成的 Edge 项不被回填成实测 PASS。
+- 生产源码、测试、权限及工作流相对已验收 PR8 `102185b` 无变化。PR9 回归、准确提交 CI 和独立本地审查将关联本次集成快照；不以旧 CI 替代。
+- P1 处于 main 目标 PR 的 in_review，完整 Z0-LIVE 仍 blocked；进入 P2 的依赖和人工签署契约保持有效。
