@@ -80,3 +80,10 @@ test('FF input events cannot reopen submit while a create is in flight',async()=
    assert.equal(ui.model.creates.length,1);
  }finally{release();await first;await second;}
 });
+
+test('launch without a selected experiment explains instead of silently doing nothing',async()=>{
+  const ui=await page();
+  const btn=ui.$('ff-launch');
+  await btn.handlers.click({target:btn,preventDefault(){}});
+  assert.match(ui.$('ff-notice').textContent,/请先在下方/);
+});

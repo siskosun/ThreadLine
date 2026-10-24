@@ -103,8 +103,20 @@
         const cap = document.createElement("button");
         cap.type = "button"; cap.className = "secondary";
         cap.textContent = "采集回复（完成后自动核对完成条件）";
-        cap.addEventListener("click", () =>
-          runOperation({type:"FF_CAPTURE", experimentId:data.id, branch}, cap));
+        cap.addEventListener("click", async () => {
+          const started = await runOperation(
+            {type:"FF_CAPTURE", experimentId:data.id, branch}, cap);
+          if (!started) return;
+          notice("采集已启动（分支 " + branch + "）。采集在分支标签页完成后自动核对，稍候此处会刷新。");
+          // The capture run finishes asynchronously in the branch tab; the
+          // immediate re-read inside runOperation still shows the old phase,
+          // so poll a few times to surface the result without a manual refresh.
+          for (const delay of [4000, 9000, 15000]) {
+            setTimeout(() => {
+              if (currentExperiment === data.id) read(currentExperiment).catch(() => {});
+            }, delay);
+          }
+        });
         row.appendChild(cap);
       }
       box.appendChild(row);
@@ -352,7 +364,12 @@
   $("ff-refresh").addEventListener("click", () =>
     list().catch(error => notice(error.message,true)));
   $("ff-launch").addEventListener("click", async event => {
-    if (!currentExperiment) return;
+    // Live-run finding: a silent no-op here reads as a dead button when the
+    // button sits below the fold and no experiment has been selected.
+    if (!currentExperiment) {
+      notice("请先在下方“已冻结的实验”列表中选择一个实验，再发起分支标签。", true);
+      return;
+    }
     const button = event.target;
     button.disabled = true;
     try {

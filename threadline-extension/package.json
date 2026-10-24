@@ -1,6 +1,6 @@
 {
   "name": "threadline-extension",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "private": true,
   "description": "ThreadLine — temporary cross-conversation research workspace",
   "scripts": {
