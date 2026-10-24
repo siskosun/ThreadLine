@@ -18,6 +18,7 @@ function system() {
   const tabsById = new Map();
   const ffdb = {
     async create(row){if(records.has(row.id))throw new Error('duplicate');records.set(row.id,row);},
+    async createImported(row){if(records.has(row.id))throw new Error('duplicate');records.set(row.id,row);},
     async read(id){return records.get(id)||null;},
     async list(){return [...records.values()];},
     async update(id,revision,reducer){
@@ -103,9 +104,9 @@ test('FF launch creates two inactive plain-chat tabs, seeds handoff, records tab
   }
   const navs=s.updates.filter(([id,patch])=>patch.url==='https://chatgpt.com/');
   assert.equal(navs.length,2,'both branch tabs navigate to the plain new chat');
-  for(const [id] of navs)assert.ok([r.tabIdA,r.tabIdB].includes(id));
-  assert.notEqual(r.tabIdA,r.tabIdB);
-  for(const tabId of [r.tabIdA,r.tabIdB]){
+  for(const [id] of navs)assert.ok([r.tabIds.A,r.tabIds.B].includes(id));
+  assert.notEqual(r.tabIds.A,r.tabIds.B);
+  for(const tabId of [r.tabIds.A,r.tabIds.B]){
     const intent=s.session.get(`tl_handoff_${tabId}`);
     assert.ok(intent && intent.text.includes('【共同材料 W₀】'),'frozen text seeded');
   }
@@ -115,7 +116,7 @@ test('FF launch creates two inactive plain-chat tabs, seeds handoff, records tab
     assert.equal(row.branches[branch].phase,'created');
     assert.equal(row.branches[branch].attempts.length,1);
     assert.equal(row.branches[branch].attempts[0].evidence.tabId,
-      branch==='A'?r.tabIdA:r.tabIdB);
+      branch==='A'?r.tabIds.A:r.tabIds.B);
   }
   // 0-send code-level invariant: only handoff delivery and readback requests.
   for(const [tabId,type] of s.sent)
@@ -130,7 +131,7 @@ test('handoff ACK moves branches to awaiting_send with exact input proof',async(
   const created=await s.setupExperiment();
   const r=await s.message({type:'FF_LAUNCH',experimentId:created.id,
     operationId:'launch_op_0000003'},s.ffSender);
-  const senderA=s.tabSender(r.tabIdA,'https://chatgpt.com/');
+  const senderA=s.tabSender(r.tabIds.A,'https://chatgpt.com/');
   await s.message({type:'HANDOFF_BEGIN'},senderA);
   await s.message({type:'HANDOFF_ACK'},senderA);
   const row=await s.message({type:'FF_READ',id:created.id},s.ffSender);
@@ -147,11 +148,11 @@ test('conversation URL binds session identity and classifies the sent user messa
   const r=await s.message({type:'FF_LAUNCH',experimentId:created.id,
     operationId:'launch_op_0000004'},s.ffSender);
   const row0=await s.message({type:'FF_READ',id:created.id},s.ffSender);
-  await s.message({type:'HANDOFF_BEGIN'},s.tabSender(r.tabIdA,'https://chatgpt.com/'));
-  await s.message({type:'HANDOFF_ACK'},s.tabSender(r.tabIdA,'https://chatgpt.com/'));
+  await s.message({type:'HANDOFF_BEGIN'},s.tabSender(r.tabIds.A,'https://chatgpt.com/'));
+  await s.message({type:'HANDOFF_ACK'},s.tabSender(r.tabIds.A,'https://chatgpt.com/'));
   const conv='https://chatgpt.com/c/conv-12345678';
   await s.message({type:'OBSERVE',href:conv,title:'会话',streaming:false,
-    assistantBytes:40},s.tabSender(r.tabIdA,conv));
+    assistantBytes:40},s.tabSender(r.tabIds.A,conv));
   const row=await s.message({type:'FF_READ',id:created.id},s.ffSender);
   const a=row.branches.A.attempts.at(-1);
   assert.equal(row.branches.A.phase,'generating');
@@ -159,11 +160,11 @@ test('conversation URL binds session identity and classifies the sent user messa
   assert.equal(a.evidence.conversationId,'conv-12345678');
   assert.equal(a.evidence.inputLevel,'exact','sent user message classified');
   // Branch B ACKs its own prefill independently of branch A.
-  await s.message({type:'HANDOFF_BEGIN'},s.tabSender(r.tabIdB,'https://chatgpt.com/'));
-  await s.message({type:'HANDOFF_ACK'},s.tabSender(r.tabIdB,'https://chatgpt.com/'));
+  await s.message({type:'HANDOFF_BEGIN'},s.tabSender(r.tabIds.B,'https://chatgpt.com/'));
+  await s.message({type:'HANDOFF_ACK'},s.tabSender(r.tabIds.B,'https://chatgpt.com/'));
   // The same conversation cannot be claimed by branch B later.
   const other='https://chatgpt.com/c/conv-12345678';
-  await s.message({type:'OBSERVE',href:other,title:'会话',streaming:false},s.tabSender(r.tabIdB,other));
+  await s.message({type:'OBSERVE',href:other,title:'会话',streaming:false},s.tabSender(r.tabIds.B,other));
   const row2=await s.message({type:'FF_READ',id:created.id},s.ffSender);
   assert.equal(row2.branches.B.phase,'awaiting_send',
     'branch B ACK must advance even after branch A ACKed');
@@ -181,19 +182,19 @@ test('completed capture with two attested signals marks the branch done',async()
     operationId:'launch_op_0000005'},s.ffSender);
   const row0=await s.message({type:'FF_READ',id:created.id},s.ffSender);
   const frozen=row0.frozen.text;
-  await s.message({type:'HANDOFF_BEGIN'},s.tabSender(r.tabIdA,'https://chatgpt.com/'));
-  await s.message({type:'HANDOFF_ACK'},s.tabSender(r.tabIdA,'https://chatgpt.com/'));
+  await s.message({type:'HANDOFF_BEGIN'},s.tabSender(r.tabIds.A,'https://chatgpt.com/'));
+  await s.message({type:'HANDOFF_ACK'},s.tabSender(r.tabIds.A,'https://chatgpt.com/'));
   const conv='https://chatgpt.com/c/conv-12345678';
-  await s.message({type:'OBSERVE',href:conv,title:'会话',streaming:false},s.tabSender(r.tabIdA,conv));
+  await s.message({type:'OBSERVE',href:conv,title:'会话',streaming:false},s.tabSender(r.tabIds.A,conv));
   const runId='cap_test_000001';
-  s.runs.set(runId,{id:runId,tabId:r.tabIdA,conversationId:'conv-12345678',
+  s.runs.set(runId,{id:runId,tabId:r.tabIds.A,conversationId:'conv-12345678',
     url:conv,status:'capturing',createdAt:Date.now(),complete:false});
   s.pageStore.set(`${runId}_0_0`,{id:runId,pageIndex:0,chunkIndex:0,messages:[
     {id:'m1',role:'user',content:frozen,finished:true},
     {id:'m2',role:'assistant',content:'好的，OK。',finished:true}
   ]});
   await s.message({type:'CAPTURE_END',id:runId,complete:true,mode:'paginated',
-    pageCount:1,count:2},{tab:{id:r.tabIdA,url:conv},id:'ff-launch-test',
+    pageCount:1,count:2},{tab:{id:r.tabIds.A,url:conv},id:'ff-launch-test',
     url:'https://chatgpt.com/c/conv-12345678'});
   const row=await s.message({type:'FF_READ',id:created.id},s.ffSender);
   assert.equal(row.branches.A.status,'done');
@@ -210,18 +211,18 @@ test('incomplete capture keeps the branch pending instead of claiming done',asyn
   const created=await s.setupExperiment();
   const r=await s.message({type:'FF_LAUNCH',experimentId:created.id,
     operationId:'launch_op_0000006'},s.ffSender);
-  await s.message({type:'HANDOFF_BEGIN'},s.tabSender(r.tabIdA,'https://chatgpt.com/'));
-  await s.message({type:'HANDOFF_ACK'},s.tabSender(r.tabIdA,'https://chatgpt.com/'));
+  await s.message({type:'HANDOFF_BEGIN'},s.tabSender(r.tabIds.A,'https://chatgpt.com/'));
+  await s.message({type:'HANDOFF_ACK'},s.tabSender(r.tabIds.A,'https://chatgpt.com/'));
   const conv='https://chatgpt.com/c/conv-12345678';
-  await s.message({type:'OBSERVE',href:conv,title:'会话',streaming:false},s.tabSender(r.tabIdA,conv));
+  await s.message({type:'OBSERVE',href:conv,title:'会话',streaming:false},s.tabSender(r.tabIds.A,conv));
   const runId='cap_test_000002';
-  s.runs.set(runId,{id:runId,tabId:r.tabIdA,conversationId:'conv-12345678',
+  s.runs.set(runId,{id:runId,tabId:r.tabIds.A,conversationId:'conv-12345678',
     url:conv,status:'capturing',createdAt:Date.now(),complete:false});
   s.pageStore.set(`${runId}_0_0`,{id:runId,pageIndex:0,chunkIndex:0,messages:[
     {id:'m1',role:'user',content:'只有半截'}
   ]});
   await s.message({type:'CAPTURE_END',id:runId,complete:false,mode:'visible-dom',
-    pageCount:1,count:1},{tab:{id:r.tabIdA,url:conv},id:'ff-launch-test',
+    pageCount:1,count:1},{tab:{id:r.tabIds.A,url:conv},id:'ff-launch-test',
     url:'https://chatgpt.com/c/conv-12345678'});
   const row=await s.message({type:'FF_READ',id:created.id},s.ffSender);
   assert.equal(row.branches.A.status,'pending','incomplete capture cannot claim done');
@@ -236,7 +237,7 @@ test('closing a branch tab marks it unknown without any replay',async()=>{
     operationId:'launch_op_0000007'},s.ffSender);
   const before=await s.message({type:'FF_READ',id:created.id},s.ffSender);
   const attemptA=before.branches.A.attempts.at(-1);
-  s.events.tabRemoved(r.tabIdA);
+  s.events.tabRemoved(r.tabIds.A);
   await new Promise(resolve=>setTimeout(resolve,60));
   const row=await s.message({type:'FF_READ',id:created.id},s.ffSender);
   assert.equal(row.branches.A.status,'unknown');
@@ -255,13 +256,13 @@ test('re-prefill re-seeds the same branch only through an explicit user action',
   // Simulate a browser restart: session bindings and intents are gone.
   for(const key of [...s.session.keys()])s.session.delete(key);
   const before=s.sent.filter(([tabId,type])=>
-    tabId===r.tabIdA && type==='TL_HANDOFF_READY').length;
+    tabId===r.tabIds.A && type==='TL_HANDOFF_READY').length;
   const reprefill=await s.message({type:'FF_REPREFILL',experimentId:created.id,
     branch:'A',operationId:'reprefill_op_0001'},s.ffSender);
-  assert.equal(reprefill.tabId,r.tabIdA);
-  assert.ok(s.session.get(`tl_handoff_${r.tabIdA}`),'intent re-seeded');
+  assert.equal(reprefill.tabId,r.tabIds.A);
+  assert.ok(s.session.get(`tl_handoff_${r.tabIds.A}`),'intent re-seeded');
   const sentAfter=s.sent.filter(([tabId,type])=>
-    tabId===r.tabIdA && type==='TL_HANDOFF_READY').length;
+    tabId===r.tabIds.A && type==='TL_HANDOFF_READY').length;
   assert.equal(sentAfter,before+1,'exactly one new handoff delivery for the re-prefill');
 });
 
@@ -273,7 +274,7 @@ test("FF comparison, verdict and export: gated, blind, deterministic, self-conta
   const row0=await s.message({type:'FF_READ',id:created.id},s.ffSender);
   const frozen=row0.frozen.text;
   // Complete BOTH branches through the P2 flow with distinct conversations.
-  for(const [branch,tabId] of [['A',r.tabIdA],['B',r.tabIdB]]){
+  for(const [branch,tabId] of [['A',r.tabIds.A],['B',r.tabIds.B]]){
     await s.message({type:'HANDOFF_BEGIN'},s.tabSender(tabId,'https://chatgpt.com/'));
     await s.message({type:'HANDOFF_ACK'},s.tabSender(tabId,'https://chatgpt.com/'));
     const conv='https://chatgpt.com/c/conv-p3-'+branch.toLowerCase();
@@ -319,4 +320,78 @@ test("FF comparison, verdict and export: gated, blind, deterministic, self-conta
   const serialized=JSON.stringify(snapshot);
   for(const banned of ['authorization','cookie','token','sessionStorage'])
     assert.ok(!serialized.toLowerCase().includes(banned),'no credentials in export');
+});
+
+test("FF P4 launches K=4 tabs, imports snapshots, and scores calibration",async()=>{
+  const s=system();
+  await s.message({type:'FF_SET_ENABLED',enabled:true,ack:'local-only-no-send'},s.ffSender);
+  const created=await s.message({type:'FF_CREATE',operationId:'create_p4_0000001',
+    w0:'K4 材料',p:'K4 任务',branchCount:4},s.ffSender);
+  assert.equal(Object.keys((await s.message({type:'FF_READ',id:created.id},
+    s.ffSender)).branches).length,4);
+  const r=await s.message({type:'FF_LAUNCH',experimentId:created.id,
+    operationId:'launch_p4_0000001'},s.ffSender);
+  assert.equal(Object.keys(r.tabIds).length,4);
+  const chatTabs=s.newTabs.filter(t=>t.options.active===false).length;
+  assert.equal(chatTabs,4,'four inactive branch tabs');
+  // 校准评分：空作答/越界选择被拒，全对通过。
+  const FCore=require('../ff-core.js');
+  await assert.rejects(s.message({type:'FF_CALIBRATION',responses:[]},s.ffSender),
+    /every calibration item/);
+  await assert.rejects(s.message({type:'FF_CALIBRATION',
+    responses:FCore.CALIBRATION_ITEMS.map(item=>({id:item.id,choice:99}))},s.ffSender),
+    /invalid calibration choice/);
+  const scored=await s.message({type:'FF_CALIBRATION',
+    responses:FCore.CALIBRATION_ITEMS.map(item=>({id:item.id,choice:1}))},s.ffSender);
+  assert.equal(scored.pass,true);
+  // 导入：先从无 K4 实验的干净系统导出（构造快照）。
+  const snap=await s.message({type:'FF_EXPORT',experimentId:created.id},s.ffSender);
+  const conflicting=await s.message({type:'FF_IMPORT',snapshot:snap},s.ffSender)
+    .catch(e=>e);
+  assert.match(conflicting.message,/already exists/);
+  const s2=system();
+  await s2.setupExperiment('seed_create_p4001');
+  const imported=await s2.message({type:'FF_IMPORT',snapshot:snap},s2.ffSender);
+  assert.equal(imported.id,created.id);
+  assert.equal(imported.branchCount,4);
+  const importedRow=await s2.message({type:'FF_READ',id:imported.id},s2.ffSender);
+  assert.equal(Object.keys(importedRow.branches).length,4);
+  assert.equal(importedRow.frozen.text.includes('K4 材料'),true);
+});
+
+test("FF P4 comparison records budget parity for K=4",async()=>{
+  const s=system();
+  await s.message({type:'FF_SET_ENABLED',enabled:true,ack:'local-only-no-send'},s.ffSender);
+  const created=await s.message({type:'FF_CREATE',operationId:'create_p4_0000002',
+    w0:'预算材料',p:'预算任务',branchCount:2},s.ffSender);
+  const r=await s.message({type:'FF_LAUNCH',experimentId:created.id,
+    operationId:'launch_p4_0000002'},s.ffSender);
+  const row0=await s.message({type:'FF_READ',id:created.id},s.ffSender);
+  const frozen=row0.frozen.text;
+  let lastRev=row0.revision;
+  for(const [branch,tabId] of [['A',r.tabIds.A],['B',r.tabIds.B]]){
+    await s.message({type:'HANDOFF_BEGIN'},s.tabSender(tabId,'https://chatgpt.com/'));
+    await s.message({type:'HANDOFF_ACK'},s.tabSender(tabId,'https://chatgpt.com/'));
+    const conv='https://chatgpt.com/c/conv-p4b-'+branch.toLowerCase();
+    await s.message({type:'OBSERVE',href:conv,title:'会话',streaming:false},
+      s.tabSender(tabId,conv));
+    const runId='cap_p4b_'+branch;
+    s.runs.set(runId,{id:runId,tabId,conversationId:'conv-p4b-'+branch.toLowerCase(),
+      url:conv,status:'capturing',createdAt:Date.now(),complete:false});
+    s.pageStore.set(`${runId}_0_0`,{id:runId,pageIndex:0,chunkIndex:0,messages:[
+      {id:'m1',role:'user',content:frozen,finished:true},
+      {id:'m2',role:'assistant',content:'回复 '+branch,finished:true}]});
+    await s.message({type:'CAPTURE_END',id:runId,complete:true,mode:'paginated',
+      pageCount:1,count:2},{tab:{id:tabId,url:conv},id:'ff-launch-test',
+      url:'https://chatgpt.com/c/conv-p4b-'+branch.toLowerCase()});
+    const row=await s.message({type:'FF_READ',id:created.id},s.ffSender);
+    lastRev=row.revision;
+    const ev=row.branches[branch].attempts.at(-1).evidence;
+    assert.ok(ev.budget && Number.isFinite(ev.budget.sentMs),'budget recorded at done');
+    assert.ok(ev.budget.replyBytes>0);
+  }
+  const decision=await s.message({type:'FF_COMPARE',experimentId:created.id,
+    operationId:'compare_p4_000001'},s.ffSender);
+  assert.equal(decision.budgetParity,true,'equal budgets yield parity');
+  assert.ok(decision.budgets.A && decision.budgets.B);
 });

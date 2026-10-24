@@ -106,14 +106,15 @@
   }
   function renderCompare(value) {
     const section = $("ff-compare");
-    const a = value.branches.A, b = value.branches.B;
+    const branches = value.branches;
+    const branchLabels = Object.keys(branches);
     const decision = value.decision || {};
-    const bothDone = a.status === "done" && b.status === "done";
+    const bothDone = branchLabels.every(label => branches[label].status === "done");
     section.hidden = !(bothDone || decision.mapping);
     if (section.hidden) return;
     const replyOf = label => {
       const branch = decision.mapping?.[label];
-      const attempt = branch && value.branches[branch].attempts.at(-1);
+      const attempt = branch && branches[branch].attempts.at(-1);
       return attempt?.evidence?.reply || "";
     };
     const note = $("ff-compare-note");
@@ -121,15 +122,19 @@
     columns.replaceChildren();
     $("ff-compare-btn").hidden = !!decision.mapping;
     if (!decision.mapping) {
-      note.textContent = "两个分支均完成后生成 X/Y 去标签对照；对应关系在裁决前不用于展示。";
+      note.textContent = "所有分支完成后生成去标签对照；对应关系在裁决前不用于展示。";
       $("ff-verdict-form").hidden = true;
       $("ff-export").hidden = true;
       $("ff-reveal").textContent = "";
       return;
     }
+    const labels = Object.keys(decision.mapping);
+    const budgets = decision.budgets || {};
     if (!decision.verdict) {
-      note.textContent = "对照已生成。请阅读 X/Y 两栏回复并提交裁决；提交后才显示对应关系。";
-      for (const label of ["X", "Y"]) {
+      const parity = decision.budgetParity === false
+        ? "（注意：各分支预算差异较大，对照时请自行考虑）" : "";
+      note.textContent = "对照已生成" + parity + "。请先完成裁判校准（全部答对后开放裁决），再阅读各栏回复并提交裁决；提交后才显示对应关系。";
+      for (const label of labels) {
         const col = document.createElement("div");
         const head = document.createElement("p");
         head.className = "mono";
@@ -137,16 +142,62 @@
         const body = document.createElement("pre");
         body.id = "ff-reply-" + label;
         body.textContent = replyOf(label);
+        const budget = budgets[decision.mapping[label]];
+        if (budget && budget.sentMs !== null) {
+          const b = document.createElement("p");
+          b.className = "subtle";
+          b.textContent = "预算：发送至采集 " + Math.round(budget.sentMs/1000) + " 秒 · 回复 " +
+            (budget.replyBytes ?? "?") + " 字节";
+          col.appendChild(b);
+        }
         col.appendChild(head); col.appendChild(body);
         columns.appendChild(col);
       }
+      // P4 裁判校准：全部答对前不开放裁决表单。
+      const cal = $("ff-calibration");
+      cal.hidden = false;
+      $("ff-verdict-form").hidden = true;
+      $("ff-export").hidden = true;
+      $("ff-reveal").textContent = "";
+      if (!calibrationPassed) {
+        const items = $("ff-calibration-items");
+        items.replaceChildren();
+        for (const item of calibrationItems) {
+          const box = document.createElement("div");
+          const q = document.createElement("p");
+          q.textContent = item.material + " —— " + item.question;
+          box.appendChild(q);
+          item.options.forEach((opt, idx) => {
+            const line = document.createElement("label");
+            line.className = "line";
+            const radio = document.createElement("input");
+            radio.type = "radio"; radio.name = "cal-" + item.id; radio.value = String(idx);
+            line.appendChild(radio);
+            line.appendChild(document.createTextNode(opt));
+            box.appendChild(line);
+          });
+          items.appendChild(box);
+        }
+        return;
+      }
+      $("ff-calibration").hidden = true;
       $("ff-verdict-form").hidden = false;
       $("ff-export").hidden = true;
       $("ff-reveal").textContent = "";
+      const pref = $("ff-preference");
+      pref.replaceChildren();
+      for (const label of labels) {
+        const opt = document.createElement("option");
+        opt.value = label; opt.textContent = label + " 更好";
+        pref.appendChild(opt);
+      }
+      const tieOpt = document.createElement("option"); tieOpt.value = "tie"; tieOpt.textContent = "相当";
+      const incOpt = document.createElement("option"); incOpt.value = "inconclusive"; incOpt.textContent = "无法判断";
+      pref.appendChild(tieOpt); pref.appendChild(incOpt);
       return;
     }
     note.textContent = "已裁决；对应关系已揭盲。";
-    for (const label of ["X", "Y"]) {
+    for (const label of labels) {
       const col = document.createElement("div");
       const head = document.createElement("p");
       head.className = "mono";
@@ -157,10 +208,12 @@
       columns.appendChild(col);
     }
     const v = decision.verdict;
+    $("ff-calibration").hidden = true;
     $("ff-verdict-form").hidden = true;
-    $("ff-reveal").textContent = "裁决：" + v.preference + " · 揭盲：X = 分支 " +
-      decision.mapping.X + "，Y = 分支 " + decision.mapping.Y + " · 依据：" + v.criteria +
-      " · 置信度 " + v.confidence + (v.notes ? " · 备注 " + v.notes : "");
+    $("ff-reveal").textContent = "裁决：" + v.preference + " · 揭盲：" +
+      labels.map(label => label + " = 分支 " + decision.mapping[label]).join("，") +
+      " · 依据：" + v.criteria + " · 置信度 " + v.confidence +
+      (v.notes ? " · 备注 " + v.notes : "");
     $("ff-export").hidden = false;
   }
   async function read(id) {
@@ -239,7 +292,8 @@
       if (!pendingCreate || pendingCreate.w0 !== w0 || pendingCreate.p !== p)
         pendingCreate = await createIntent(w0,p);
       const intent = pendingCreate;
-      const created = await send({type:"FF_CREATE",...intent});
+      const branchCount = Number($("ff-branch-count").value) || 2;
+      const created = await send({type:"FF_CREATE",...intent,branchCount});
       saved = true;
       await list();
       await read(created.id);
@@ -252,6 +306,35 @@
       notice(saved ? "实验已保存，显示刷新失败。保留相同输入再次点击保存可恢复本次结果：" + error.message
         : error.message,true);
     } finally {createBusy = false; bytes();}
+  });
+  let calibrationPassed = false;
+  const calibrationItems = ThreadLineFFCore.CALIBRATION_ITEMS;
+  $("ff-calibrate").addEventListener("click", async event => {
+    const button = event.target;
+    button.disabled = true;
+    try {
+      const responses = calibrationItems.map(item => {
+        const picked = document.querySelector('input[name="cal-' + item.id + '"]:checked');
+        return {id:item.id, choice:picked ? Number(picked.value) : -1};
+      });
+      const result = await send({type:"FF_CALIBRATION",responses});
+      $("ff-calibration-result").textContent = "校准得分 " + result.score + "/" + result.total +
+        (result.pass ? "：已通过，裁决已开放。" : "：未通过，请重新阅读材料后作答。");
+      if (result.pass) { calibrationPassed = true; if (currentExperiment) await read(currentExperiment); }
+    } catch (e) { notice(e.message, true); }
+    finally { button.disabled = false; }
+  });
+  $("ff-import-file").addEventListener("change", async event => {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    try {
+      const snapshot = JSON.parse(await file.text());
+      const imported = await send({type:"FF_IMPORT",snapshot});
+      notice("已导入实验 " + imported.id + "（revision " + imported.revision + "，" +
+        imported.branchCount + " 分支）。");
+      await list();
+    } catch (e) { notice("导入被拒绝：" + e.message, true); }
+    finally { event.target.value = ""; }
   });
   $("ff-refresh").addEventListener("click", () =>
     list().catch(error => notice(error.message,true)));
