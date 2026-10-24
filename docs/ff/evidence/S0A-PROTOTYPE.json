@@ -3,8 +3,8 @@
   "task_id": "S0A-PROTOTYPE",
   "date": "2026-10-25",
   "title": "S0a 证据存储与采纳原型：单事务权威写入、只读投影、崩溃点/恢复设计、容量探针与工期估算",
-  "pr_number": 0,
-  "merge_commit": "0000000000000000000000000000000000000000",
+  "pr_number": 28,
+  "merge_commit": "6e814f603519138592defff5f5acbb8f5dd356c0",
   "summary": "新增 threadline_evidence_v1 多 store 权威库（evidence-db.js）与纯逻辑层（evidence-core.js）：限额校验（4000 码点正文/片段 16 KiB/8 片段/200 结论/20 MiB 包）、单 readwrite 事务提交、事务内 evidenceRevision CAS、operationId+SHA-256 请求摘要幂等台账、显式截断的只读摘要投影、导出导入（ID 冲突/跨课题/版本上限拒绝）。background.js 增加 EV_* 消息（serialize() 队列，service worker 唯一写者，页面只发命令）。evidence-prototype.html/.js 提供采纳/撤回/计时协议原型页。设计文档 docs/ff/S0A_STORAGE_RECOVERY_20261025.md 冻结崩溃点 C1–C6 恢复顺序（幂等、不重放外部操作）与破坏性路径 D1–D6 处置。合成 E2E（一次性 profile）验证：12/12 次采纳操作无帮助完成（中位 2–3 ms、P90 3 ms）、完整浏览器重启后权威库与撤回修订存活、同库重导入冲突拒绝、storage.estimate 探针可用。",
   "scope_note": "12 次计时协议按所有者既有会话内授权（2026-10-23“‘人验收’的部分由你代劳，给你全部授权”）由受托 Agent 经自动化通道（Playwright 驱动原型页）代执；计时反映操作可无帮助完成与提交链路耗时，不冒充真人手速工效学，所有者可随时在原型页点击“复制计时 JSON”复核。",
   "not_claimed": [
@@ -48,8 +48,8 @@
     }
   ],
   "manual": {
-    "comment_id": 0,
-    "accepted_head_sha": "0000000000000000000000000000000000000000",
+    "comment_id": 6386980693,
+    "accepted_head_sha": "092d857ea7fa5d83d4c4948d9fea528099368fd6",
     "scope": "受托代理验收范围：S0a 原型单事务写入/幂等/CAS/回滚与限额测试通过（217/217）、合成 E2E 含 12 次计时协议（≥11 次无帮助完成、中位 ≤30s、P90 ≤60s 门禁达标，自动化通道代执已在证据 scope_note 声明）、重启恢复与探针通过、崩溃点/破坏性路径无待定项、首期容量默认值冻结。chrome.storage 投影与旧编辑封口不在本次验收范围（S1a）。"
   }
 }
