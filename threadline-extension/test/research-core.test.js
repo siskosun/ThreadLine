@@ -193,6 +193,33 @@ test("covered changes must name an existing matching change and affected root", 
   amendAndRecord(s, a, "ver_amend_validatio", "evt_eeeeeeee");
   assert.throws(() => confirmCovered(s, edgeId, [{ triggerEventId: "evt_eeeeeeee", rootConclusionId: a, rootVersionId: "ver_aaaaaaaa" }]), /覆盖/);
 });
+test("validator rejects malformed historical impact causes before notification traversal", () => {
+  const s = state(), a = "con_aaaaaaaa", b = "con_bbbbbbbb", edgeId = add(s, a, b);
+  amendAndRecord(s, a, "ver_history_a", "evt_ffffffff");
+  const event = s.projects.p1.research.events.find(x => x.kind === "change");
+  const badNull = structuredClone(s.projects.p1.research);
+  badNull.events.find(x => x.kind === "change").affected[0].causes = [null];
+  assert.throws(() => Research.validateResearch(badNull, s, "p1"), /致因/);
+  const badRoot = structuredClone(s.projects.p1.research);
+  badRoot.events.find(x => x.kind === "change").affected[0].causes[0].rootConclusionId = b;
+  assert.throws(() => Research.validateResearch(badRoot, s, "p1"), /致因/);
+  const badEdge = structuredClone(s.projects.p1.research);
+  badEdge.events.find(x => x.kind === "change").affected[0].causes[0].contributingEdgeIds = ["dep_unknown0001"];
+  assert.throws(() => Research.validateResearch(badEdge, s, "p1"), /致因/);
+  const badPath = structuredClone(s.projects.p1.research);
+  badPath.events.find(x => x.kind === "change").affected[0].causes[0].path = [a, "con_cccccccc", b];
+  badPath.events.find(x => x.kind === "change").affected[0].causes[0].edgeIds = [edgeId, edgeId];
+  assert.throws(() => Research.validateResearch(badPath, s, "p1"), /致因/);
+  assert.equal(event.affected[0].causes[0].edgeIds[0], edgeId);
+});
+test("validator preserves valid diamond and removed-edge historical causes", () => {
+  const s = state(), a = "con_aaaaaaaa", b = "con_bbbbbbbb", c = "con_cccccccc", d = "con_dddddddd";
+  const ab = add(s, a, b); add(s, a, c); add(s, b, d); add(s, c, d);
+  amendAndRecord(s, a, "ver_history_diamond", "evt_gggggggg");
+  assert.equal(Research.validateResearch(s.projects.p1.research, s, "p1"), true);
+  s.projects.p1.research = Research.update(s, "p1", { kind: "removeDependency", edgeId: ab, reason: "historic edge removed" }, opts()).research;
+  assert.equal(Research.validateResearch(s.projects.p1.research, s, "p1"), true);
+});
 test("validator rejects forged confirmation ownership and duplicate record IDs", () => {
   const s = state(), edgeId = add(s, "con_aaaaaaaa", "con_bbbbbbbb");
   confirm(s, edgeId);
@@ -216,4 +243,7 @@ test("validator rejects forged review and event references", () => {
   const badEvent = structuredClone(s.projects.p1.research);
   badEvent.events.find(x => x.edgeId === edgeId).edgeId = "dep_missing0001";
   assert.throws(() => Research.validateResearch(badEvent, s, "p1"), /事件引用/);
+  const badSource = structuredClone(s.projects.p1.research);
+  badSource.reviews[0].sourceSnapshots[0].id = "src_missing00";
+  assert.throws(() => Research.validateResearch(badSource, s, "p1"), /来源快照/);
 });
