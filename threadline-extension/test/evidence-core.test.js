@@ -1031,7 +1031,7 @@ test("stale editor cannot amend a newer version, but its committed retry still r
 });
 
 test("adoption, backup and project constructor reject inherited-key IDs", async () => {
-  for (const projectId of ["__proto__", "constructor", "prototype", "bad/id", "", "x".repeat(129)]) {
+  for (const projectId of ["__proto__", "constructor", "prototype", "toString", "valueOf", "hasOwnProperty", "toLocaleString", "__defineGetter__", "bad/id", "", "x".repeat(129)]) {
     assert.equal(Core.validProjectId(projectId), false, projectId);
     assert.throws(() => Core.newProjectRecord(projectId), /课题 ID/);
     assert.throws(() => Core.validateAdoption({...adoption(), projectId}), /课题 ID/);
