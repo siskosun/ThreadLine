@@ -2,7 +2,12 @@
 // Evidence behavior has its own real-core and native IndexedDB regression suite.
 module.exports = () => ({
   structuredClone,
+  TextEncoder,
   ThreadLineEvidenceCore: require('../../evidence-core.js'),
+  ThreadLineResearchCore: require('../../research-core.js'),
+  ThreadLineEvidenceSource: require('../../evidence-source.js'),
+  ThreadLineEvidenceLifecycle: require('../../evidence-lifecycle.js'),
+  ThreadLineEvidenceWorkflows: require('../../evidence-workflows.js'),
   ThreadLineEvidenceDB: {
     async open() { return {}; },
     async snapshot() {

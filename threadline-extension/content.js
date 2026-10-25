@@ -121,7 +121,7 @@
         #ack-line{margin-top:9px}#ack-line[hidden]{display:none!important}
         #modal{margin-bottom:9px;padding:14px;border-radius:14px;background:#fff;border:1px solid #dab899;box-shadow:0 10px 35px #08132733;}
         .actions{display:flex;gap:8px;margin-top:12px;}
-        button{appearance:none;border:1px solid #d7dce5;background:#fff;padding:8px 10px;border-radius:9px;color:#273a50;font-size:12px;cursor:pointer;line-height:1.3;}
+        button{min-height:36px;appearance:none;border:1px solid #d7dce5;background:#fff;padding:8px 10px;border-radius:9px;color:#273a50;font-size:12px;cursor:pointer;line-height:1.3;}
         button.primary{background:#243b59;color:#fff;border-color:#243b59} button:focus-visible{outline:2px solid #659bce;outline-offset:2px}
         #root[hidden], #warning[hidden],#modal[hidden]{display:none!important}
       </style>
@@ -134,7 +134,7 @@
         <div id="warning" hidden aria-live="polite">
           <div class="hd" id="heading"></div>
           <div class="detail" id="message"></div>
-          <div id="decision" hidden></div>
+          <div id="decision" tabindex="0" aria-label="最新课题结论，可滚动查看" hidden></div>
           <div id="ack-line" hidden><button id="ack-branch" class="primary">已核对最新课题状态</button></div>
         </div>
         <div id="pill"><span id="dot"></span><span id="topic"></span><span id="branch"></span></div>

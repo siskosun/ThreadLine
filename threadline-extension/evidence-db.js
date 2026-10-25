@@ -106,6 +106,7 @@
       ledgerReq.onsuccess = () => {
         const prior = ledgerReq.result;
         if (prior) {
+          if(prior.redacted){tx.abort();return fail(new Error("旧操作所属数据已删除或替换，不能重放"));}
           if (
             prior.schema !== 2 ||
             prior.kind !== w.ledger.kind ||
@@ -126,7 +127,8 @@
             plan.expectedRevision === undefined
               ? w.project.evidenceRevision - 1
               : plan.expectedRevision;
-          if (!current || current.evidenceRevision !== expected) {
+          if ((expected === null && current) || (expected !== null &&
+              (!current || current.evidenceRevision !== expected))) {
             try {
               tx.abort();
             } catch {
@@ -145,6 +147,12 @@
             stores[store].add(value);
           };
           try {
+            for (const [store, ids] of Object.entries(w.deleteIds || {})) {
+              if (!STORES.includes(store) || store === "projects" || store === "operations")
+                throw new Error("无效的证据删除范围");
+              if (!Array.isArray(ids)) throw new Error("无效的证据删除 ID");
+              for (const id of ids) stores[store].delete(id);
+            }
             if (w.conclusion) {
               if (w.ledger.kind === "adopt") add("conclusions",w.conclusion);
               else stores.conclusions.put(w.conclusion);
@@ -157,7 +165,8 @@
             for (const s of w.bulkSources || []) add("sources", s);
             for (const l of w.bulkLinks || []) add("links", l);
             stores.projects.put(w.project);
-            add("operations", w.ledger);
+            for(const ledger of w.redactedOperations||[])stores.operations.put(ledger);
+            add("operations", {...w.ledger,projectId:w.project.projectId});
           } catch (e) {
             try {
               tx.abort();
@@ -220,6 +229,32 @@
     });
   }
 
+  /* A tombstone is durable evidence that cleanup was requested.  It must not
+   * be cleared by a stale worker after a restore/re-delete changed revision. */
+  function markCleanupDone(db, projectId, expectedRevision) {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const done = (v) => { if (!settled) { settled = true; resolve(v); } };
+      const fail = (e) => { if (!settled) { settled = true; reject(e); } };
+      let tx;
+      try { tx = db.transaction(["projects"], "readwrite"); }
+      catch (e) { return fail(e); }
+      tx.oncomplete = () => done({ done: true });
+      tx.onabort = () => fail(tx.error || new Error("删除清理标记事务中止"));
+      tx.onerror = () => fail(tx.error || new Error("删除清理标记事务失败"));
+      const store = tx.objectStore("projects"), req = store.get(projectId);
+      req.onsuccess = () => {
+        const current = req.result;
+        if (!current || !current.deleted || current.evidenceRevision !== expectedRevision) {
+          try { tx.abort(); } catch {}
+          return done({ done: false, stale: true });
+        }
+        store.put({ ...current, cleanupPending: false });
+      };
+      req.onerror = () => fail(req.error || new Error("删除清理标记读取失败"));
+    });
+  }
+
   async function ensureProject(db, projectId, Core) {
     const tx = db.transaction(["projects"], "readwrite");
     return new Promise((resolve, reject) => {
@@ -230,6 +265,10 @@
       tx.onerror = () => reject(tx.error || new Error("证据课题初始化失败"));
       req.onsuccess = () => {
         if (req.result) {
+          if (req.result.deleted) {
+            reject(new Error("课题证据已删除：请使用明确恢复流程，不能自动复活"));
+            tx.abort(); return;
+          }
           created = req.result;
           return;
         }
@@ -238,6 +277,15 @@
         created = record;
       };
       req.onerror = () => reject(req.error);
+    });
+  }
+
+  function markRestoreDone(db, projectId, revision) {
+    return new Promise((resolve,reject)=>{
+      const tx=db.transaction(["projects"],"readwrite"),q=tx.objectStore("projects").get(projectId);
+      tx.oncomplete=()=>resolve(true);tx.onabort=()=>reject(tx.error||Error("恢复对账中止"));tx.onerror=()=>reject(tx.error);
+      q.onsuccess=()=>{const p=q.result;if(!p||p.evidenceRevision!==revision){tx.abort();return;}
+        const next={...p,restorePending:false};delete next.restoreTopic;tx.objectStore("projects").put(next);};
     });
   }
 
@@ -250,6 +298,8 @@
     applyPlan,
     ensureProject,
     clearProjectionTodo,
+    markCleanupDone,
+    markRestoreDone,
   };
   if (typeof module !== "undefined" && module.exports) module.exports = DB;
   else globalThis.ThreadLineEvidenceDB = DB;

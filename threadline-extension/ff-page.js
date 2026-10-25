@@ -45,6 +45,8 @@
   function notice(message, error=false) {
     $("ff-notice").textContent = message;
     $("ff-notice").dataset.error = String(error);
+    let toast=$("ff-action-status");if(!toast){toast=document.createElement("div");toast.id="ff-action-status";toast.setAttribute("aria-hidden","true");document.body.append(toast);}
+    toast.textContent=message;toast.dataset.error=String(error);toast.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>toast.hidden=true,error?9000:5000);
   }
   function bytes() {
     const value = ThreadLineFFCore.formatText($("ff-w0").value, $("ff-p").value);
@@ -53,7 +55,9 @@
       " / 24,000 UTF-8 字节" + (size>24000?"（超出限制）":"");
     $("ff-save").disabled = createBusy || size > 24000 || !$("ff-p").value.trim();
   }
-  let currentExperiment = null;
+  let currentExperiment = null,currentData=null,readTicket=0,listTicket=0;
+  const verdictDrafts=new Map();
+  let toastTimer;
   async function runOperation(payload, busyButton) {
     if (busyButton) busyButton.disabled = true;
     try {
@@ -68,7 +72,7 @@
     const box = document.createElement("div");
     const head = document.createElement("p");
     head.className = "mono";
-    head.textContent = "分支 " + branch + "：" + info.status + " · 阶段 " + info.phase +
+    head.textContent = "分支 " + branch + "：" + ({pending:"进行中",done:"已完成",failed:"失败",unknown:"结果未确认"}[info.status]||info.status) + " · " + ({created:"等待预填核对",awaiting_send:"待你手动发送",generating:"生成中",capturing:"采集中"}[info.phase]||info.phase) +
       (attempt ? " · 尝试 " + attempt.id.slice(0, 16) : "") +
       (ev.sessionId ? " · 会话 " + ev.sessionId.slice(0, 16) : "");
     box.appendChild(head);
@@ -129,7 +133,7 @@
     const branch = decision.mapping[label];
     const attempt = value.branches[branch] && value.branches[branch].attempts.at(-1);
     const reply = replyText || "";
-    const sessionId = attempt && attempt.evidence && attempt.evidence.sessionId;
+    const evidence = attempt && attempt.evidence;
     const status = document.createElement("span");
     status.className = "subtle";
     const adopt = document.createElement("button");
@@ -138,23 +142,19 @@
     adopt.addEventListener("click", async () => {
       adopt.disabled = true;
       try {
-        const snapshot = await chrome.storage.local.get("threadline_state_v1");
-        const projects = ((snapshot["threadline_state_v1"] || {}).projects) || [];
-        if (!projects.length) throw new Error("尚无课题：请先在研线面板创建课题");
-        const names = projects.map(p => p.id + "：" + (p.name || p.id)).join("\n");
-        const chosen = prompt("采纳到哪个课题？\n" + names + "\n（输入课题 ID）", projects[0].id);
-        if (!chosen) return;
-        const project = projects.find(p => p.id === chosen);
-        if (!project) throw new Error("课题不存在：" + chosen);
-        const result = await send({ type: "EV_ADOPT", projectId: project.id,
-          text: "【Fork " + value.id.slice(0, 12) + " · " + label + "】" + reply.slice(0, 3900),
-          fragments: [{
-            selection: reply.slice(0, 2000), before: "", after: "",
-            relation: "cites", completeness: "complete", kind: "capture",
-            conversationId: sessionId || null
-          }],
-          operationId: "op_adopt_" + crypto.randomUUID().replace(/-/g, "").slice(0, 10) });
-        status.textContent = result.dedupe ? "已存在相同采纳（未重复创建）" : "已采纳：" + result.conclusionId.slice(0, 14) + "…";
+        if (!evidence?.captureRunId || !evidence?.messageId || !reply)
+          throw new Error("此旧实验缺少完整回复来源，无法精确采纳；请重新采集该分支");
+        const result=await ThreadLineEvidenceAdoption.open({text:"",sources:[{
+          label:"Fork " + label + " · 已采集最终回复",
+          experimentId:value.id,branch:branch,attemptId:attempt.id,
+          captureRunId:evidence.captureRunId,messageId:evidence.messageId,
+          content:reply,coverage:evidence.captureComplete?"原始采集：分页完成":"原始采集：部分历史",
+          nonText:!!evidence.hasNonText,aiCoverage:"不适用（Fork 原始回复）"
+        }],submit:form=>send({type:"EV_ADOPT_FORK",projectId:form.projectId,text:form.text,conditions:form.conditions,
+          experimentId:value.id,branch:form.selections[0].source.branch,attemptId:form.selections[0].source.attemptId,
+          selections:form.selections.map(x=>({selection:x.selection,selectionStart:x.selectionStart,selectionEnd:x.selectionEnd,relation:x.relation,messageId:x.source.messageId,captureRunId:x.source.captureRunId})),
+          operationId:form.operationId})});
+        status.textContent = result ? "已采纳："+result.conclusionId+"。请在“证据与复核”中查看。" : "已取消采纳，没有保存结论。";
       } catch (e) { status.textContent = "采纳失败：" + e.message; }
       finally { adopt.disabled = false; }
     });
@@ -199,7 +199,7 @@
         head.textContent = "回复 " + label;
         const body = document.createElement("pre");
         body.id = "ff-reply-" + label;
-        body.textContent = replyOf(label);
+        body.textContent = replyOf(label);body.tabIndex=0;body.setAttribute("aria-label","回复 "+label);
         const timing = timings[decision.mapping[label]];
         if (timing && timing.sentMs !== null) {
           const b = document.createElement("p");
@@ -279,8 +279,10 @@
     $("ff-export").hidden = false;
   }
   async function read(id) {
-    const value = await send({type:"FF_READ",id});
-    currentExperiment = id;
+    const ticket=++readTicket,value=await send({type:"FF_READ",id});if(ticket!==readTicket)return;
+    if(currentExperiment){verdictDrafts.set(currentExperiment,{preference:$("ff-preference").value,criteria:$("ff-criteria").value,notes:$("ff-notes").value,confidence:$("ff-confidence").value,
+      calibration:[...document.querySelectorAll('#ff-calibration-items input:checked')].map(n=>({name:n.name,value:n.value}))});}
+    const draft=verdictDrafts.get(id);currentExperiment = id;currentData=value;
     $("ff-meta").textContent = "实验 " + value.id + " · revision " + value.revision +
       " · " + value.frozen.bytes + " UTF-8 字节";
     $("ff-sha").textContent = "冻结 SHA-256（canonicalization-v1）：" +
@@ -292,7 +294,7 @@
       b.status === "pending" || b.status === "done");
     $("ff-branches").hidden = false;
     $("ff-launch").disabled = launched && blocked;
-    $("ff-launch").textContent = launched ? "重新发起（仅当所有分支都非进行中且未完成）" : "发起双分支（K 个新标签）";
+    $("ff-launch").textContent = launched ? "重新发起（仅当所有分支都非进行中且未完成）" : "发起 "+Object.keys(value.branches).length+" 个分支标签";
     // P4: render every branch's operations, not just A/B.
     const branchBoxes = $("ff-branch-boxes");
     branchBoxes.replaceChildren();
@@ -300,9 +302,12 @@
       branchBoxes.appendChild(branchBox(label, value));
     }
     renderCompare(value);
+    if(draft){for(const [key,selector] of [["preference","ff-preference"],["criteria","ff-criteria"],["notes","ff-notes"],["confidence","ff-confidence"]])if(draft[key]!==undefined)$(selector).value=draft[key];for(const answer of draft.calibration||[]){const input=[...document.querySelectorAll('#ff-calibration-items input')].find(n=>n.name===answer.name&&n.value===answer.value);if(input)input.checked=true;}}
+    else {$("ff-criteria").value="";$("ff-notes").value="";$("ff-confidence").value="medium";}
+    document.querySelectorAll('#ff-list button[data-experiment-id]').forEach(button=>button.setAttribute("aria-pressed",String(button.dataset.experimentId===id)));
   }
   async function list() {
-    const values = await send({type:"FF_LIST"});
+    const ticket=++listTicket,values = await send({type:"FF_LIST"});if(ticket!==listTicket)return;
     const holder = $("ff-list");
     holder.replaceChildren();
     if (values.length === 0) {
@@ -315,7 +320,7 @@
     for (const item of values) {
       const button = document.createElement("button");
       button.type = "button";
-      button.className = "secondary";
+      button.className = "secondary";button.dataset.experimentId=item.id;button.setAttribute("aria-pressed",String(item.id===currentExperiment));
       const statuses = item.statuses || {A:item.statusA, B:item.statusB};
       const mark = s => s === "done" ? "✓" : s === "failed" ? "✗" : s === "unknown" ? "?" : "…";
       button.textContent = item.id + " · K=" + (item.branchCount || Object.keys(statuses).length) +
@@ -396,6 +401,7 @@
     const file = event.target.files && event.target.files[0];
     if (!file) return;
     try {
+      if(file.size>20*1024*1024)throw Error("文件超过 20 MiB，未读取内容");
       const snapshot = JSON.parse(await file.text());
       const imported = await send({type:"FF_IMPORT",snapshot});
       notice("已导入实验 " + imported.id + "（revision " + imported.revision + "，" +
@@ -419,9 +425,9 @@
       await send({type:"FF_LAUNCH", experimentId:currentExperiment,
         operationId:crypto.randomUUID()});
       await read(currentExperiment);
-      notice("双分支已创建并预填；请在两个新标签中检查内容后手动发送。研线不会替你发送。");
+      notice(Object.keys(currentData?.branches||{}).length+" 个分支已创建并预填；请逐个核对内容后手动发送。");
     } catch (e) { notice(e.message, true); await read(currentExperiment).catch(()=>{}); }
-    finally { button.disabled = false; }
+    finally { const value=currentData;button.disabled=!value||(Object.values(value.branches).some(b=>b.attempts.length>0)&&Object.values(value.branches).some(b=>b.status==="pending"||b.status==="done")); }
   });
   $("ff-compare-btn").addEventListener("click", async event => {
     if (!currentExperiment) return;
@@ -431,7 +437,7 @@
       await send({type:"FF_COMPARE", experimentId:currentExperiment,
         operationId:crypto.randomUUID()});
       await read(currentExperiment);
-      notice("X/Y 对照已生成；对应关系在裁决前不用于展示。");
+      notice("去标签对照已生成；请阅读回复并完成裁判校准后裁决。");
     } catch (e) { notice(e.message, true); await read(currentExperiment).catch(()=>{}); }
     finally { button.disabled = false; }
   });

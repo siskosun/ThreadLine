@@ -19,9 +19,12 @@ test('AI report promotion uses explicit human approval, not closure automation',
  assert.ok(html.includes('id="report-promote-state"'));
  assert.ok(capture.includes('function promoteAnalysisToProject'));
  assert.ok(html.includes('id="promote-review-check"'));
- assert.ok(capture.includes("$('promote-review-check').checked"));
- assert.ok(capture.includes('expectedRevision:target.revision'));
- assert.ok(capture.includes('patch:{decision}'));
+ assert.ok(capture.includes('ThreadLineEvidenceAdoption.open'));
+ assert.ok(capture.includes('EV_ADOPT_CAPTURE'));
+ assert.ok(!capture.includes('patch:{decision}'));
+ const dialog=fs.readFileSync(require('node:path').join(base,'evidence-adoption-ui.js'),'utf8');
+ assert.ok(dialog.includes('确认采纳'));
+ assert.ok(dialog.includes('selectionStart'));
  assert.ok(!capture.includes('patch:{stage:"closed"'));
 });
 test('stale branch reminder stays nonblocking, unlike explicit closure',()=>{
