@@ -929,7 +929,7 @@ async function completeEvidenceReview(authority,payload,planMetadata,commit) {
   if(!changed.result.stale&&(payload.outcome==="revise"||payload.outcome==="withdraw")) {
     const edit=payload.outcome==="revise"?{text:payload.text,expectedVersionId:review.targetVersionId}:null;
     if(edit&&Object.hasOwn(payload,"conditions"))edit.conditions=payload.conditions;
-    const corePlan=edit?await Core.planAmendment(state,review.targetConclusionId,edit,payload.operationId):await Core.planWithdrawal(state,review.targetConclusionId,payload.reason,payload.operationId);
+    const corePlan=edit?await Core.planAmendment(state,review.targetConclusionId,edit,payload.operationId):await Core.planWithdrawal(state,review.targetConclusionId,payload.reason,payload.operationId,review.targetVersionId);
     corePlan.writes.project=plan.writes.project;corePlan.writes.ledger=plan.writes.ledger;
     corePlan.result={...plan.result,...corePlan.result};corePlan.writes.ledger.result=corePlan.result;
     plan=recordEvidenceChange(state,corePlan,payload.operationId);
