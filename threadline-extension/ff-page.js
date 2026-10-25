@@ -63,6 +63,22 @@
     } catch (e) { notice(e.message, true); return false; }
     finally { if (busyButton) busyButton.disabled = false; }
   }
+  async function inspectCapture(experimentId,branch,runId){
+    const result=await send({type:"FF_CAPTURE_STATUS",experimentId,branch,...(runId?{runId}:{})});
+    if(currentExperiment!==experimentId)return result;
+    const description=({
+      done:"采集已完成，分支结果已确认",
+      capturing:"采集正在执行，等待来源响应",
+      stalled:"采集超过 30 秒未更新，结果未确认；请检查分支标签与日志，勿自动重试",
+      needs_review:"原始采集已结束，但分支完成条件不足；请核对来源、完成信号和输入一致性",
+      integration_error:"原文已保存，Fork 结果关联失败；请保留原文并报告此错误",
+      error:"采集失败，没有获得完整结果",
+      unknown:"采集状态未知，需人工检查"
+    })[result.state]||"采集结果未知";
+    notice(description+(result.error?"："+result.error:""),!["done","capturing"].includes(result.state));
+    await read(experimentId);
+    return result;
+  }
   function branchBox(branch, data) {
     const info = data.branches[branch], attempt = info.attempts.at(-1), ev = attempt?.evidence || {};
     const box = document.createElement("div");
@@ -104,20 +120,37 @@
         cap.type = "button"; cap.className = "secondary";
         cap.textContent = "采集回复（完成后自动核对完成条件）";
         cap.addEventListener("click", async () => {
-          const started = await runOperation(
-            {type:"FF_CAPTURE", experimentId:data.id, branch}, cap);
-          if (!started) return;
-          notice("采集已启动（分支 " + branch + "）。采集在分支标签页完成后自动核对，稍候此处会刷新。");
-          // The capture run finishes asynchronously in the branch tab; the
-          // immediate re-read inside runOperation still shows the old phase,
-          // so poll a few times to surface the result without a manual refresh.
-          for (const delay of [4000, 9000, 15000]) {
-            setTimeout(() => {
-              if (currentExperiment === data.id) read(currentExperiment).catch(() => {});
-            }, delay);
-          }
+          cap.disabled=true;
+          try {
+            const result=await send({type:"FF_CAPTURE",experimentId:data.id,branch});
+            if(!result.started){
+              notice("采集未启动（分支 "+branch+"）："+(result.error||"注入失败")+"。没有自动重试。",true);
+              await read(data.id);return;
+            }
+            notice("采集请求已确认。将检查分支 "+branch+" 的实际完成状态。");
+            await read(data.id);
+            // Poll only while this page is open; pending state is durable and
+            // may be checked again manually after re-opening the page.
+            for(const delay of [1000,5000,15000,32000])
+              setTimeout(()=>{
+                if(currentExperiment===data.id)
+                  inspectCapture(data.id,branch,result.runId).catch(e=>notice("采集状态无法核验："+e.message,true));
+              },delay);
+          }catch(e){notice("采集启动结果未确认："+e.message+"。请先检查状态，不要盲目重复点击。",true);}
+          finally{cap.disabled=false;}
         });
         row.appendChild(cap);
+      }
+      if(ev.captureRunId){
+        const check=document.createElement("button");
+        check.type="button";check.className="secondary";check.textContent="查看采集状态";
+        check.addEventListener("click",async()=>{
+          check.disabled=true;
+          try {await inspectCapture(data.id,branch,ev.captureRunId);}
+          catch(e){notice("无法读取采集状态："+e.message,true);}
+          finally{check.disabled=false;}
+        });
+        row.appendChild(check);
       }
       box.appendChild(row);
     }

@@ -166,9 +166,16 @@ async function beginCapture(tabId) {
     await chrome.scripting.executeScript({target:{tabId},files:["capture-page.js"],world:"ISOLATED"});
     const reply=await chrome.tabs.sendMessage(tabId,{type:"TL_CAPTURE_START",id,conversationId});
     if(!reply?.ok)throw new Error(reply?.error||"无法与源标签页通讯");
-  }catch(e){captureOwners.delete(id);await chrome.storage.session.remove(`${CAPTURE_PREFIX}${id}`);await ThreadLineCaptureDB.modifyRun(id,{status:"error",error:String(e.message||e)});}
+  }catch(e){
+    captureOwners.delete(id);
+    await chrome.storage.session.remove(`${CAPTURE_PREFIX}${id}`);
+    const message=String(e?.message||e).slice(0,1200);
+    await ThreadLineCaptureDB.modifyRun(id,{status:"error",error:message,phase:"start-failed"});
+    await chrome.storage.local.set({tl_last_capture_id:id});
+    return {id,started:false,error:message};
+  }
   await chrome.storage.local.set({tl_last_capture_id:id});
-  return {id};
+  return {id,started:true};
 }
 async function receiveCapture(payload,sender){
   if(!sender.tab?.id)throw new Error("此消息只能由采集标签页提交");
@@ -191,7 +198,12 @@ async function receiveCapture(payload,sender){
       const finished=await ThreadLineCaptureDB.modifyRun(run.id,{status:"done",complete:payload.complete===true,mode:String(payload.mode||""),pageCount:Number(payload.pageCount)||0,messageCount:Number(payload.count)||0,notice:String(payload.notice||"").slice(0,1200)});
       captureOwners.delete(run.id);await chrome.storage.session.remove(`${CAPTURE_PREFIX}${run.id}`);await markSuccess("capture");
       // Fork branches turn a completed capture into their completion evidence.
-      try { await serialize(() => ffCaptureEnded(finished, sender.tab.id)); } catch {}
+      try { await serialize(() => ffCaptureEnded(finished, sender.tab.id)); }
+      catch (error) {
+        // The captured source is already durable; do not hide a failed Fork
+        // reconciliation behind a successful source-capture receipt.
+        await ThreadLineCaptureDB.modifyRun(run.id,{forkIntegrationError:String(error?.message||error).slice(0,1200)});
+      }
       return {ok:true};
     }
     case "CAPTURE_FAIL":
@@ -719,8 +731,7 @@ async function handleFF(payload, sender) {
       if (!await ffEnabled()) throw new Error("Fork Beta is disabled");
       const existing = await ThreadLineFFDB.read(payload.experimentId);
       if (!existing) throw new Error("experiment not found");
-      // K=2-4 (live K=4 finding): capture must be addressable for every
-      // branch; the previous A/B guard made C/D completion impossible.
+      // K=2-4: require the branch to belong to this experiment.
       if (!Object.prototype.hasOwnProperty.call(existing.branches, payload.branch))
         throw new Error("invalid branch");
       const attempt = existing.branches[payload.branch].attempts.at(-1);
@@ -728,8 +739,42 @@ async function handleFF(payload, sender) {
         !Number.isInteger(attempt.evidence?.tabId) || !attempt.evidence.sessionId)
         throw new Error("branch has no bound conversation to capture");
       const run = await beginCapture(attempt.evidence.tabId);
-      return {runId:run.id};
+      // Persist exact run identity before returning. After ff.html reloads the
+      // pending capture is still inspectable; a silent injection failure is
+      // never reported as "capture started".
+      await ffAdvance({experimentId:existing.id,branch:payload.branch,attemptId:attempt.id},
+        {status:"pending",phase:run.started?"capturing":attempt.phase,
+         operationId:"ff_capture_"+run.id,
+         reason:run.started?"capture started; receipt pending":"capture injection failed; no source collected",
+         updates:{captureRunId:run.id,captureStartedAt:Date.now(),
+           captureError:run.started?null:run.error}});
+      return {runId:run.id,started:run.started,error:run.error||null};
     });
+  }
+  if (payload.type === "FF_CAPTURE_STATUS") {
+    // Read-only diagnostics scoped to the exact branch and capture run.
+    // No raw messages, URLs, tokens, or automatic replay are exposed.
+    const existing=await ThreadLineFFDB.read(payload.experimentId);
+    if(!existing || !Object.prototype.hasOwnProperty.call(existing.branches,payload.branch))
+      throw new Error("invalid experiment or branch");
+    const branch=existing.branches[payload.branch],
+      attempt=branch.attempts.at(-1),runId=attempt?.evidence?.captureRunId;
+    if(!runId || (payload.runId!==undefined && payload.runId!==runId))
+      throw new Error("capture run does not belong to this branch");
+    const run=await ThreadLineCaptureDB.getRun(runId);
+    if(!run || run.tabId!==attempt.evidence.tabId ||
+       run.conversationId!==attempt.evidence.sessionId)
+      throw new Error("capture identity mismatch; manual verification required");
+    const ageMs=Math.max(0,Date.now()-(run.updatedAt||run.createdAt||Date.now()));
+    let state=run.status==="error"?"error":
+      run.forkIntegrationError?"integration_error":
+      run.status==="done"?(branch.status==="done"?"done":"needs_review"):
+      run.status==="capturing"?(ageMs>=30000?"stalled":"capturing"):"unknown";
+    return {runId,state,captureStatus:run.status,branchStatus:branch.status,
+      branchPhase:branch.phase,ageMs,phase:run.phase||"",
+      pageCount:run.pageCount||0,messageCount:run.messageCount||0,
+      captureComplete:run.complete===true,
+      error:(run.forkIntegrationError||run.error||attempt.evidence?.captureError||"").slice(0,600)};
   }
   if (payload.type === "FF_COMPARE") {
     // Blind X/Y mapping: only after BOTH branches are done with verified
