@@ -310,6 +310,7 @@ test("withdrawal keeps history and stays idempotent", async () => {
     adopted.conclusionId,
     "理由",
     "op_wd000000002",
+    adopted.versionId,
   );
   assert.deepEqual(replay.replay, withdrawn);
   await assert.rejects(
