@@ -71,13 +71,22 @@ def run():
    assert revised["stale"] is False and revised["versionId"].startswith("ver_"),revised
    r=state();v=next(x for x in r["rows"] if x["conclusion"]["id"]==b["conclusionId"])
    assert v["current"]["text"]=="研究结论 b 已调整" and v["current"]["conditions"]=="相同样本"
+   fourth=prepare("withdraw")
+   r=state()
+   withdrawn=send({"type":"EV_REVIEW_COMPLETE","projectId":pid,"reviewId":fourth["reviewId"],
+     "outcome":"withdraw","reason":"完整核对后撤回下游结论",
+     "analysis":"经独立复核撤回","expectedRevision":r["project"]["evidenceRevision"],
+     "operationId":"op_s4complete_withdraw"})
+   assert withdrawn["stale"] is False and withdrawn["status"]=="withdrawn",withdrawn
+   r=state();v=next(x for x in r["rows"] if x["conclusion"]["id"]==b["conclusionId"])
+   assert v["conclusion"]["status"]=="withdrawn",v
    backup=send({"type":"EV_BACKUP","projectId":pid})
    assert backup["evidence"]["format"]=="threadline-evidence/3"
-   assert len(backup["evidence"]["project"]["research"]["reviews"])==3
+   assert len(backup["evidence"]["project"]["research"]["reviews"])==4
    err=send({"type":"EV_REVIEW_COMPLETE","projectId":pid,"reviewId":third["reviewId"],
      "outcome":"keep","reason":"重复完成","expectedRevision":r["project"]["evidenceRevision"],
      "operationId":"op_s4complete_again"},False)
    assert err,err
    context.close()
- print("PASS: S4 frozen review, ancestor staleness, exact keep, atomic revise, immutable /3 history")
+ print("PASS: S4 frozen review, ancestor staleness, exact keep, atomic revise/withdraw, immutable /3 history")
 if __name__=="__main__":run()
