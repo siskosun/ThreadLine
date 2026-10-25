@@ -58,8 +58,9 @@ def run():
    assert backup["evidence"]["format"]=="threadline-evidence/3"
    assert len(backup["evidence"]["project"]["research"]["edges"])==1
    assert len(backup["evidence"]["project"]["research"]["confirmations"])==2
-   # No post-write effects are allowed from an unregistered S4 command.
-   err=send({"type":"EV_REVIEW_PREPARE","projectId":pid},False)
+   # S4 commands become available in the next independent slice; test the
+   # unchanged rejection of unknown privileged evidence commands instead.
+   err=send({"type":"EV_UNKNOWN_PRIVILEGED","projectId":pid},False)
    assert "未知证据消息" in err,err
    context.close()
  print("PASS: S2 exact-version dependency, stale update rejection, cycle denial, /3 backup, S4 isolation")
