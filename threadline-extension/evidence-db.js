@@ -49,7 +49,7 @@
       sources: toMap(sources, "id"),
       links: toMap(links, "id"),
       projects: Object.fromEntries(projects.map(p => [p.projectId, p])),
-      operations: toMap(operations, "id")
+      operations: toMap(operations, "operationId")
     };
   }
 
@@ -75,28 +75,46 @@
       const projectReq = stores.projects.get(plan.writes.project.projectId);
       projectReq.onsuccess = () => {
         const current = projectReq.result;
-        const expected = plan.writes.project.evidenceRevision - 1;
+        const expected = plan.expectedRevision === undefined
+          ? plan.writes.project.evidenceRevision - 1 : plan.expectedRevision;
         if (!current || current.evidenceRevision !== expected) {
           try { tx.abort(); } catch { /* already aborting */ }
           return fail(new Error("证据版本冲突（CAS）：请刷新后重试，本地修订 " +
             (current ? current.evidenceRevision : "无") + " ≠ 期望 " + expected));
         }
         const w = plan.writes;
-        try {
-          if (w.conclusion) stores.conclusions.put(w.conclusion);
-          if (w.version) stores.versions.put(w.version);
-          for (const s of w.sources || []) stores.sources.put(s);
-          for (const l of w.links || []) stores.links.put(l);
-          for (const c of w.bulkConclusions || []) stores.conclusions.put(c);
-          for (const v of w.bulkVersions || []) stores.versions.put(v);
-          for (const s of w.bulkSources || []) stores.sources.put(s);
-          for (const l of w.bulkLinks || []) stores.links.put(l);
-          stores.projects.put(w.project);
-          stores.operations.put(w.ledger);
-        } catch (e) {
-          try { tx.abort(); } catch { }
-          return fail(e);
-        }
+        const ledgerReq = stores.operations.get(w.ledger.operationId);
+        ledgerReq.onsuccess = () => {
+          const prior = ledgerReq.result;
+          if (prior) {
+            if (prior.schema !== 2 || prior.kind !== w.ledger.kind || prior.requestHash !== w.ledger.requestHash) {
+              try { tx.abort(); } catch { }
+              return fail(new Error("操作 ID 已用于不同请求，已拒绝"));
+            }
+            // A crash after commit but before response is a replay, never a second write.
+            return done(prior.result);
+          }
+          const add = (store, value) => {
+            if (typeof stores[store].add === "function") stores[store].add(value);
+            else stores[store].put(value); // test doubles must still enforce collision separately.
+          };
+          try {
+            if (w.conclusion) stores.conclusions.put(w.conclusion);
+            if (w.version) add("versions", w.version);
+            for (const s of w.sources || []) add("sources", s);
+            for (const l of w.links || []) add("links", l);
+            for (const c of w.bulkConclusions || []) add("conclusions", c);
+            for (const v of w.bulkVersions || []) add("versions", v);
+            for (const s of w.bulkSources || []) add("sources", s);
+            for (const l of w.bulkLinks || []) add("links", l);
+            stores.projects.put(w.project);
+            add("operations", w.ledger);
+          } catch (e) {
+            try { tx.abort(); } catch { }
+            return fail(e);
+          }
+        };
+        ledgerReq.onerror = () => fail(ledgerReq.error || new Error("operations 读取失败"));
       };
       projectReq.onerror = () => fail(projectReq.error || new Error("projects 读取失败"));
     });
@@ -125,7 +143,7 @@
           return done({ cleared: false, stale: true });
         }
         tx.objectStore("projects").put({ ...current,
-          projectionRevision: current.projectionRevision + 1, projectionTodo: false });
+          projectionRevision: expectedRevision, projectionTodo: false });
       };
       req.onerror = () => fail(req.error);
     });
@@ -135,11 +153,15 @@
     const tx = db.transaction(["projects"], "readwrite");
     return new Promise((resolve, reject) => {
       const req = tx.objectStore("projects").get(projectId);
+      let created;
+      tx.oncomplete = () => resolve(created || req.result);
+      tx.onabort = () => reject(tx.error || new Error("证据课题初始化中止"));
+      tx.onerror = () => reject(tx.error || new Error("证据课题初始化失败"));
       req.onsuccess = () => {
-        if (req.result) return resolve(req.result);
+        if (req.result) { created = req.result; return; }
         const record = Core.newProjectRecord(projectId);
         tx.objectStore("projects").put(record);
-        tx.oncomplete = () => resolve(record);
+        created = record;
       };
       req.onerror = () => reject(req.error);
     });

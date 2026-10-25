@@ -49,8 +49,10 @@ function mockIdb(initial = {}) {
           get onsuccess() { return null; }, set onsuccess(fn) { queueMicrotask(fn); },
           get onerror() { return null; }, set onerror(fn) {} };
       }
-      // commit when the microtask queue drains with no pending callbacks
-      queueMicrotask(() => queueMicrotask(() => {
+      // IDB completes only after request callbacks scheduled by earlier
+      // callbacks have run; a task boundary models that better than a fixed
+      // two-microtask shortcut.
+      setTimeout(() => {
         if (aborted || finished) return;
         finished = true;
         for (const [composite, value] of staged) {
@@ -59,7 +61,7 @@ function mockIdb(initial = {}) {
         }
         staged.clear();
         if (tx.oncomplete) tx.oncomplete();
-      }));
+      }, 0);
       return tx;
     }
   };
@@ -186,7 +188,7 @@ test('export/import: roundtrip, collision and cross-project refusal', async () =
   const adopted = await DB.applyPlan(db, await Core.planAdoption(state, adoption('可导出结论'), 'op_ex000000001'));
   state = await stateFrom(db);
   const pkg = Core.exportPackage(state, 'p1');
-  assert.equal(pkg.format, 'threadline-evidence/1');
+  assert.equal(pkg.format, 'threadline-evidence/2');
   assert.equal(pkg.counts.conclusions, 1);
   assert.equal(pkg.includesOriginalExcerpts, true);
   // Collision against existing IDs is refused by the planner itself.
@@ -196,7 +198,7 @@ test('export/import: roundtrip, collision and cross-project refusal', async () =
   const state2 = await stateFrom(db2);
   // A package whose conclusions belong to a different project is refused
   // (checked on the fresh state so the ID-collision rule is not what fires).
-  await assert.rejects(Core.importPackage(state2, { ...pkg, projectId: 'p2' }, 'op_im000000002'), /不一致/);
+  await assert.rejects(Core.importPackage(state2, { ...pkg, projectId: 'p2' }, 'op_im000000002'), /归属/);
   const imported = await DB.applyPlan(db2, await Core.importPackage(state2, pkg, 'op_im000000003'));
   assert.equal(imported.imported, 1);
   const after2 = await stateFrom(db2);
@@ -251,7 +253,7 @@ test('duplicate adoption detection: same body+fragments, different fragments', a
     state.projects.p1 = w.project; state.operations[w.ledger.operationId] = w.ledger; };
   await apply(await Core.planAdoption(state, adoption('相同正文'), 'op_dup000000001'));
   const same = await Core.findDuplicateAdoption(state, 'p1',
-    { text: '相同正文', fragments: [{ selection: '依据片段', before: '前文', after: '后文' }] });
+    { text: '相同正文', fragments: [{ selection: '依据片段', before: '前文', after: '后文', relation: 'supports' }] });
   assert.ok(same, 'identical body+fragments detected as duplicate');
   const different = await Core.findDuplicateAdoption(state, 'p1',
     { text: '相同正文', fragments: [{ selection: '不同的依据', before: '', after: '' }] });
@@ -259,4 +261,46 @@ test('duplicate adoption detection: same body+fragments, different fragments', a
   const otherText = await Core.findDuplicateAdoption(state, 'p1',
     { text: '另一条正文', fragments: [{ selection: '依据片段' }] });
   assert.equal(otherText, null, 'different body is not a duplicate');
+});
+
+test('source identity, relation and conditions are part of duplicate identity', async () => {
+  const state = { conclusions: {}, versions: {}, sources: {}, links: {}, projects: { p1: Core.newProjectRecord('p1') }, operations: {} };
+  const input = { projectId:'p1', text:'同一正文', conditions:'仅中国', fragments:[{selection:'相同摘录',conversationId:'conv-one',messageId:'msg-one',relation:'supports'}] };
+  const plan = await Core.planAdoption(state,input,'op_identity00001'), w=plan.writes;
+  state.conclusions[w.conclusion.id]=w.conclusion; state.versions[w.version.id]=w.version;
+  w.sources.forEach(x=>state.sources[x.id]=x); w.links.forEach(x=>state.links[x.id]=x); state.projects.p1=w.project;
+  assert.ok(await Core.findDuplicateAdoption(state,'p1',input));
+  assert.equal(await Core.findDuplicateAdoption(state,'p1',{...input,conditions:'仅海外'}),null);
+  assert.equal(await Core.findDuplicateAdoption(state,'p1',{...input,fragments:[{...input.fragments[0],conversationId:'conv-two'}]}),null);
+  assert.equal(await Core.findDuplicateAdoption(state,'p1',{...input,fragments:[{...input.fragments[0],relation:'opposes'}]}),null);
+});
+
+test('text-only amendment preserves conditions and immutable source snapshots', async () => {
+  const db=mockIdb({projects:{p1:Core.newProjectRecord('p1')}}); let state=await stateFrom(db);
+  const first=await DB.applyPlan(db,await Core.planAdoption(state,{...adoption('初版','依据'),conditions:'条件A'},'op_keep00000001'));
+  state=await stateFrom(db); const before=Object.keys(state.sources);
+  await DB.applyPlan(db,await Core.planAmendment(state,first.conclusionId,{text:'仅正文更新'},'op_keep00000002'));
+  state=await stateFrom(db); const current=state.versions[state.conclusions[first.conclusionId].currentVersionId];
+  assert.equal(current.conditions,'条件A'); assert.deepEqual(Object.keys(state.sources),before);
+  assert.equal(Object.values(state.links).filter(x=>x.versionId===current.id)[0].sourceId,before[0]);
+});
+
+test('import rejects forged hashes, dangling links and collisions in every store', async () => {
+  const state={conclusions:{},versions:{},sources:{},links:{},projects:{p1:Core.newProjectRecord('p1')},operations:{}};
+  const plan=await Core.planAdoption(state,adoption('导出'),'op_impseed00001'),w=plan.writes;
+  for(const [n,x] of [['conclusions',w.conclusion],['versions',w.version],['projects',w.project],['operations',w.ledger]]) state[n][n==='projects'?x.projectId:n==='operations'?x.operationId:x.id]=x;
+  w.sources.forEach(x=>state.sources[x.id]=x);w.links.forEach(x=>state.links[x.id]=x);
+  const pkg=Core.exportPackage(state,'p1');
+  await assert.rejects(Core.importPackage({conclusions:{},versions:{},sources:{},links:{},operations:{},projects:{p1:Core.newProjectRecord('p1')}},{...pkg,sources:[{...pkg.sources[0],textHash:'forged'}]},'op_impbad00001'),/哈希/);
+  await assert.rejects(Core.importPackage({conclusions:{},versions:{},sources:{},links:{},operations:{},projects:{p1:Core.newProjectRecord('p1')}},{...pkg,sources:[]},'op_impbad00002'),/链接/);
+  const clean={conclusions:{},versions:{},sources:{[pkg.sources[0].id]:pkg.sources[0]},links:{},operations:{},projects:{p1:Core.newProjectRecord('p1')}};
+  await assert.rejects(Core.importPackage(clean,pkg,'op_impbad00003'),/sources ID 冲突/);
+});
+
+test('actual DB snapshot indexes the durable operation ledger by operationId', async () => {
+  const row={operationId:'op_snapshot001',schema:2,kind:'adopt',requestHash:'hash',result:{ok:true}};
+  const fake={transaction(){return {objectStore(name){return {getAll(){const req={};queueMicrotask(()=>{req.result=name==='operations'?[row]:[];req.onsuccess();});return req;}};}};}};
+  const snapshot=await DB.snapshot(fake);
+  assert.deepEqual(snapshot.operations['op_snapshot001'],row);
+  assert.equal(snapshot.operations.undefined,undefined);
 });
