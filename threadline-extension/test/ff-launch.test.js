@@ -487,3 +487,34 @@ test('F3 startup injection failure is visible and cannot masquerade as capturing
   assert.ok(!s.sent.some(([,type])=>type==='TL_CAPTURE_START'),
     'failed injection must not send a capture start to any tab');
 });
+
+test('K=4 startup recovery rebinds C/D as well as A/B without auto-prefill',async()=>{
+  const s=system();
+  await s.message({type:'FF_SET_ENABLED',enabled:true,ack:'local-only-no-send'},s.ffSender);
+  const created=await s.message({type:'FF_CREATE',
+    operationId:'create_k4recover0001',w0:'合成材料',p:'合成任务',branchCount:4},s.ffSender);
+  const launched=await s.message({type:'FF_LAUNCH',experimentId:created.id,
+    operationId:'launch_k4recover0001'},s.ffSender);
+  for(const branch of ['A','B','C','D']){
+    const tabId=launched.tabIds[branch];
+    s.tabsById.get(tabId).url='https://chatgpt.com/c/recover-'+branch.toLowerCase()+'-1234';
+  }
+  // Mimic a Chrome restart: ephemerally registered intents vanish, while
+  // existing tabs and user-created conversation identities remain durable.
+  s.session.clear();
+  const sentBefore=s.sent.length;
+  s.events.startup();
+  let last;
+  for(let i=0;i<100;i++){
+    last=await s.message({type:'FF_READ',id:created.id},s.ffSender);
+    if(Object.values(last.branches).every(b=>b.phase==='generating'))break;
+    await new Promise(r=>setTimeout(r,10));
+  }
+  for(const branch of ['A','B','C','D']){
+    const attempt=last.branches[branch].attempts.at(-1);
+    assert.equal(attempt.evidence.sessionId,'recover-'+branch.toLowerCase()+'-1234',
+      'recovered branch '+branch);
+    assert.equal(last.branches[branch].phase,'generating');
+  }
+  assert.equal(s.sent.length,sentBefore,'startup recovery never re-seeds user drafts');
+});

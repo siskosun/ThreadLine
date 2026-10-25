@@ -517,8 +517,9 @@ async function ffRecoverBindings() {
   // already sent. Never re-seeds a prefill automatically.
   const rows = await ThreadLineFFDB.list();
   for (const row of rows) {
-    for (const branch of ["A", "B"]) {
-      const attempt = row.branches[branch].attempts.at(-1);
+    // K can be 2–4. Reconcile every persisted branch, not only A/B.
+    for (const branch of Object.keys(row.branches || {})) {
+      const attempt = row.branches[branch]?.attempts?.at(-1);
       if (!attempt || attempt.status !== "pending" || attempt.evidence?.sessionId) continue;
       const tabId = attempt.evidence?.tabId;
       if (!Number.isInteger(tabId)) continue;
