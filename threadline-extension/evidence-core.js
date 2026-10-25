@@ -22,7 +22,7 @@
   // A backup must never resolve an inherited Object.prototype key.
   const validProjectId = x => typeof x === "string" &&
     /^[a-zA-Z0-9_-]{1,128}$/.test(x) &&
-    !["__proto__", "constructor", "prototype"].includes(x);
+    x !== "prototype" && !Object.hasOwn(Object.prototype, x);
   function requireProjectId(x) {
     if (!validProjectId(x)) throw Error("课题 ID 无效或保留名称");
     return x;
