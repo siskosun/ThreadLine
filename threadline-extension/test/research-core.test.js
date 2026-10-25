@@ -90,6 +90,88 @@ test("prepared review preserves immutable scope; any incoming or source change m
   assert.equal(completed.research.reviews[0].targetVersionId, "ver_bbbbbbbb");
   assert.equal(edgeId, completed.research.reviews[0].incoming[0].edgeId);
 });
+test("review freezes an optional scope manifest and rejects a newly added incoming edge", () => {
+  const s = state(), a = "con_aaaaaaaa", b = "con_bbbbbbbb", c = "con_cccccccc";
+  add(s, a, b);
+  const manifest = { changeEvents: [{ triggerEventId: "evt_aaaaaaaa", rootConclusionId: a, rootVersionId: "ver_aaaaaaaa" }] };
+  const prepared = Research.prepareReview(s, "p1", { targetConclusionId: b, targetVersionId: "ver_bbbbbbbb", scopeManifestHash: "scope", scopeManifest: manifest, sourceSnapshots: [], blindMaterials: [] }, opts());
+  s.projects.p1.research = prepared.research;
+  manifest.changeEvents[0].rootVersionId = "ver_tampered";
+  assert.equal(s.projects.p1.research.reviews[0].scopeManifest.changeEvents[0].rootVersionId, "ver_aaaaaaaa");
+  add(s, c, b);
+  const complete = Research.completeReview(s, "p1", { reviewId: prepared.result.reviewId, outcome: "keep", reason: "new incoming edge" }, opts());
+  assert.equal(complete.result.stale, true);
+  assert.deepEqual(complete.result.edgesToConfirm, []);
+});
+test("review stales when its frozen ancestor topology or ancestor version changes", () => {
+  const s = state(), a = "con_aaaaaaaa", b = "con_bbbbbbbb", c = "con_cccccccc";
+  const ab = add(s, a, b), initialEdge = s.projects.p1.research.edges.find(x => x.id === ab);
+  const manifest = { conclusions: [
+    { id: a, versionId: "ver_aaaaaaaa", status: "adopted" },
+    { id: b, versionId: "ver_bbbbbbbb", status: "adopted" },
+  ], edges: [{ id: ab, revision: initialEdge.revision }] };
+  const prepared = Research.prepareReview(s, "p1", { targetConclusionId: b, targetVersionId: "ver_bbbbbbbb", scopeManifestHash: "scope-ancestors", scopeManifest: manifest, sourceSnapshots: [], blindMaterials: [] }, opts());
+  s.projects.p1.research = prepared.research;
+  add(s, c, a);
+  const complete = Research.completeReview(s, "p1", { reviewId: prepared.result.reviewId, outcome: "keep", reason: "scope changed" }, opts());
+  assert.equal(complete.result.stale, true);
+});
+function amendAndRecord(s, conclusionId, versionId, triggerEventId) {
+  const previous = s.conclusions[conclusionId].currentVersionId;
+  s.versions[versionId] = { id: versionId, conclusionId, text: "amended" };
+  s.conclusions[conclusionId].currentVersionId = versionId;
+  const result = Research.recordChange(s, "p1", { triggerEventId, conclusionId, fromVersion: previous, toVersion: versionId, kind: "amend" }, opts());
+  s.projects.p1.research = result.research;
+}
+function confirmCovered(s, edgeId, coveredChanges) {
+  const edge = s.projects.p1.research.edges.find(e => e.id === edgeId);
+  const result = Research.update(s, "p1", { kind: "confirmDependency", edgeId,
+    upstreamVersionId: s.conclusions[edge.upstreamConclusionId].currentVersionId,
+    downstreamVersionId: s.conclusions[edge.downstreamConclusionId].currentVersionId,
+    scopeManifestHash: "scope-covered", coveredChanges, reason: "explicitly reviewed change" }, opts());
+  s.projects.p1.research = result.research;
+}
+test("notifications require an explicit post-change confirmation at the transitive terminal edge", () => {
+  const s = state(), a = "con_aaaaaaaa", b = "con_bbbbbbbb", c = "con_cccccccc";
+  add(s, a, b); const bc = add(s, b, c);
+  amendAndRecord(s, a, "ver_amend_aa", "evt_aaaaaaaa");
+  let row = Research.notifications(s, "p1")[0].affected.find(x => x.conclusionId === c);
+  assert.equal(row.pending, true);
+  const covered = { triggerEventId: "evt_aaaaaaaa", rootConclusionId: a, rootVersionId: "ver_amend_aa" };
+  confirmCovered(s, bc, [covered]);
+  row = Research.notifications(s, "p1")[0].affected.find(x => x.conclusionId === c);
+  assert.equal(row.pending, false);
+  assert.equal(row.pendingCauses[0].reason, "已对照本次变更确认");
+});
+test("notifications keep diamond branches pending until every terminal edge is explicitly covered", () => {
+  const s = state(), a = "con_aaaaaaaa", b = "con_bbbbbbbb", c = "con_cccccccc", d = "con_dddddddd";
+  add(s, a, b); add(s, a, c); const bd = add(s, b, d), cd = add(s, c, d);
+  amendAndRecord(s, a, "ver_amend_diamond", "evt_bbbbbbbb");
+  const covered = { triggerEventId: "evt_bbbbbbbb", rootConclusionId: a, rootVersionId: "ver_amend_diamond" };
+  confirmCovered(s, bd, [covered]);
+  assert.equal(Research.notifications(s, "p1")[0].affected.find(x => x.conclusionId === d).pending, true);
+  confirmCovered(s, cd, [covered]);
+  assert.equal(Research.notifications(s, "p1")[0].affected.find(x => x.conclusionId === d).pending, false);
+});
+test("notifications do not inherit coverage across a removed and reactivated edge and reopen for a new change", () => {
+  const s = state(), a = "con_aaaaaaaa", b = "con_bbbbbbbb", edgeId = add(s, a, b);
+  amendAndRecord(s, a, "ver_amend_onee", "evt_cccccccc");
+  const first = { triggerEventId: "evt_cccccccc", rootConclusionId: a, rootVersionId: "ver_amend_onee" };
+  confirmCovered(s, edgeId, [first]);
+  assert.equal(Research.notifications(s, "p1")[0].affected[0].pending, false);
+  s.projects.p1.research = Research.update(s, "p1", { kind: "removeDependency", edgeId, reason: "temporarily removed" }, opts()).research;
+  assert.equal(Research.notifications(s, "p1")[0].affected[0].pending, false);
+  add(s, a, b);
+  assert.equal(Research.notifications(s, "p1")[0].affected[0].pending, true);
+  amendAndRecord(s, a, "ver_amend_twoo", "evt_dddddddd");
+  const latest = Research.notifications(s, "p1").at(-1).affected[0];
+  assert.equal(latest.pending, true);
+});
+test("covered changes must name an existing matching change and affected root", () => {
+  const s = state(), a = "con_aaaaaaaa", b = "con_bbbbbbbb", edgeId = add(s, a, b);
+  amendAndRecord(s, a, "ver_amend_validatio", "evt_eeeeeeee");
+  assert.throws(() => confirmCovered(s, edgeId, [{ triggerEventId: "evt_eeeeeeee", rootConclusionId: a, rootVersionId: "ver_aaaaaaaa" }]), /覆盖/);
+});
 test("validator rejects forged confirmation ownership and duplicate record IDs", () => {
   const s = state(), edgeId = add(s, "con_aaaaaaaa", "con_bbbbbbbb");
   confirm(s, edgeId);
