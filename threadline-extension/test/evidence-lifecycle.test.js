@@ -112,3 +112,15 @@ test("restore of an absent project uses null CAS and cannot overwrite another pr
   assert.equal(plan.expectedRevision, null);
   assert.equal(plan.writes.project.evidenceRevision, 5);
 });
+
+test("delete and restore refuse inherited Object.prototype project IDs", async () => {
+  const s = await state(false), pkg = Core.exportPackage(s, "p_target");
+  for(const id of ["__proto__", "constructor", "prototype"]) {
+    await assert.rejects(Lifecycle.planDelete(s, id, "op_protected_0000001", 0), /课题 ID/);
+    const corrupt=structuredClone(pkg);
+    corrupt.projectId=id;
+    for(const c of corrupt.conclusions) c.projectId=id;
+    await assert.rejects(Lifecycle.planRestore(s, corrupt, "op_protected_0000002",
+      {expectedRevision:null, replace:false}), /课题 ID/);
+  }
+});

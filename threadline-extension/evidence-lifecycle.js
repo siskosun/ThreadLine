@@ -42,8 +42,9 @@
     };
   }
   function expectProject(state, projectId) {
-    if (typeof projectId !== "string" || !projectId.trim()) throw new Error("课题 ID 无效");
-    return state.projects && state.projects[projectId];
+    Core.requireProjectId(projectId);
+    return state.projects && Object.hasOwn(state.projects, projectId)
+      ? state.projects[projectId] : undefined;
   }
   function deleteIds(state, projectId) {
     const conclusions = records(state, projectId), conclusionIds = new Set(conclusions.map(x => x.id));
@@ -100,8 +101,8 @@
       .map(o=>({operationId:o.operationId,schema:o.schema,kind:o.kind,projectId,requestHash:o.requestHash,at:o.at,redacted:true,result:{projectId,redacted:true}}));
   }
   function validatePackageProject(pkg) {
-    if (!pkg || typeof pkg.projectId !== "string" || !pkg.projectId.trim())
-      throw new Error("课题 ID 无效");
+    if (!pkg) throw new Error("证据包缺失");
+    Core.requireProjectId(pkg.projectId);
     if (!pkg.conclusions.length) throw new Error("空证据包没有可恢复的结论");
   }
   function incomingIds(pkg) {
