@@ -89,11 +89,11 @@ export function evaluateData(protocol,observations,protocolSha256){
   for(const arm of ARM) {
    const v=item.arms[arm];
    if(!v||typeof v.correctContinuation!=="boolean"||typeof v.wronglyRevisedTrueClaim!=="boolean"||
-      !Number.isFinite(v.elapsedMs)||v.elapsedMs<=0||!Number.isSafeInteger(v.humanInterventions)||v.humanInterventions<0||
+      !Number.isFinite(v.elapsedMs)||v.elapsedMs<=0||!Number.isFinite(v.learningMs)||v.learningMs<0||!Number.isSafeInteger(v.humanInterventions)||v.humanInterventions<0||
       !Number.isSafeInteger(v.modelCalls)||v.modelCalls<0||!v.receiptId||typeof v.receiptId!=="string"||
       typeof v.modelVersion!=="string"||!v.modelVersion||
       v.sourceCorpusSha256!==frozenEvent.sourceCorpusSha256)
-    fail("三臂均须保留正确性、误改、完整耗时、模型信息、原始资料 SHA 与独立收据");
+    fail("三臂均须保留正确性、误改、操作耗时、学习成本、模型信息、原始资料 SHA 与独立收据");
    if(receiptIds.has(v.receiptId))fail("重复使用收据 ID：不同臂/事件必须有独立记录");
    receiptIds.add(v.receiptId);
    if(arm==="B"&&Object.hasOwn(v,"predictedAffectedIds"))fail("B 的预测集合只能由 Research.impacts 实算，不允许填入");
@@ -106,7 +106,7 @@ export function evaluateData(protocol,observations,protocolSha256){
  const events=[],cases=[];
  for(const c of protocol.cases) {
   let cTP=0,cFP=0,cFN=0,criticalCaseMisses=0;
-  const metrics=Object.fromEntries(ARM.map(a=>[a,{correct:[],wrongRevised:[],elapsed:[],human:[],calls:[]}]));
+  const metrics=Object.fromEntries(ARM.map(a=>[a,{correct:[],wrongRevised:[],elapsed:[],learning:[],human:[],calls:[]}]));
   const registered=new Set();
   const research=c.events[0]?.frozenState?.projects?.[c.projectId]?.research;
   for(const edge of research?.edges||[])if(edge.active)registered.add(edge.upstreamConclusionId+"=>"+edge.downstreamConclusionId);
@@ -126,7 +126,7 @@ export function evaluateData(protocol,observations,protocolSha256){
    for(const arm of ARM){
     const v=item.arms[arm],m=metrics[arm];
     m.correct.push(Number(v.correctContinuation));m.wrongRevised.push(Number(v.wronglyRevisedTrueClaim));
-    m.elapsed.push(v.elapsedMs);m.human.push(v.humanInterventions);m.calls.push(v.modelCalls);
+    m.elapsed.push(v.elapsedMs);m.learning.push(v.learningMs);m.human.push(v.humanInterventions);m.calls.push(v.modelCalls);
    }
    events.push({caseId:c.id,eventId:e.id,kind:e.kind,critical:e.critical===true,
      predictedAffectedIds:computed,goldAffectedIds:e.goldAffectedIds,
@@ -135,13 +135,19 @@ export function evaluateData(protocol,observations,protocolSha256){
   TP+=cTP;FP+=cFP;FN+=cFN;criticalMisses+=criticalCaseMisses;
   const outcome=Object.fromEntries(ARM.map(a=>{
    const m=metrics[a];return [a,{correctRate:mean(m.correct),wrongRevisionRate:mean(m.wrongRevised),
-     medianElapsedMs:median(m.elapsed),meanHumanInterventions:mean(m.human),
+     medianElapsedMs:median(m.elapsed),totalElapsedMs:m.elapsed.reduce((a,b)=>a+b,0),
+      totalLearningMs:m.learning.reduce((a,b)=>a+b,0),
+      totalWithLearningMs:m.elapsed.reduce((a,b)=>a+b,0)+m.learning.reduce((a,b)=>a+b,0),
+      meanHumanInterventions:mean(m.human),
      meanModelCalls:mean(m.calls)}];
   }));
-  const gainA=ratio(outcome.A.medianElapsedMs-outcome.B.medianElapsedMs,outcome.A.medianElapsedMs);
-  const gainC=ratio(outcome.C.medianElapsedMs-outcome.B.medianElapsedMs,outcome.C.medianElapsedMs);
+  const gainA=ratio(outcome.A.totalWithLearningMs-outcome.B.totalWithLearningMs,outcome.A.totalWithLearningMs);
+  const gainC=ratio(outcome.C.totalWithLearningMs-outcome.B.totalWithLearningMs,outcome.C.totalWithLearningMs);
+  const gainAWithoutLearning=ratio(outcome.A.totalElapsedMs-outcome.B.totalElapsedMs,outcome.A.totalElapsedMs);
+  const gainCWithoutLearning=ratio(outcome.C.totalElapsedMs-outcome.B.totalElapsedMs,outcome.C.totalElapsedMs);
   cases.push({id:c.id,events:c.events.length,tp:cTP,fp:cFP,fn:cFN,criticalMisses:criticalCaseMisses,
    arms:outcome,gainBvsA:gainA,gainBvsC:gainC,
+   gainBvsAExcludingLearning:gainAWithoutLearning,gainBvsCExcludingLearning:gainCWithoutLearning,
    accuracyDeltaBvsA:outcome.B.correctRate-outcome.A.correctRate,
    accuracyDeltaBvsC:outcome.B.correctRate-outcome.C.correctRate});
  }
@@ -162,7 +168,9 @@ export function evaluateData(protocol,observations,protocolSha256){
   caveat:"Pilot/2 has clustered events and small independent case count. Passing screening does not establish population performance or causality.",
   protocolSha256,affected:{tp:TP,fp:FP,fn:FN,recall,precision,criticalMisses},
   necessaryEdges:{tp:edgesTP,fp:edgesFP,fn:edgesFN,coverage:dependencyCoverage},
-  caseSummary:{medianBvsAGain:gain,nonSlowerCases:nonSlower,totalCases:cases.length,
+  caseSummary:{medianBvsAGain:gain,
+    medianBvsAGainExcludingLearning:median(cases.map(c=>c.gainBvsAExcludingLearning).filter(x=>x!==null)),
+    nonSlowerCases:nonSlower,totalCases:cases.length,
    meanAccuracyDeltaBvsA:mean(cases.map(c=>c.accuracyDeltaBvsA)),
    meanAccuracyDeltaBvsC:mean(cases.map(c=>c.accuracyDeltaBvsC)),
    clusterIntervals:{deltaBvsA:bootCaseInterval(cases,"accuracyDeltaBvsA"),
