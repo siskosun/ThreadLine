@@ -140,15 +140,15 @@
       try {
         if (!evidence?.captureRunId || !evidence?.messageId || !reply)
           throw new Error("此旧实验缺少完整回复来源，无法精确采纳；请重新采集该分支");
-        await ThreadLineEvidenceAdoption.open({sources:[{
+        await ThreadLineEvidenceAdoption.open({text:"",sources:[{
           label:"Fork " + label + " · 已采集最终回复",
           experimentId:value.id,branch:branch,attemptId:attempt.id,
           captureRunId:evidence.captureRunId,messageId:evidence.messageId,
-          coverage:evidence.captureComplete?"原始采集：分页完成":"原始采集：部分历史",
+          content:reply,coverage:evidence.captureComplete?"原始采集：分页完成":"原始采集：部分历史",
           nonText:!!evidence.hasNonText,aiCoverage:"不适用（Fork 原始回复）"
         }],submit:form=>send({type:"EV_ADOPT_FORK",projectId:form.projectId,text:form.text,conditions:form.conditions,
-          experimentId:value.id,branch:form.source.branch,attemptId:form.source.attemptId,
-          selection:form.selection,relation:form.relation,
+          experimentId:value.id,branch:form.selections[0].source.branch,attemptId:form.selections[0].source.attemptId,
+          selections:form.selections.map(x=>({selection:x.selection,selectionStart:x.selectionStart,selectionEnd:x.selectionEnd,relation:x.relation,messageId:x.source.messageId,captureRunId:x.source.captureRunId})),
           operationId:"op_fork_adopt_"+crypto.randomUUID().replace(/-/g,"").slice(0,12)})});
         status.textContent = "已提交采纳；请在研线面板的证据结论中查看。";
       } catch (e) { status.textContent = "采纳失败：" + e.message; }

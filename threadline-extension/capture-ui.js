@@ -62,13 +62,13 @@
     return [...new Set(candidates)].slice(0,200).map(n=>{const m=messages[n];return {
       label:`M${n+1} · ${m.role||"未知"} · ${String(m.content||"").slice(0,80)}`,
       captureRunId:currentRun.id,messageIndex:n,coverage:currentRun.complete?"原始采集：分页完成":"原始采集：部分历史",
-      nonText:!!m.hasNonText,aiCoverage:currentRun.aiCoverage?.complete?"本次采集全部文本":"未确认或部分",messageId:m.id||null
+      content:m.content||"",nonText:!!m.hasNonText,aiCoverage:currentRun.aiCoverage?.complete?"本次采集全部文本":"未确认或部分",messageId:m.id||null
     };});
   }
   async function adoptCandidate(item){
-    try { await ThreadLineEvidenceAdoption.open({sources:sourcesForCandidate(item),submit:form=>reply({
+    try { await ThreadLineEvidenceAdoption.open({text:item.text||item.content||"",sources:sourcesForCandidate(item),submit:form=>reply({
       type:"EV_ADOPT_CAPTURE",projectId:form.projectId,text:form.text,conditions:form.conditions,
-      selections:[{captureRunId:form.source.captureRunId,messageIndex:form.source.messageIndex,selection:form.selection,relation:form.relation}],
+      selections:form.selections.map(x=>({captureRunId:x.source.captureRunId,messageIndex:x.source.messageIndex,selection:x.selection,selectionStart:x.selectionStart,selectionEnd:x.selectionEnd,relation:x.relation})),
       operationId:"op_capture_adopt_"+crypto.randomUUID().replace(/-/g,"").slice(0,12)
     })}); }
     catch(e){$("report-promote-hint").textContent="无法采纳此条："+e.message;}
