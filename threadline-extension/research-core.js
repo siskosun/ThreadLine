@@ -88,6 +88,20 @@
     }
     throw Error("未知依赖命令");
   }
+  function carryForward(s,p,cmd,raw={}) {
+    const r=normal(s.projects?.[p]?.research||base()),o=options(raw),conclusion=s.conclusions?.[cmd?.conclusionId],from=s.versions?.[cmd?.fromVersion],to=s.versions?.[cmd?.toVersion];
+    if(!valid(cmd?.conclusionId,"con_")||!owns(s,p,cmd.conclusionId)||!valid(cmd?.fromVersion,"ver_")||!valid(cmd?.toVersion,"ver_")||cmd.fromVersion===cmd.toVersion||!from||!to||from.conclusionId!==cmd.conclusionId||to.conclusionId!==cmd.conclusionId||conclusion.currentVersionId!==cmd.toVersion||conclusion.status==="withdrawn"||typeof cmd.reason!=="string"||!cmd.reason.trim())throw Error("仅措辞承接数据无效");
+    const candidates=r.edges.filter(edge=>edge.active&&edge.downstreamConclusionId===cmd.conclusionId).map(edge=>({edge,confirmation:latestConfirmation(r,edge)})).filter(item=>item.confirmation?.confirmedForDownstreamVersion===cmd.fromVersion);
+    if(r.confirmations.length+candidates.length>MAX_CONFIRMATIONS||r.events.length+candidates.length>MAX_EVENTS)throw Error("依赖记录超过上限");
+    const carried=[];
+    for(const {edge,confirmation:prior} of candidates) {
+      const confirmation={id:o.id(),edgeId:edge.id,edgeRevision:edge.revision,acknowledgedUpstreamVersion:prior.acknowledgedUpstreamVersion,confirmedForDownstreamVersion:cmd.toVersion,scopeManifestHash:prior.scopeManifestHash,reason:cmd.reason,at:o.at,carryForwardFrom:cmd.fromVersion,...(Object.hasOwn(prior,"coveredChanges")?{coveredChanges:copy(prior.coveredChanges)}:{})};
+      r.confirmations.push(confirmation);
+      appendEvent(r,{kind:"confirmed",edgeId:edge.id,edgeRevision:edge.revision,confirmationId:confirmation.id,upstreamVersionId:confirmation.acknowledgedUpstreamVersion,downstreamVersionId:confirmation.confirmedForDownstreamVersion,reason:confirmation.reason,carryForwardFrom:cmd.fromVersion},o);
+      carried.push({edgeId:edge.id,confirmationId:confirmation.id});
+    }
+    return {research:r,result:{conclusionId:cmd.conclusionId,fromVersion:cmd.fromVersion,toVersion:cmd.toVersion,carried}};
+  }
   function latestConfirmation(r,edge) {return r.confirmations.filter(c=>c.edgeId===edge.id&&c.edgeRevision===edge.revision).at(-1)||null;}
   function changeTuple(event) {return {triggerEventId:event.triggerEventId,rootConclusionId:event.conclusionId,rootVersionId:event.toVersion};}
   function sameTuple(a,b) {return a?.triggerEventId===b?.triggerEventId&&a?.rootConclusionId===b?.rootConclusionId&&a?.rootVersionId===b?.rootVersionId;}
@@ -222,7 +236,7 @@
     if(new Set(all).size!==all.length||!all.every(id=>valid(id,"dep_")))throw Error("研究记录 ID 无效或重复");
     for(const edge of r.edges)if(edge.projectId!==p||edge.type!=="necessary"||!Number.isSafeInteger(edge.revision)||edge.revision<1||typeof edge.active!=="boolean"||!owns(s,p,edge.upstreamConclusionId)||!owns(s,p,edge.downstreamConclusionId)||edge.upstreamConclusionId===edge.downstreamConclusionId)throw Error("依赖边无效");
     for(const edge of r.edges.filter(x=>x.active))if(reaches(r.edges.filter(x=>x.active&&x.id!==edge.id),edge.downstreamConclusionId,edge.upstreamConclusionId))throw Error("依赖存在环");
-    for(const c of r.confirmations){const e=r.edges.find(x=>x.id===c.edgeId),up=s.versions?.[c.acknowledgedUpstreamVersion],down=s.versions?.[c.confirmedForDownstreamVersion];if(!e||!Number.isSafeInteger(c.edgeRevision)||c.edgeRevision<1||!up||!down||up.conclusionId!==e.upstreamConclusionId||down.conclusionId!==e.downstreamConclusionId||typeof c.scopeManifestHash!=="string"||!c.scopeManifestHash||typeof c.reason!=="string"||!c.reason.trim()||!Number.isSafeInteger(c.at))throw Error("依赖确认无效");if(Object.hasOwn(c,"coveredChanges"))validateCoveredChanges(r,c.coveredChanges,e);}
+    for(const c of r.confirmations){const e=r.edges.find(x=>x.id===c.edgeId),up=s.versions?.[c.acknowledgedUpstreamVersion],down=s.versions?.[c.confirmedForDownstreamVersion];if(!e||!Number.isSafeInteger(c.edgeRevision)||c.edgeRevision<1||!up||!down||up.conclusionId!==e.upstreamConclusionId||down.conclusionId!==e.downstreamConclusionId||typeof c.scopeManifestHash!=="string"||!c.scopeManifestHash||typeof c.reason!=="string"||!c.reason.trim()||!Number.isSafeInteger(c.at)||Object.hasOwn(c,"carryForwardFrom")&&(!valid(c.carryForwardFrom,"ver_")||s.versions?.[c.carryForwardFrom]?.conclusionId!==e.downstreamConclusionId||c.carryForwardFrom===c.confirmedForDownstreamVersion))throw Error("依赖确认无效");if(Object.hasOwn(c,"coveredChanges"))validateCoveredChanges(r,c.coveredChanges,e);}
     for(const event of r.events) {
       if(!Number.isSafeInteger(event.at)||!["added","reactivated","removed","confirmed","change","reviewCompleted"].includes(event.kind))throw Error("依赖事件无效");
       if(["added","reactivated","removed","confirmed"].includes(event.kind)) {
@@ -232,7 +246,7 @@
           const up=s.versions?.[event.upstreamVersionId],down=s.versions?.[event.downstreamVersionId];
           if(!up||!down||up.conclusionId!==edge.upstreamConclusionId||down.conclusionId!==edge.downstreamConclusionId)throw Error("依赖事件版本无效");
         }
-        if(event.kind==="confirmed"&&!r.confirmations.some(c=>c.id===event.confirmationId&&c.edgeId===edge.id))throw Error("依赖确认事件无效");
+        if(event.kind==="confirmed"){const confirmation=r.confirmations.find(c=>c.id===event.confirmationId&&c.edgeId===edge.id);if(!confirmation||Object.hasOwn(event,"carryForwardFrom")&&event.carryForwardFrom!==confirmation.carryForwardFrom||Object.hasOwn(confirmation||{},"carryForwardFrom")&&event.carryForwardFrom!==confirmation.carryForwardFrom)throw Error("依赖确认事件无效");}
       } else if(event.kind==="change") {
         const from=s.versions?.[event.fromVersion],to=s.versions?.[event.toVersion];
         if(!valid(event.triggerEventId,"evt_")||!owns(s,p,event.conclusionId)||!from||!to||from.conclusionId!==event.conclusionId||to.conclusionId!==event.conclusionId||!["amend","withdraw"].includes(event.changeKind)||!Array.isArray(event.affected)||event.affected.length>MAX_EDGES)throw Error("变更事件引用无效");
@@ -261,6 +275,6 @@
     }
     return true;
   }
-  const Research={base,update,inspect,impacts,recordChange,prepareReview,completeReview,notifications,validateResearch,MAX_EDGES,MAX_CONFIRMATIONS,MAX_EVENTS,MAX_REVIEWS};
+  const Research={base,update,carryForward,inspect,impacts,recordChange,prepareReview,completeReview,notifications,validateResearch,MAX_EDGES,MAX_CONFIRMATIONS,MAX_EVENTS,MAX_REVIEWS};
   if(typeof module!=="undefined"&&module.exports)module.exports=Research;else globalThis.ThreadLineResearchCore=Research;
 })();

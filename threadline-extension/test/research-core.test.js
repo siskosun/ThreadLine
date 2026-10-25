@@ -54,6 +54,27 @@ test("changed conclusion or withdrawal never lets a prior confirmation silence t
   s.conclusions[a].status = "withdrawn";
   assert.match(Research.inspect(s, "p1").edges[0].reason, /上游已撤回/);
 });
+test("wording-only carry forward creates a new immutable confirmation without advancing outgoing edges", () => {
+  const s = state(), a = "con_aaaaaaaa", b = "con_bbbbbbbb", c = "con_cccccccc";
+  const ab = add(s, a, b), bc = add(s, b, c);
+  const original = structuredClone(s.projects.p1.research.confirmations.find(x => x.edgeId === ab));
+  s.versions.ver_wording_b = { id: "ver_wording_b", conclusionId: b, text: "wording only" };
+  s.conclusions[b].currentVersionId = "ver_wording_b";
+  const carried = Research.carryForward(s, "p1", { conclusionId: b, fromVersion: "ver_bbbbbbbb", toVersion: "ver_wording_b", reason: "user confirmed wording-only change" }, opts());
+  s.projects.p1.research = carried.research;
+  assert.equal(carried.result.carried.length, 1);
+  const next = s.projects.p1.research.confirmations.find(x => x.id === carried.result.carried[0].confirmationId);
+  assert.notEqual(next.id, original.id);
+  assert.equal(next.confirmedForDownstreamVersion, "ver_wording_b");
+  assert.equal(next.acknowledgedUpstreamVersion, original.acknowledgedUpstreamVersion);
+  assert.deepEqual(s.projects.p1.research.confirmations.find(x => x.id === original.id), original);
+  assert.equal(s.projects.p1.research.confirmations.filter(x => x.edgeId === bc).at(-1).confirmedForDownstreamVersion, "ver_cccccccc");
+  s.versions.ver_changed_a = { id: "ver_changed_a", conclusionId: a, text: "upstream changed" };
+  s.conclusions[a].currentVersionId = "ver_changed_a";
+  assert.equal(Research.inspect(s, "p1").edges.find(x => x.id === ab).status, "pending");
+  assert.match(Research.inspect(s, "p1").edges.find(x => x.id === ab).reason, /上游版本/);
+  assert.equal(Research.validateResearch(s.projects.p1.research, s, "p1"), true);
+});
 test("diamond impacts retain every branch cause for a tail without exponential paths", () => {
   const s = state(), a = "con_aaaaaaaa", b = "con_bbbbbbbb", c = "con_cccccccc", d = "con_dddddddd";
   add(s, a, b); add(s, a, c); add(s, b, d); add(s, c, d);
