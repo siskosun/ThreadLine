@@ -918,12 +918,39 @@ function carryEvidenceWording(state,plan) {
     {id:()=>"dep_"+crypto.randomUUID().replace(/-/g,""),at:Date.now()});
   plan.writes.project.research=carried.research;
 }
+async function completeEvidenceReview(authority,payload,planMetadata,commit) {
+  const {state}=authority,id=payload.projectId,Core=ThreadLineEvidenceCore,Research=ThreadLineResearchCore;
+  const changed=Research.completeReview(state,id,payload,{id:()=>"dep_"+crypto.randomUUID().replace(/-/g,""),at:Date.now()});
+  const review=changed.research.reviews.find(r=>r.id===payload.reviewId);
+  if(payload.analysis!==undefined&&(typeof payload.analysis!=="string"||Core.bytes(payload.analysis)>32*1024))throw Error("独立分析必须为不超过 32 KiB 的文本");
+  if(payload.branchUrl!==undefined&&(typeof payload.branchUrl!=="string"||payload.branchUrl.length>2048||payload.branchUrl&&!/^https:\/\//i.test(payload.branchUrl)))throw Error("复核对话链接须为 HTTPS 地址");
+  Object.assign(review.completions.at(-1),{analysis:payload.analysis||"",branchUrl:payload.branchUrl||""});
+  let plan=await planMetadata(state,id,payload,changed.research,undefined,{...changed.result,outcome:payload.outcome});
+  if(!changed.result.stale&&(payload.outcome==="revise"||payload.outcome==="withdraw")) {
+    const edit=payload.outcome==="revise"?{text:payload.text,expectedVersionId:review.targetVersionId}:null;
+    if(edit&&Object.hasOwn(payload,"conditions"))edit.conditions=payload.conditions;
+    const corePlan=edit?await Core.planAmendment(state,review.targetConclusionId,edit,payload.operationId):await Core.planWithdrawal(state,review.targetConclusionId,payload.reason,payload.operationId);
+    corePlan.writes.project=plan.writes.project;corePlan.writes.ledger=plan.writes.ledger;
+    corePlan.result={...plan.result,...corePlan.result};corePlan.writes.ledger.result=corePlan.result;
+    plan=recordEvidenceChange(state,corePlan,payload.operationId);
+  } else if(!changed.result.stale&&payload.outcome==="keep") {
+    let temporary={...state,projects:{...state.projects,[id]:plan.writes.project}};
+    for(const pair of changed.result.edgesToConfirm) {
+      const confirmed=Research.update(temporary,id,{kind:"confirmDependency",edgeId:pair.edgeId,upstreamVersionId:pair.upstreamVersionId,
+        downstreamVersionId:pair.downstreamVersionId,scopeManifestHash:review.scopeManifestHash,
+        coveredChanges:(changed.result.coveredChanges||[]).filter(t=>changed.research.events.some(e=>e.kind==="change"&&e.triggerEventId===t.triggerEventId&&e.affected.some(r=>r.conclusionId===review.targetConclusionId&&r.causes.some(c=>c.contributingEdgeIds.includes(pair.edgeId))))),
+        reason:payload.reason},{id:()=>"dep_"+crypto.randomUUID().replace(/-/g,""),at:Date.now()});
+      plan.writes.project.research=confirmed.research;temporary.projects[id]=plan.writes.project;
+    }
+  }
+  return commit(authority,plan);
+}
 function evidenceWorkflows() {
   if(!evidenceWorkflowsInstance)evidenceWorkflowsInstance=ThreadLineEvidenceWorkflows.create({chrome,Core:ThreadLineEvidenceCore,DB:ThreadLineEvidenceDB,
     Lifecycle:ThreadLineEvidenceLifecycle,Source:ThreadLineEvidenceSource,Research:ThreadLineResearchCore,TopicCore:ThreadLineCore,
     CaptureDB:{getRun:(...args)=>ThreadLineCaptureDB.getRun(...args),pages:(...args)=>ThreadLineCaptureDB.pages(...args)},
     CaptureCore:{assemble:(...args)=>ThreadLineCaptureCore.assemble(...args)},FFDB:{read:(...args)=>ThreadLineFFDB.read(...args)},db:evidenceDb,serialize,
-    loadAuthority:loadEvidenceAuthorityLocked,reconcile:reconcileEvidenceLocked,rows:evidenceRows,budget:evidenceBudget});
+    loadAuthority:loadEvidenceAuthorityLocked,reconcile:reconcileEvidenceLocked,rows:evidenceRows,budget:evidenceBudget,completeReview:completeEvidenceReview});
   return evidenceWorkflowsInstance;
 }
 function evidenceUnavailable(detail) {

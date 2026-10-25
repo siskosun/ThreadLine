@@ -79,12 +79,16 @@
       return {hash,prior};
     }
     function scope(state,id) {
-      const inspected=Research.inspect(state,id);
+      const inspected=Research.inspect(state,id),notifications=Research.notifications(state,id);
       return Object.values(state.conclusions).filter(c=>c.projectId===id)
         .sort((a,b)=>a.id.localeCompare(b.id))
         .map(c=>({id:c.id,status:c.status,versionId:c.currentVersionId,
           dependencies:inspected.edges.filter(e=>e.downstreamConclusionId===c.id)
             .map(e=>({id:e.id,revision:e.revision,active:e.active,status:e.status,confirmationId:e.confirmation?.id||null})),
+          pendingChanges:notifications.filter(e=>e.affected.some(r=>r.conclusionId===c.id&&r.pending)).map(e=>e.triggerEventId),
+          reviews:inspected.research.reviews.filter(r=>r.targetConclusionId===c.id).map(r=>({
+            id:r.id,targetVersionId:r.targetVersionId,scopeManifestHash:r.scopeManifestHash,
+            completions:r.completions})),
           sources:Object.values(state.links).filter(l=>l.versionId===c.currentVersionId)
             .map(l=>({id:l.sourceId,hash:state.sources[l.sourceId]?.textHash,relation:l.relation}))
             .sort((a,b)=>a.id.localeCompare(b.id))}));
@@ -109,7 +113,8 @@
     const commands=new Set(["EV_PROJECTS","EV_BACKUP","EV_DELETE_PREVIEW","EV_DELETE_COMMIT",
       "EV_RESTORE_PREVIEW","EV_RESTORE_COMMIT","EV_ADOPT_CAPTURE","EV_ADOPT_FORK",
       "EV_HANDOFF_PREPARE","EV_HANDOFF_VALIDATE","EV_HANDOFF_RECORD",
-      "EV_RESEARCH_LIST","EV_RESEARCH_COMMAND","EV_DEPENDENCY_PROMPT","EV_SUGGESTIONS_PREVIEW","EV_IMPACT_CONTEXT"]);
+      "EV_RESEARCH_LIST","EV_RESEARCH_COMMAND","EV_DEPENDENCY_PROMPT","EV_SUGGESTIONS_PREVIEW","EV_IMPACT_CONTEXT",
+      "EV_REVIEW_PREPARE","EV_REVIEW_REFERENCE","EV_REVIEW_COMPLETE"]);
     async function handle(payload) {
       if(!commands.has(payload.type))return undefined;
       return env.serialize(async()=>{
@@ -235,6 +240,27 @@
           const changed=Research.update(state,id,command,{id:recordId,at:Date.now()});
           return commit(authority,await planMetadata(state,id,payload,changed.research,undefined,changed.result));
         }
+        if(type==="EV_REVIEW_PREPARE"){
+          const c=state.conclusions[payload.targetConclusionId];if(c?.projectId!==id)throw Error("目标结论不存在");
+          if(typeof payload.question!=="string"||!payload.question.trim()||payload.question.length>4000)throw Error("请填写本次复核问题和范围");
+          const ancestors=new Set([c.id]);let expanded=true;
+          while(expanded){expanded=false;for(const edge of inspected.edges)if(edge.active&&ancestors.has(edge.downstreamConclusionId)&&!ancestors.has(edge.upstreamConclusionId)){ancestors.add(edge.upstreamConclusionId);expanded=true;}}
+          const ids=new Set([...ancestors].map(id=>state.conclusions[id].currentVersionId));
+          const sourceIds=[...new Set(Object.values(state.links).filter(l=>ids.has(l.versionId)).map(l=>l.sourceId))];
+          const sourceSnapshots=sourceIds.map(id=>({id,hash:state.sources[id].textHash}));
+          const blindMaterials=[{question:payload.question},...sourceIds.map(id=>({sourceId:id,selection:state.sources[id].selection,completeness:state.sources[id].completeness,url:state.sources[id].url}))];
+          if(sourceIds.length>63)throw Error("本次复核涉及超过 63 份来源，请拆分研究范围；未截断");
+          const manifest={targetConclusionId:c.id,targetVersionId:c.currentVersionId,question:payload.question,sourceSnapshots,versionIds:[...ids].sort(),
+            conclusions:[...ancestors].sort().map(id=>({id,versionId:state.conclusions[id].currentVersionId,status:state.conclusions[id].status})),
+            edges:inspected.edges.filter(e=>e.active&&ancestors.has(e.downstreamConclusionId)).map(e=>({id:e.id,revision:e.revision})).sort((a,b)=>a.id.localeCompare(b.id)),
+            changeEvents:inspected.research.events.filter(e=>e.kind==="change"&&ancestors.has(e.conclusionId)).map(e=>({triggerEventId:e.triggerEventId,rootConclusionId:e.conclusionId,rootVersionId:e.toVersion}))};
+          const changed=Research.prepareReview(state,id,{...manifest,scopeManifest:manifest,scopeManifestHash:await Core.hashRequest(manifest),blindMaterials},{id:recordId,at:Date.now()});
+          return commit(authority,await planMetadata(state,id,payload,changed.research,undefined,changed.result));
+        }
+        if(type==="EV_REVIEW_REFERENCE"){
+          const review=inspected.research.reviews.find(r=>r.id===payload.reviewId);if(!review)throw Error("复核不存在");const v=state.versions[review.targetVersionId];return {text:v.text,conditions:v.conditions};
+        }
+        if(type==="EV_REVIEW_COMPLETE")return env.completeReview(authority,payload,planMetadata,commit);
         if(type==="EV_HANDOFF_PREPARE"){
           const text=handoffText(state,id),handoffs=copy(p.handoffs||[]);if(handoffs.length>=100)throw Error("交接历史已达 100 条，请导出后整理课题");
           const handoff={id:recordId(),scope:currentScope,scopeHash,text,materialHash:await Core.hashText(text),createdAt:Date.now(),events:[]};handoffs.push(handoff);
