@@ -490,6 +490,12 @@ async function ffCaptureEnded(run, tabId) {
   const existing = await ThreadLineFFDB.read(bind.experimentId);
   const attempt = existing?.branches[bind.branch]?.attempts.find(a => a.id === bind.attemptId);
   if (!attempt || attempt.status !== "pending") return;
+  // A source captured from the same tab is NOT proof that the current Fork
+  // attempt initiated it. Panel captures and superseded runs must never
+  // complete a different attempt, even when their conversation text matches.
+  if (attempt.evidence?.captureRunId !== run.id ||
+      attempt.evidence?.tabId !== tabId ||
+      attempt.evidence?.sessionId !== run.conversationId) return;
   const inputLevel = attempt.evidence?.inputLevel;
   const canComplete = run.complete === true && signals.length >= 2 &&
     typeof attempt.evidence?.sessionId === "string" &&
@@ -739,6 +745,16 @@ async function handleFF(payload, sender) {
       if (!attempt || attempt.status !== "pending" ||
         !Number.isInteger(attempt.evidence?.tabId) || !attempt.evidence.sessionId)
         throw new Error("branch has no bound conversation to capture");
+      // The authoritative run ID is a single-flight lease for this branch.
+      // A second click/window must not replace its identity while running.
+      // Terminal errors or incomplete completed runs can be retried manually.
+      const previousId=attempt.evidence?.captureRunId;
+      if (previousId) {
+        const previous=await ThreadLineCaptureDB.getRun(previousId);
+        if (!previous) throw new Error("此前采集记录缺失，不能直接覆盖；请先核对或导出诊断");
+        if (previous.status==="capturing")
+          throw new Error("该分支已有进行中的采集；请先查看采集状态，勿重复启动");
+      }
       const run = await beginCapture(attempt.evidence.tabId);
       // Persist exact run identity before returning. After ff.html reloads the
       // pending capture is still inspectable; a silent injection failure is
