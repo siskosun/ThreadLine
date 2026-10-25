@@ -67,32 +67,37 @@
       let tx;
       try { tx = db.transaction(STORES, "readwrite"); }
       catch (e) { return fail(e); }
-      tx.oncomplete = () => done(plan.result);
+      // Do not resolve a durable replay until the read-only transaction has
+      // actually completed: a request callback is not a commit boundary.
+      let completedResult = plan.result;
+      tx.oncomplete = () => done(completedResult);
       tx.onabort = () => fail(tx.error || new Error("证据事务中止：无部分写入"));
       tx.onerror = () => fail(tx.error || new Error("证据事务失败"));
       const stores = {};
       for (const name of STORES) stores[name] = tx.objectStore(name);
-      const projectReq = stores.projects.get(plan.writes.project.projectId);
-      projectReq.onsuccess = () => {
-        const current = projectReq.result;
-        const expected = plan.expectedRevision === undefined
-          ? plan.writes.project.evidenceRevision - 1 : plan.expectedRevision;
-        if (!current || current.evidenceRevision !== expected) {
-          try { tx.abort(); } catch { /* already aborting */ }
-          return fail(new Error("证据版本冲突（CAS）：请刷新后重试，本地修订 " +
-            (current ? current.evidenceRevision : "无") + " ≠ 期望 " + expected));
+      const w = plan.writes;
+      // The ledger is authoritative for retries, even if the project revision
+      // has moved since the original request.  Check it first in this same tx.
+      const ledgerReq = stores.operations.get(w.ledger.operationId);
+      ledgerReq.onsuccess = () => {
+        const prior = ledgerReq.result;
+        if (prior) {
+          if (prior.schema !== 2 || prior.kind !== w.ledger.kind || prior.requestHash !== w.ledger.requestHash) {
+            try { tx.abort(); } catch { }
+            return fail(new Error("操作 ID 已用于不同请求，已拒绝"));
+          }
+          completedResult = prior.result;
+          return;
         }
-        const w = plan.writes;
-        const ledgerReq = stores.operations.get(w.ledger.operationId);
-        ledgerReq.onsuccess = () => {
-          const prior = ledgerReq.result;
-          if (prior) {
-            if (prior.schema !== 2 || prior.kind !== w.ledger.kind || prior.requestHash !== w.ledger.requestHash) {
-              try { tx.abort(); } catch { }
-              return fail(new Error("操作 ID 已用于不同请求，已拒绝"));
-            }
-            // A crash after commit but before response is a replay, never a second write.
-            return done(prior.result);
+        const projectReq = stores.projects.get(w.project.projectId);
+        projectReq.onsuccess = () => {
+          const current = projectReq.result;
+          const expected = plan.expectedRevision === undefined
+            ? w.project.evidenceRevision - 1 : plan.expectedRevision;
+          if (!current || current.evidenceRevision !== expected) {
+            try { tx.abort(); } catch { /* already aborting */ }
+            return fail(new Error("证据版本冲突（CAS）：请刷新后重试，本地修订 " +
+              (current ? current.evidenceRevision : "无") + " ≠ 期望 " + expected));
           }
           const add = (store, value) => {
             if (typeof stores[store].add === "function") stores[store].add(value);
@@ -114,9 +119,9 @@
             return fail(e);
           }
         };
-        ledgerReq.onerror = () => fail(ledgerReq.error || new Error("operations 读取失败"));
+        projectReq.onerror = () => fail(projectReq.error || new Error("projects 读取失败"));
       };
-      projectReq.onerror = () => fail(projectReq.error || new Error("projects 读取失败"));
+      ledgerReq.onerror = () => fail(ledgerReq.error || new Error("operations 读取失败"));
     });
   }
 

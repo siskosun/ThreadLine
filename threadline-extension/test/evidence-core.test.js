@@ -120,6 +120,23 @@ test('stale project revision aborts the whole transaction (CAS)', async () => {
   assert.equal(after.operations['op_cas00000002'], undefined);
 });
 
+test('durable ledger replay wins over a stale CAS plan', async () => {
+  const db = mockIdb({ projects: { p1: Core.newProjectRecord('p1') } });
+  const original = await stateFrom(db);
+  // These emulate two service-worker requests that planned from exactly the
+  // same snapshot, followed by the second request retrying after the first
+  // committed but before it received its response.
+  const p1 = await Core.planAdoption(original, adoption('重试结论'), 'op_race00000001');
+  const p2 = await Core.planAdoption(original, adoption('重试结论'), 'op_race00000001');
+  const first = await DB.applyPlan(db, p1);
+  const replay = await DB.applyPlan(db, p2);
+  assert.deepEqual(replay, first);
+  const after = await stateFrom(db);
+  assert.equal(after.projects.p1.evidenceRevision, 1);
+  assert.equal(Object.keys(after.conclusions).length, 1);
+  assert.equal(Object.keys(after.operations).length, 1);
+});
+
 test('crash mid-transaction leaves no partial writes (rollback)', async () => {
   const db = mockIdb({ projects: { p1: Core.newProjectRecord('p1') } });
   const state = await stateFrom(db);
@@ -333,4 +350,41 @@ test('non-adoption writes repair takeover for legacy evidence projects', async (
   const withdraw=await Core.planWithdrawal(state,w.conclusion.id,'理由','op_repair000003');
   assert.equal(withdraw.writes.project.takeover,true);
   assert.equal(Core.exportPackage(state,'p1').project.takeover,true);
+});
+
+test('import discards an untrusted cached adoption fingerprint', async () => {
+  const source={conclusions:{},versions:{},sources:{},links:{},projects:{p1:Core.newProjectRecord('p1')},operations:{}};
+  const a={...adoption('A','摘录A'),fragments:[{selection:'摘录A',conversationId:'one'}]};
+  const b={...adoption('B','摘录B'),fragments:[{selection:'摘录B',conversationId:'two'}]};
+  const pa=await Core.planAdoption(source,a,'op_untrusted0001'),wa=pa.writes;
+  source.conclusions[wa.conclusion.id]=wa.conclusion;source.versions[wa.version.id]=wa.version;wa.sources.forEach(x=>source.sources[x.id]=x);wa.links.forEach(x=>source.links[x.id]=x);source.projects.p1=wa.project;
+  const pb=await Core.planAdoption({conclusions:{},versions:{},sources:{},links:{},operations:{},projects:{p1:Core.newProjectRecord('p1')}},b,'op_untrusted0002');
+  const pkg=Core.exportPackage(source,'p1'); pkg.versions[0].adoptionFingerprint=pb.writes.version.adoptionFingerprint;
+  const target={conclusions:{},versions:{},sources:{},links:{},operations:{},projects:{p1:Core.newProjectRecord('p1')}};
+  const imported=await Core.importPackage(target,pkg,'op_untrusted0003'),w=imported.writes;
+  w.bulkConclusions.forEach(x=>target.conclusions[x.id]=x);w.bulkVersions.forEach(x=>target.versions[x.id]=x);w.bulkSources.forEach(x=>target.sources[x.id]=x);w.bulkLinks.forEach(x=>target.links[x.id]=x);
+  assert.equal(target.versions[wa.version.id].adoptionFingerprint,undefined);
+  assert.equal(await Core.findDuplicateAdoption(target,'p1',b),null);
+});
+
+test('import enforces semantic status, metadata, per-version limits and existing cap', async () => {
+  const state={conclusions:{},versions:{},sources:{},links:{},projects:{p1:Core.newProjectRecord('p1')},operations:{}};
+  const plan=await Core.planAdoption(state,adoption('规则'),'op_semantic0001'),w=plan.writes;
+  for(const [n,x] of [['conclusions',w.conclusion],['versions',w.version],['projects',w.project],['operations',w.ledger]])state[n][n==='projects'?x.projectId:n==='operations'?x.operationId:x.id]=x;
+  w.sources.forEach(x=>state.sources[x.id]=x);w.links.forEach(x=>state.links[x.id]=x);const pkg=Core.exportPackage(state,'p1');
+  const badStatus=structuredClone(pkg);badStatus.conclusions[0].status='forged';await assert.rejects(Core.validateExportPackage(badStatus),/状态/);
+  const badMeta=structuredClone(pkg);badMeta.project.legacyNote={text:'forged',verified:true};await assert.rejects(Core.validateExportPackage(badMeta),/元数据/);
+  const tooMany=structuredClone(pkg);for(let i=0;i<8;i++){const s={...tooMany.sources[0],id:'src_extra'+String(i).padStart(8,'0')};tooMany.sources.push(s);tooMany.links.push({...tooMany.links[0],id:'lnk_extra'+String(i).padStart(8,'0'),sourceId:s.id});}await assert.rejects(Core.validateExportPackage(tooMany),/最多 8/);
+  const full={conclusions:{},versions:{},sources:{},links:{},operations:{},projects:{p1:Core.newProjectRecord('p1')}};for(let i=0;i<200;i++)full.conclusions['con_full'+String(i).padStart(8,'0')]={id:'con_full'+String(i).padStart(8,'0'),projectId:'p1'};
+  await assert.rejects(Core.importPackage(full,pkg,'op_semantic0002'),/200/);
+});
+
+test('amend replay is bound to raw user intent before current status', async () => {
+  const db=mockIdb({projects:{p1:Core.newProjectRecord('p1')}});let state=await stateFrom(db);
+  const first=await DB.applyPlan(db,await Core.planAdoption(state,{...adoption('初版'),conditions:'A'},'op_raw00000001'));
+  state=await stateFrom(db);const firstAmend=await DB.applyPlan(db,await Core.planAmendment(state,first.conclusionId,{text:'改一'},'op_raw00000002'));
+  state=await stateFrom(db);await DB.applyPlan(db,await Core.planAmendment(state,first.conclusionId,{text:'改二',conditions:'B'},'op_raw00000003'));
+  state=await stateFrom(db);assert.deepEqual((await Core.planAmendment(state,first.conclusionId,{text:'改一'},'op_raw00000002')).replay,firstAmend);
+  await DB.applyPlan(db,await Core.planWithdrawal(state,first.conclusionId,'撤回','op_raw00000004'));
+  state=await stateFrom(db);assert.deepEqual((await Core.planAmendment(state,first.conclusionId,{text:'改一'},'op_raw00000002')).replay,firstAmend);
 });
