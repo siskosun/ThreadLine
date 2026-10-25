@@ -59,7 +59,7 @@
     // A candidate without a model/rule reference is not silently attached to a
     // summary. The user must choose an actual captured message in the dialog.
     const candidates=indexes.length?indexes:messages.map((_,n)=>n);
-    return [...new Set(candidates)].slice(0,200).map(n=>{const m=messages[n];return {
+    return [...new Set(candidates)].map(n=>{const m=messages[n];return {
       label:`M${n+1} · ${m.role||"未知"} · ${String(m.content||"").slice(0,80)}`,
       captureRunId:currentRun.id,messageIndex:n,coverage:currentRun.complete?"原始采集：分页完成":"原始采集：部分历史",
       content:m.content||"",nonText:!!m.hasNonText,aiCoverage:currentRun.aiCoverage?.complete?"本次采集全部文本":"未确认或部分",messageId:m.id||null

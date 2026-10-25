@@ -48,6 +48,7 @@ def discard_evidence_idb(profile, extension_id):
     roots = list(Path(profile).rglob(f"chrome-extension_{extension_id}_0.indexeddb.leveldb"))
     assert roots, "Chromium did not create the extension IndexedDB directory"
     for root in roots:
+        assert root.resolve().is_relative_to(Path(profile).resolve()), "refuse deletion outside disposable profile"
         shutil.rmtree(root)
 
 def run():
@@ -96,6 +97,8 @@ def run():
         assert checked["materialHash"] == handoff["materialHash"]
         copied = good(panel, {"type":"EV_HANDOFF_RECORD", "projectId":p1, "handoffId":handoff["id"], "text":handoff["text"], "event":"copied", "operationId":op("copied"), "expectedRevision":evidence_revision(panel, p1)})
         assert copied["event"] == "copied"
+        good(panel,{"type":"EV_RESEARCH_COMMAND","projectId":p1,"operationId":op("removeedge"),"expectedRevision":evidence_revision(panel,p1),"command":{"kind":"removeDependency","edgeId":edge["edgeId"],"reason":"测试显式移除"}})
+        bad(panel,{"type":"EV_HANDOFF_VALIDATE","projectId":p1,"handoffId":handoff["id"],"text":handoff["text"]},"证据已变化")
         current = good(proto,{"type":"EV_LIST","projectId":p1})["rows"]
         current_down = next(x for x in current if x["conclusion"]["id"] == down)["current"]["id"]
         good(proto,{"type":"EV_AMEND","conclusionId":down,"text":"下游变化", "expectedVersionId":current_down,"operationId":op("changedown")})
@@ -113,6 +116,8 @@ def run():
         ctx, panel, eid = launch()
         proto = ctx.new_page(); proto.goto(f"chrome-extension://{eid}/evidence-prototype.html", wait_until="domcontentloaded")
         restore_preview = good(panel,{"type":"EV_RESTORE_PREVIEW","backup":backup,"replace":True})
+        changed_backup=copy.deepcopy(backup);changed_backup["topic"]["name"]="未经预览的课题名"
+        bad(panel,{"type":"EV_RESTORE_COMMIT","backup":changed_backup,"preview":restore_preview["preview"],"operationId":op("wrongpreview")},"与预览不一致")
         restored = good(panel,{"type":"EV_RESTORE_COMMIT","backup":backup,"preview":restore_preview["preview"],"replace":True,"operationId":op("restoreloss")})
         assert restored["revision"] > backup_revision
         # The authoritative store was lost for two marked projects.  Restoring
@@ -125,8 +130,15 @@ def run():
         after_loss = good(proto,{"type":"EV_LIST","projectId":p1})
         assert after_loss["project"]["takeover"] is True
         assert good(proto,{"type":"EV_LIST","projectId":p2})["project"]["takeover"] is True
+        changed_name=copy.deepcopy(backup_p2);changed_name["topic"]["name"]="不能用同一操作换恢复名称"
+        bad(panel,{"type":"EV_RESTORE_COMMIT","backup":changed_name,"preview":restore_p2_preview["preview"],"replace":True,"operationId":op("restorep2")},"与预览不一致")
+        # These operation results contain original text: deletion must redact them too.
+        good(panel,{"type":"EV_HANDOFF_PREPARE","projectId":p1,"expectedRevision":evidence_revision(panel,p1),"operationId":op("privatehandoff")})
+        good(panel,{"type":"EV_REVIEW_PREPARE","projectId":p1,"targetConclusionId":down,"question":"PRIVATE_REVIEW_SHOULD_DISAPPEAR","expectedRevision":evidence_revision(panel,p1),"operationId":op("privatereview")})
+        assert "PRIVATE_REVIEW_SHOULD_DISAPPEAR" in str(raw(panel))
         # Preview binds an exact revision. A concurrent amendment makes the old delete preview unusable.
         preview = good(panel,{"type":"EV_DELETE_PREVIEW","projectId":p1})
+        bad(panel,{"type":"EV_DELETE_COMMIT","projectId":p2,"preview":preview["preview"],"operationId":op("wrongdelete")},"与预览不一致")
         current = good(proto,{"type":"EV_LIST","projectId":p1})["rows"]
         current_down = next(x for x in current if x["conclusion"]["id"] == down)["current"]["id"]
         good(proto,{"type":"EV_AMEND","conclusionId":down,"text":"删除预览期间变更", "expectedVersionId":current_down,"operationId":op("deletechange")})
@@ -135,6 +147,8 @@ def run():
         deleted = good(panel,{"type":"EV_DELETE_COMMIT","projectId":p1,"preview":preview["preview"],"operationId":op("deletefresh")})
         assert deleted["deleted"] is True
         assert "删除预览期间变更" not in str(raw(panel))
+        assert "PRIVATE_REVIEW_SHOULD_DISAPPEAR" not in str(raw(panel))
+        assert "原始依据" not in str(raw(panel)), "operation ledgers must not retain deleted original text"
         projects = good(panel,{"type":"EV_PROJECTS"})["projects"]
         assert any(x["id"] == p2 for x in projects)
         bad(proto,{"type":"EV_ENSURE","projectId":p1},"删除")

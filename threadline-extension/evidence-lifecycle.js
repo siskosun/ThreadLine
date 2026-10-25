@@ -78,6 +78,7 @@
       result,
       expectedRevision,
       writes: {
+        redactedOperations: redactOperations(state,projectId),
         deleteIds: deleteIds(state, projectId),
         project: {
           projectId,
@@ -93,6 +94,10 @@
         ledger: await ledger("delete", input, operationId, result, projectId),
       },
     };
+  }
+  function redactOperations(state,projectId) {
+    return Object.values(state.operations||{}).filter(o=>o.projectId===projectId||state.conclusions[o.result?.conclusionId]?.projectId===projectId)
+      .map(o=>({operationId:o.operationId,schema:o.schema,kind:o.kind,projectId,requestHash:o.requestHash,at:o.at,redacted:true,result:{projectId,redacted:true}}));
   }
   function validatePackageProject(pkg) {
     if (!pkg || typeof pkg.projectId !== "string" || !pkg.projectId.trim())
@@ -137,7 +142,7 @@
       throw new Error("恢复预览已过期，请刷新后重新确认");
     const removed = rejectForeignCollisions(state, pkg, pkg.projectId, !!existing);
     const revision = Math.max(existing?.evidenceRevision || 0, minimumRevision) + 1;
-    const meta = pkg.format === "threadline-evidence/2" ? pkg.project : null;
+    const meta = pkg.format !== "threadline-evidence/1" ? pkg.project : null;
     const project = {
       projectId: pkg.projectId,
       evidenceRevision: revision,
@@ -147,7 +152,9 @@
       deleted: false,
       cleanupPending: false,
       legacyNote: meta?.legacyNote ? clone(meta.legacyNote) : null,
-      ...(meta?.legacyNoteUnavailable ? { legacyNoteUnavailable: true } : {}),
+      ...(!meta?.legacyNote || meta?.legacyNoteUnavailable ? { legacyNoteUnavailable: true } : {}),
+      ...(meta?.research ? {research:clone(meta.research)} : {}),
+      ...(meta?.handoffs ? {handoffs:clone(meta.handoffs)} : {}),
     };
     const result = { projectId: pkg.projectId, restored: pkg.conclusions.length, revision, replaced: !!existing };
     return {
@@ -155,7 +162,7 @@
       result,
       expectedRevision,
       writes: {
-        ...(existing ? { deleteIds: removed } : {}),
+        ...(existing ? { deleteIds: removed,redactedOperations:redactOperations(state,pkg.projectId) } : {}),
         bulkConclusions: pkg.conclusions.map(clone),
         bulkVersions: pkg.versions.map(({ adoptionFingerprint, ...version }) => clone(version)),
         bulkSources: pkg.sources.map(clone),

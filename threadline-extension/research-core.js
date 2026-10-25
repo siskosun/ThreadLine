@@ -163,7 +163,7 @@
         const rootCause=row.causes.find(x=>x.rootConclusionId===cause.rootConclusionId);
         if(rootCause) {
           for(const id of cause.edgeIds)if(!rootCause.contributingEdgeIds.includes(id))rootCause.contributingEdgeIds.push(id);
-          if(cause.path.join("/")<rootCause.path.join("/"))rootCause.path=cause.path;
+          if(cause.path.join("/")<rootCause.path.join("/")){rootCause.path=cause.path;rootCause.edgeIds=cause.edgeIds;}
         } else row.causes.push({...cause,contributingEdgeIds:[...cause.edgeIds]});
         out.set(target,row);
         if(!item.path.includes(target))queue.push({id:target,root:item.root,path:cause.path,edgeIds:cause.edgeIds});

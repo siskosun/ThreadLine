@@ -106,6 +106,7 @@
       ledgerReq.onsuccess = () => {
         const prior = ledgerReq.result;
         if (prior) {
+          if(prior.redacted){tx.abort();return fail(new Error("旧操作所属数据已删除或替换，不能重放"));}
           if (
             prior.schema !== 2 ||
             prior.kind !== w.ledger.kind ||
@@ -164,7 +165,8 @@
             for (const s of w.bulkSources || []) add("sources", s);
             for (const l of w.bulkLinks || []) add("links", l);
             stores.projects.put(w.project);
-            add("operations", w.ledger);
+            for(const ledger of w.redactedOperations||[])stores.operations.put(ledger);
+            add("operations", {...w.ledger,projectId:w.project.projectId});
           } catch (e) {
             try {
               tx.abort();
@@ -263,8 +265,10 @@
       tx.onerror = () => reject(tx.error || new Error("证据课题初始化失败"));
       req.onsuccess = () => {
         if (req.result) {
-          if (req.result.deleted)
-            throw new Error("课题证据已删除：请使用明确恢复流程，不能自动复活");
+          if (req.result.deleted) {
+            reject(new Error("课题证据已删除：请使用明确恢复流程，不能自动复活"));
+            tx.abort(); return;
+          }
           created = req.result;
           return;
         }
@@ -273,6 +277,15 @@
         created = record;
       };
       req.onerror = () => reject(req.error);
+    });
+  }
+
+  function markRestoreDone(db, projectId, revision) {
+    return new Promise((resolve,reject)=>{
+      const tx=db.transaction(["projects"],"readwrite"),q=tx.objectStore("projects").get(projectId);
+      tx.oncomplete=()=>resolve(true);tx.onabort=()=>reject(tx.error||Error("恢复对账中止"));tx.onerror=()=>reject(tx.error);
+      q.onsuccess=()=>{const p=q.result;if(!p||p.evidenceRevision!==revision){tx.abort();return;}
+        const next={...p,restorePending:false};delete next.restoreTopic;tx.objectStore("projects").put(next);};
     });
   }
 
@@ -286,6 +299,7 @@
     ensureProject,
     clearProjectionTodo,
     markCleanupDone,
+    markRestoreDone,
   };
   if (typeof module !== "undefined" && module.exports) module.exports = DB;
   else globalThis.ThreadLineEvidenceDB = DB;

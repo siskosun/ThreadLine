@@ -8,8 +8,8 @@ test('research UI is local, bounded and explicit',()=>{
   assert.match(source,/response\.revision/);
   assert.match(source,/response\.stale/);
   assert.match(source,/function blankReview/);
-  assert.match(source,/note\.pending !== false/);
-  assert.match(source,/note\.targetIDs/);
+  assert.match(source,/note\.affected\.filter\(target=>target\.pending\)/);
+  assert.match(source,/复核此结论/);
   assert.match(source,/ids\.slice\(0,20\)/);
   assert.match(source,/包含结论文本/);
   assert.doesNotMatch(source,/conditions:\s*""/);

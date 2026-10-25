@@ -11,9 +11,9 @@
   const normalizeBackup = parsed => {
     if (parsed?.format === "threadline-project-backup/1" && parsed.evidence)
       return parsed;
-    if (["threadline-evidence/1", "threadline-evidence/2"].includes(parsed?.format))
+    if (["threadline-evidence/1", "threadline-evidence/2", "threadline-evidence/3"].includes(parsed?.format))
       return { format: "threadline-project-backup/1", topic: null, evidence: parsed, legacyEvidenceOnly: true };
-    throw new Error("请选择研线证据备份（/1 或 /2）");
+    throw new Error("请选择研线证据备份（/1、/2 或 /3）");
   };
   async function parseBackupFile(file) {
     if (!file) throw new Error("请选择备份文件");
@@ -61,7 +61,7 @@
     const restorePanel = doc.createElement("div"); restorePanel.hidden = true; restorePanel.style.cssText = "border:1px solid #dce5ee;border-radius:9px;padding:9px;margin:8px 0";
     const restoreText = doc.createElement("p"); restoreText.className = "subtle"; restoreText.style.whiteSpace = "pre-line";
     const replace = doc.createElement("input"); replace.type = "checkbox"; replace.id = "evidence-maintenance-replace";
-    const replaceLabel = doc.createElement("label"); replaceLabel.htmlFor = replace.id; replaceLabel.textContent = "替换同 ID 的当前证据课题（会先保全当前状态）"; replaceLabel.style.cssText = "display:block;font-size:11px;margin:7px 0"; replaceLabel.prepend(replace);
+    const replaceLabel = doc.createElement("label"); replaceLabel.htmlFor = replace.id; replaceLabel.textContent = "替换同 ID 的当前证据课题（会删除当前状态，请先自行导出备份）"; replaceLabel.style.cssText = "display:block;font-size:11px;margin:7px 0"; replaceLabel.prepend(replace);
     const restore = button("确认恢复", "primary"), cancelRestore = button("取消"); restore.disabled = true;
     restorePanel.append(restoreText, replaceLabel, restore, cancelRestore);
     const retry = button("重试未完成的删除清理"); retry.hidden = true;
@@ -106,6 +106,7 @@
       try {
         const backupFile = await parseBackupFile(file);
         pendingRestore = { backup: backupFile, replace: false, operationId: operationId("restore") };
+        replace.checked=false;restorePanel.hidden=false;restoreText.textContent="备份包含原文片段。若同 ID 课题已存在，请选择替换模式后再次预览。替换会删除当前状态，建议先导出。";
         const data = await send({ type: "EV_RESTORE_PREVIEW", backup: backupFile, replace: false });
         pendingRestore.preview = data.preview; pendingRestore.counts = data.counts;
         restoreText.textContent = `${backupFile.legacyEvidenceOnly ? "旧式仅证据包；将创建或关联恢复课题。\n" : ""}恢复范围：${countText(data.counts)}。\n${data.includesOriginalExcerpts ? "包含对话原文片段。" : "不含完整原文片段。"}\n恢复模式：新建。请确认后再写入。`;
@@ -118,7 +119,7 @@
       try {
         const data = await send({ type: "EV_RESTORE_PREVIEW", backup: pendingRestore.backup, replace: pendingRestore.replace });
         pendingRestore.preview = data.preview; pendingRestore.counts = data.counts;
-        restoreText.textContent = `恢复范围：${countText(data.counts)}。\n${data.includesOriginalExcerpts ? "包含对话原文片段。" : "不含完整原文片段。"}\n恢复模式：${pendingRestore.replace ? "替换同 ID 课题；当前证据将先保全。" : "新建。"}\n请确认后再写入。`;
+        restoreText.textContent = `恢复范围：${countText(data.counts)}。\n${data.includesOriginalExcerpts ? "包含对话原文片段。" : "不含完整原文片段。"}\n恢复模式：${pendingRestore.replace ? "替换同 ID 课题；当前证据将被删除，请先自行导出备份。" : "新建。"}\n请确认后再写入。`;
         restore.disabled = false;
       } catch (error) { say("无法预览恢复：" + error.message, true); }
     });

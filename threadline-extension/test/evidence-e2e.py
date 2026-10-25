@@ -177,9 +177,12 @@ def run():
             assert panel_errors == [], panel_errors
             # Exercise the actual text-only edit control and retain original evidence identity.
             original = send(panel, {"type": "EV_LIST", "projectId": project_id})["data"]["rows"][0]
-            panel.once("dialog", lambda dialog: dialog.accept("面板修订后的结论"))
+            def amend_dialog(dialog):
+                dialog.accept("实质" if "变更类型" in dialog.message else "面板修订后的结论")
+            panel.on("dialog", amend_dialog)
             panel.locator("#evidence-list button", has_text="修订").click()
             panel.wait_for_function("() => document.querySelector('#evidence-list').textContent.includes('面板修订后的结论')")
+            panel.remove_listener("dialog", amend_dialog)
             changed = send(panel, {"type": "EV_LIST", "projectId": project_id})["data"]["rows"][0]
             assert changed["current"]["conditions"] == original["current"]["conditions"]
             assert changed["fragments"] == original["fragments"], "text edits preserve source IDs, times and provenance"
@@ -194,6 +197,7 @@ def run():
             topic = next(p for p in current_topic["projects"] if p["id"] == project_id)
             assert "可重试修订" in topic["decision"] and topic["knowledgeVersion"] == 3
             panel.click("#evidence-handoff")
+            panel.wait_for_function("() => !document.querySelector('#evidence-handoff-view').hidden && document.querySelector('#evidence-handoff-view').value.includes('仅适用合成样本 A')")
             assert "仅适用合成样本 A" in panel.locator("#evidence-handoff-view").input_value()
             panel.locator("#evidence-handoff-view").fill("人工修改的交接材料")
             assert panel.locator("#evidence-handoff-view").input_value() == "人工修改的交接材料"
@@ -306,6 +310,9 @@ def run():
                     assert not empty_restore["ok"] and "空证据包" in empty_restore["error"], empty_restore
                     assert raw_evidence(restored_page) == empty_before
                     incoming = copy.deepcopy(pkg["data"])
+                    incoming["format"] = f"threadline-evidence/{format_version}"
+                    incoming.get("project", {}).pop("research", None)
+                    incoming.get("project", {}).pop("handoffs", None)
                     if format_version == 1:
                         incoming["format"] = "threadline-evidence/1"
                         incoming.pop("project", None)

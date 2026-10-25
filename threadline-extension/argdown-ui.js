@@ -52,6 +52,8 @@
       if ([...project.options].some(item => item.value === prior)) project.value = prior;
     }
     async function load() {
+      proposals.replaceChildren();
+      data=null;
       try {
         const directory = await send({ type: "EV_PROJECTS" });
         projects = Array.isArray(directory.projects) ? directory.projects : [];
@@ -81,6 +83,7 @@
       return select;
     }
     function addProposal(relation) {
+      const proposalData=data,proposalProject=selectedId();
       const kind = relationKind(relation.type);
       const card = doc.createElement("fieldset"); card.className = "argdown-proposal";
       const title = doc.createElement("legend"); title.textContent = `${kind === "support" ? "支持候选" : kind === "oppose" ? "反对候选" : "未识别关系"}：${relation.fromLabel} → ${relation.toLabel}`;
@@ -101,7 +104,8 @@
         if (!canConfirm() || !data?.project) return;
         confirm.disabled = true;
         try {
-          await send({ type: "EV_RESEARCH_COMMAND", projectId: selectedId(), expectedRevision: data.project.evidenceRevision,
+          if(proposalData!==data||proposalProject!==selectedId())throw Error("结论范围已变化，请重新预览并确认");
+          await send({ type: "EV_RESEARCH_COMMAND", projectId: proposalProject, expectedRevision: data.project.evidenceRevision,
             operationId: operationId(), command: { kind: "addDependency", upstreamConclusionId: upstream.value,
               downstreamConclusionId: downstream.value,
               upstreamVersionId: currentVersion(upstream.value), downstreamVersionId: currentVersion(downstream.value),

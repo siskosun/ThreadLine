@@ -525,10 +525,17 @@
         amend.addEventListener("click", async () => {
           const text = prompt("修订结论正文（生成新版本，历史保留）：", row.current ? row.current.text : "");
           if (text === null) return;
+          const impact=prompt("变更类型：实质 / 仅措辞 / 适用条件（默认实质）", "实质");
+          if(impact===null)return;
+          if(!["实质","仅措辞","适用条件"].includes(impact)){alert("请选择列出的变更类型");return;}
+          const conditions=impact==="适用条件"?prompt("新的适用条件：",row.current.conditions||""):row.current.conditions;
+          if(conditions===null)return;
+          const carryForward=impact==="仅措辞"&&confirm("确认原依赖关系继续适用？只推进本结论版本，不会确认上游的新版本。");
           try {
-            await evSend({ type: "EV_AMEND", conclusionId: c.id, text, expectedVersionId:row.current.id,
+            await evSend({ type: "EV_AMEND", conclusionId: c.id, text, conditions,changeImpact:({"实质":"substantive","仅措辞":"wording","适用条件":"conditions"})[impact],carryForward,expectedVersionId:row.current.id,
               operationId: "op_amend_" + crypto.randomUUID().replace(/-/g, "").slice(0, 12) });
             await renderEvidenceProject();
+            window.dispatchEvent(new Event("threadline-evidence-changed"));
           } catch (e) { alert("修订失败：" + e.message); }
         });
         const withdraw = document.createElement("button");
@@ -555,46 +562,42 @@
     if (!projectId) return;
     try {
       const data = await evSend({ type: "EV_LIST", projectId });
-      const corrected = [], withdrawn = [], active = [];
-      for (const row of data.rows) {
-        const c = row.conclusion;
-        if (c.status === "withdrawn") { withdrawn.push(row); continue; }
-        if (row.versions && row.versions.length > 1) corrected.push(row);
-        else active.push(row);
-      }
-      const lines = ["【交接材料 · " + (ev$("evidence-project").selectedOptions[0]?.textContent || projectId) + "】", ""];
-      const append = r => {
-        lines.push("- " + r.current.text + "（版本 " + r.current.id + "）");
-        if (r.current.conditions) lines.push("  适用条件：" + r.current.conditions);
-        for (const f of r.fragments) lines.push("  依据（" + f.relation + "，" + f.completeness + "）：" +
-          f.selection + (f.conversationId ? "；会话 " + f.conversationId : "；仅片段") +
-          (f.messageId ? "；消息 " + f.messageId : ""));
-      };
-      lines.push("■ 已采纳结论（" + active.length + "）");
-      for (const r of active) append(r);
-      lines.push("", "■ 更正过的结论（" + corrected.length + "，以最新为准）");
-      for (const r of corrected) append(r);
-      lines.push("", "■ 已撤回（" + withdrawn.length + "，请勿继续引用）");
-      for (const r of withdrawn) lines.push("- " + (r.current?.text || "").slice(0, 80));
-      lines.push("", "■ 已知未知项：未逐条核验外部资料；来源定位失败时仅有片段。");
+      const result = await evSend({type:"EV_HANDOFF_PREPARE",projectId,
+        expectedRevision:data.project.evidenceRevision,operationId:"op_handoff_"+crypto.randomUUID().replace(/-/g,"")});
       const view = ev$("evidence-handoff-view");
-      view.hidden = false;
-      view.value = lines.join("\n");
-      evidenceHandoffStamp = {projectId,revision:data.project?.evidenceRevision || 0};
+      view.hidden = false; view.value = result.handoff.text;
+      evidenceHandoffStamp = {projectId,handoffId:result.handoff.id};
       ev$("evidence-handoff-copy").hidden = false;
       ev$("evidence-handoff-copy").disabled = false;
+      ev$("evidence-handoff-read").hidden = false;
+      window.dispatchEvent(new Event("threadline-evidence-changed"));
     } catch (e) { alert("交接生成失败：" + e.message); }
   });
   ev$("evidence-handoff-copy").addEventListener("click", async () => {
+    let copied=false;
     try {
       const stamp = evidenceHandoffStamp;
       if (!stamp || stamp.projectId !== ev$("evidence-project").value) throw new Error("课题已变化，请重新生成预览；当前草稿仍保留");
-      const data = await evSend({type:"EV_LIST",projectId:stamp.projectId});
-      if ((data.project?.evidenceRevision || 0) !== stamp.revision) throw new Error("证据已变化，请重新核对预览；当前草稿仍保留");
-      await navigator.clipboard.writeText(ev$("evidence-handoff-view").value);
+      const text=ev$("evidence-handoff-view").value;
+      await evSend({type:"EV_HANDOFF_VALIDATE",projectId:stamp.projectId,handoffId:stamp.handoffId,text});
+      await navigator.clipboard.writeText(text);
+      copied=true;
+      const data=await evSend({type:"EV_LIST",projectId:stamp.projectId});
+      await evSend({type:"EV_HANDOFF_RECORD",projectId:stamp.projectId,handoffId:stamp.handoffId,text,event:"copied",
+        expectedRevision:data.project.evidenceRevision,operationId:"op_copied_"+crypto.randomUUID().replace(/-/g,"")});
       notify("已复制编辑后的交接材料");
-    } catch (e) { notify(e.message || "复制失败，请核对后手动复制", true); }
+    } catch (e) { notify((copied?"文本已复制，但复制记录未保存：":"复制未完成：")+(e.message||"请核对当前状态"), true); }
   });
+  ev$("evidence-handoff-read").addEventListener("click",async()=>{
+    try {
+      const stamp=evidenceHandoffStamp;if(!stamp||stamp.projectId!==ev$("evidence-project").value)throw Error("请先生成本课题交接预览");
+      const data=await evSend({type:"EV_LIST",projectId:stamp.projectId});
+      await evSend({type:"EV_HANDOFF_RECORD",projectId:stamp.projectId,handoffId:stamp.handoffId,text:ev$("evidence-handoff-view").value,
+        event:"human-read",expectedRevision:data.project.evidenceRevision,operationId:"op_read_"+crypto.randomUUID().replace(/-/g,"")});
+      notify("已记录你看过此份材料；这不表示模型已理解。");
+    } catch(e){notify(e.message,true);}
+  });
+  window.addEventListener("threadline-evidence-changed",()=>{renderEvidence().catch(e=>notify(e.message,true));refresh(true);});
   renderEvidence().catch(() => {});
   document.querySelector(".workspace-tabs").addEventListener("keydown", e => {
     if (!["ArrowLeft","ArrowRight"].includes(e.key)) return;

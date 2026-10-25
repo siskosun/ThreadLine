@@ -9,7 +9,7 @@
   const relations=[["cites","引用"],["supports","支持"],["opposes","反对"],["background","背景"]];
   async function open(options) {
     if(!options || !Array.isArray(options.sources) || !options.sources.length)throw Error("没有可选择的原始消息，不能采纳");
-    const snap=await send({type:"SNAPSHOT"}),projects=(snap.state?.projects||[]).filter(p=>p.stage!=="closed");if(!projects.length)throw Error("请先在研线面板创建进行中的课题");
+    const snap=await send({type:"EV_PROJECTS"}),projects=(snap.projects||[]).filter(p=>p.stage==="active"&&!p.deleted&&!p.unavailable);if(!projects.length)throw Error(snap.error||"请先在研线面板创建进行中的课题");
     const dialog=el("dialog",{className:"evidence-adoption-dialog",ariaLabel:"采纳证据结论"});
     const style=el("style",{},`.evidence-adoption-dialog{width:min(760px,calc(100vw - 24px));max-height:calc(100vh - 24px);overflow:auto;padding:22px}.evidence-adoption-dialog label{display:block;margin:12px 0;font-weight:600}.evidence-adoption-dialog textarea,.evidence-adoption-dialog select{display:block;width:100%;margin-top:5px;font:14px/1.5 system-ui}.evidence-adoption-source{border-top:1px solid #dce3ed;margin-top:12px;padding-top:10px}.evidence-adoption-source textarea[readonly]{background:#f4f7fa}.evidence-adoption-actions{display:flex;gap:10px;flex-wrap:wrap}`);
     dialog.append(style,el("h3",{},"采纳一条证据结论"),el("p",{className:"subtle"},"正文、依据和关系均由你确认。原始采集范围、AI 输入范围与依据选区是不同事实。"));
