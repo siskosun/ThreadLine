@@ -312,3 +312,22 @@ test('missing evidence links cannot silently become an evidence-free adopted con
       await assert.rejects(s.message({type,projectId:'p-taken'}),/版本依据链接/);
   }
 });
+
+test('EV_ requires the actual extension document, not a lookalike pathname', async () => {
+  const s=system();
+  const request={type:'EV_ENSURE',projectId:'p-free'};
+  const otherURL=[
+    {id:'ev-bg-test',url:'https://chatgpt.com/panel.html'},
+    {id:'ev-bg-test',url:'https://chatgpt.com/evidence-prototype.html'},
+    {id:'external-id',url:'chrome-extension://ev-bg-test/evidence-prototype.html'},
+    {id:'ev-bg-test',url:'chrome-extension://ev-bg-test/ff.html',origin:'https://chatgpt.com'},
+    {id:'ev-bg-test',url:'chrome-extension://ev-bg-test/panel.html',frameId:1},
+    {id:'ev-bg-test',url:'chrome-extension://ev-bg-test/ff.html',tab:{id:2,url:'https://chatgpt.com/'}}
+  ];
+  for(const sender of otherURL)
+    await assert.rejects(s.message(request,sender),/证据消息仅限扩展页面|研线面板|来源标签/,
+      JSON.stringify(sender));
+  assert.ok(await s.message(request,s.evSender),'valid same-extension prototype still works');
+  assert.ok(await s.message({type:'EV_LIST',projectId:'p-free'},s.panelSender),
+    'native panel remains authorized');
+});

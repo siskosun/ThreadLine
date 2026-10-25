@@ -987,10 +987,20 @@ async function guardEvidenceRestoreLocked(previous,restored) {
 
 async function handleEvidence(payload, sender) {
   if (!payload || typeof payload.type !== "string") throw new Error("无效消息");
+  // EV_* carries original excerpts and can delete/restore entire projects.
+  // Match the exact extension document principal, not merely a pathname:
+  // an unrelated URL ending in /panel.html is never an extension page.
   const ownPages = ["evidence-prototype.html", "panel.html", "ff.html"];
-  const senderPath = (() => { try { return new URL(sender.url).pathname.replace(/^\//, ""); } catch { return ""; } })();
-  if (!ownPages.includes(senderPath))
+  const authorizedPage = ownPages.some(page => sender?.url === chrome.runtime.getURL(page));
+  const extensionOrigin = "chrome-extension://" + chrome.runtime.id;
+  if (!authorizedPage || sender?.id !== chrome.runtime.id ||
+      (sender.origin !== undefined && sender.origin !== extensionOrigin) ||
+      (sender.frameId !== undefined && sender.frameId !== 0))
     throw new Error("证据消息仅限扩展页面");
+  if(sender.url === chrome.runtime.getURL("panel.html"))
+    await requirePanelSender(sender, "只能由研线面板读取和修改证据");
+  else if(sender.tab?.url && sender.tab.url !== sender.url)
+    throw new Error("证据消息来源标签与扩展页面不一致");
   const Core = ThreadLineEvidenceCore;
   if (payload.type === "EV_ENSURE") {
     return serialize(async () => {
