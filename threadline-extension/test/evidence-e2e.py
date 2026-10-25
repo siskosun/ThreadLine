@@ -183,8 +183,12 @@ def run():
             assert panel_errors == [], panel_errors
             # Exercise the actual text-only edit control and retain original evidence identity.
             original = send(panel, {"type": "EV_LIST", "projectId": project_id})["data"]["rows"][0]
-            panel.once("dialog", lambda dialog: dialog.accept("面板修订后的结论"))
+            # S1 now uses the inline accessible form, not window.prompt.
+            # Exercise the actual text field and submit path without weakening
+            # the evidence/source preservation assertions below.
             panel.locator("#evidence-list button", has_text="修订").click()
+            panel.locator("dialog.tl-dialog #tl-field-text").fill("面板修订后的结论")
+            panel.locator("dialog.tl-dialog button[type=submit]").click()
             panel.wait_for_function("() => document.querySelector('#evidence-list').textContent.includes('面板修订后的结论')")
             changed = send(panel, {"type": "EV_LIST", "projectId": project_id})["data"]["rows"][0]
             assert changed["current"]["conditions"] == original["current"]["conditions"]
