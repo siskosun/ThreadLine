@@ -1104,7 +1104,7 @@ async function handleEvidence(payload, sender) {
         }, payload.operationId);
       }
       else if (payload.type === "EV_WITHDRAW")
-        plan = await Core.planWithdrawal(state, payload.conclusionId, payload.reason, payload.operationId);
+        plan = await Core.planWithdrawal(state, payload.conclusionId, payload.reason, payload.operationId, payload.expectedVersionId);
       else
         plan = await Core.importPackage(state, payload.pkg, payload.operationId);
       await evidenceBudget(state,plan);

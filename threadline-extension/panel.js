@@ -550,6 +550,7 @@
           if (!confirm("撤回该结论？历史与片段保留。")) return;
           try {
             await evSend({ type: "EV_WITHDRAW", conclusionId: c.id, reason: "面板撤回",
+              expectedVersionId: row.current.id,
               operationId: "op_wd_" + crypto.randomUUID().replace(/-/g, "").slice(0, 12) });
             await renderEvidenceProject();
           } catch (e) { alert("撤回失败：" + e.message); }
