@@ -48,6 +48,7 @@ function validateProtocol(p) {
    seenEvents.add(k);
    if(!["premise_error","definition_change","source_lost","wording_only","unrelated"].includes(e.kind))fail("变化类型无效");
    if(!e.frozenState?.projects?.[c.projectId]||!e.frozenState?.conclusions?.[e.rootConclusionId])fail("B 臂缺少事先冻结的真实图状态");
+   if(typeof e.sourceCorpusSha256!=="string"||!/^[a-f0-9]{64}$/.test(e.sourceCorpusSha256))fail("每次变化必须预先冻结原始资料 SHA-256");
    if(e.goldAffectedIds.includes(e.rootConclusionId))fail("下游真值不能把变化根结论自身算作依赖影响");
    if(e.carryForwardConfirmed===true&&e.kind!=="wording_only")fail("仅措辞承接只能用于 wording_only 事件");
    if(e.critical===true)critical++;
@@ -78,20 +79,27 @@ export function evaluateData(protocol,observations,protocolSha256){
   fail("观测包未执行、协议 SHA 不匹配或格式不合法；拒绝补填预测集合");
  if(!Array.isArray(observations.records)||observations.records.length!==design.events)
   fail("三臂执行记录必须完整覆盖冻结的每次变化；缺失不能静默排除");
- const byKey=new Map();
+ const byKey=new Map(),receiptIds=new Set();
  for(const item of observations.records) {
   const k=item.caseId+"/"+item.eventId;
   if(byKey.has(k)||!item.arms||Object.keys(item.arms).sort().join(",")!=="A,B,C")
    fail("重复事件或 A/B/C 观测臂不完整");
+  const frozenEvent=protocol.cases.find(c=>c.id===item.caseId)?.events.find(e=>e.id===item.eventId);
+  if(!frozenEvent)fail("出现冻结协议之外的变化事件");
   for(const arm of ARM) {
    const v=item.arms[arm];
    if(!v||typeof v.correctContinuation!=="boolean"||typeof v.wronglyRevisedTrueClaim!=="boolean"||
       !Number.isFinite(v.elapsedMs)||v.elapsedMs<=0||!Number.isSafeInteger(v.humanInterventions)||v.humanInterventions<0||
       !Number.isSafeInteger(v.modelCalls)||v.modelCalls<0||!v.receiptId||typeof v.receiptId!=="string"||
-      typeof v.modelVersion!=="string"||!v.modelVersion)
-    fail("三臂均须保留实际正确性、误改、全部耗时、人工干预、调用数与收据");
+      typeof v.modelVersion!=="string"||!v.modelVersion||
+      v.sourceCorpusSha256!==frozenEvent.sourceCorpusSha256)
+    fail("三臂均须保留正确性、误改、完整耗时、模型信息、原始资料 SHA 与独立收据");
+   if(receiptIds.has(v.receiptId))fail("重复使用收据 ID：不同臂/事件必须有独立记录");
+   receiptIds.add(v.receiptId);
    if(arm==="B"&&Object.hasOwn(v,"predictedAffectedIds"))fail("B 的预测集合只能由 Research.impacts 实算，不允许填入");
   }
+  const versions=ARM.map(arm=>item.arms[arm].modelVersion);
+  if(versions.some(version=>version!==versions[0]))fail("同一事件三臂模型版本不同，不能直接作配对比较");
   byKey.set(k,item);
  }
  let edgesTP=0,edgesFN=0,edgesFP=0,TP=0,FP=0,FN=0,criticalMisses=0;
