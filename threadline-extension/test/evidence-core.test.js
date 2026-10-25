@@ -295,6 +295,7 @@ test("withdrawal keeps history and stays idempotent", async () => {
       adopted.conclusionId,
       "理由",
       "op_wd000000002",
+      adopted.versionId,
     ),
   );
   assert.equal(withdrawn.status, "withdrawn");
@@ -312,7 +313,7 @@ test("withdrawal keeps history and stays idempotent", async () => {
   );
   assert.deepEqual(replay.replay, withdrawn);
   await assert.rejects(
-    Core.planWithdrawal(state, adopted.conclusionId, "再撤", "op_wd000000003"),
+    Core.planWithdrawal(state, adopted.conclusionId, "再撤", "op_wd000000003", adopted.versionId),
     /已撤回/,
   );
 });
@@ -800,6 +801,7 @@ test("non-adoption writes repair takeover for legacy evidence projects", async (
     w.conclusion.id,
     "理由",
     "op_repair000003",
+    w.conclusion.currentVersionId,
   );
   assert.equal(withdraw.writes.project.takeover, true);
   assert.equal(Core.exportPackage(state, "p1").project.takeover, true);
@@ -999,6 +1001,7 @@ test("amend replay is bound to raw user intent before current status", async () 
       first.conclusionId,
       "撤回",
       "op_raw00000004",
+      state.conclusions[first.conclusionId].currentVersionId,
     ),
   );
   state = await stateFrom(db);
@@ -1047,6 +1050,29 @@ test("stale withdraw is rejected without mutating the newer version; exact retry
   const replay = await Core.planWithdrawal(await stateFrom(db), adopted.conclusionId,
     "核对后撤回", "op_wdversion00004", amended.versionId);
   assert.deepEqual(replay.replay, accepted);
+});
+
+test("unguarded new withdrawal is rejected but legacy committed retry remains readable", async () => {
+  const db = mockIdb({ projects: { p1: Core.newProjectRecord("p1") } });
+  const adopted = await DB.applyPlan(db, await Core.planAdoption(
+    await stateFrom(db), adoption("原始结论"), "op_wdstrict000001"));
+  const state = await stateFrom(db);
+  await assert.rejects(
+    Core.planWithdrawal(state, adopted.conclusionId, "无版本", "op_wdstrict000002"),
+    /撤回需要当前版本 ID/,
+  );
+  await assert.rejects(
+    Core.planWithdrawal(state, adopted.conclusionId, "错误版本", "op_wdstrict000003", "not_a_version"),
+    /撤回需要当前版本 ID/,
+  );
+  assert.equal((await stateFrom(db)).conclusions[adopted.conclusionId].status, "adopted");
+  const oldId = "op_wdstrict000004", reason = "旧版本已提交操作";
+  const oldResult = { conclusionId: adopted.conclusionId, status: "withdrawn", revision: 2 };
+  state.operations[oldId] = {operationId: oldId, schema: 2, kind: "withdraw",
+    requestHash: await Core.hashRequest({schema: 2, kind: "withdraw",
+      input: {conclusionId: adopted.conclusionId, reason}}), result: oldResult};
+  const prior = await Core.planWithdrawal(state, adopted.conclusionId, reason, oldId);
+  assert.deepEqual(prior.replay, oldResult);
 });
 
 test("adoption, backup and project constructor reject inherited-key IDs", async () => {

@@ -400,10 +400,12 @@
         ...(expectedVersionId === undefined ? {} : { expectedVersionId }) },
       replay = await prior(s, "withdraw", input, operationId);
     if (replay) return { replay };
+    if (!isId(expectedVersionId, "ver_"))
+      throw Error("撤回需要当前版本 ID，请刷新后核对");
     const c = s.conclusions[id],
       project = c && s.projects[c.projectId];
     if (!c || !project) throw Error("结论不存在");
-    if (expectedVersionId !== undefined && expectedVersionId !== c.currentVersionId)
+    if (expectedVersionId !== c.currentVersionId)
       throw Error("结论已在其他窗口修订，请刷新后核对；未撤回当前版本");
     if (c.status === "withdrawn") throw Error("结论已撤回");
     const next = {
