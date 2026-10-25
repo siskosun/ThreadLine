@@ -898,6 +898,26 @@ async function evidenceBudget(state,plan) {
   // The same validator guards writes and imports, so saved metadata stays exportable.
   if(!plan.writes.project.deleted)await ThreadLineEvidenceCore.validateExportPackage(ThreadLineEvidenceCore.exportPackage(next,plan.writes.project.projectId));
 }
+function recordEvidenceChange(state,plan,operationId) {
+  const conclusion=plan.writes?.conclusion,prior=conclusion&&state.conclusions[conclusion.id];
+  if(!prior)return plan;
+  const next=evidenceStateAfter(state,plan);
+  const changed=ThreadLineResearchCore.recordChange(next,conclusion.projectId,{
+    triggerEventId:"evt_"+operationId.slice(3),conclusionId:conclusion.id,
+    fromVersion:prior.currentVersionId,toVersion:conclusion.currentVersionId,
+    kind:conclusion.status==="withdrawn"?"withdraw":"amend"
+  },{id:()=>"dep_"+crypto.randomUUID().replace(/-/g,""),at:Date.now()});
+  plan.writes.project.research=changed.research;return plan;
+}
+function carryEvidenceWording(state,plan) {
+  const version=plan.writes?.version,conclusion=plan.writes?.conclusion;
+  if(!version?.carryForward||version.changeImpact!=="wording"||!conclusion)return;
+  const carried=ThreadLineResearchCore.carryForward(evidenceStateAfter(state,plan),
+    conclusion.projectId,{conclusionId:conclusion.id,fromVersion:version.predecessorId,
+      toVersion:version.id,reason:"用户声明仅调整措辞并显式承接输入依赖"},
+    {id:()=>"dep_"+crypto.randomUUID().replace(/-/g,""),at:Date.now()});
+  plan.writes.project.research=carried.research;
+}
 function evidenceWorkflows() {
   if(!evidenceWorkflowsInstance)evidenceWorkflowsInstance=ThreadLineEvidenceWorkflows.create({chrome,Core:ThreadLineEvidenceCore,DB:ThreadLineEvidenceDB,
     Lifecycle:ThreadLineEvidenceLifecycle,Source:ThreadLineEvidenceSource,Research:ThreadLineResearchCore,TopicCore:ThreadLineCore,
@@ -1076,7 +1096,7 @@ async function handleEvidence(payload, sender) {
       let plan;
       if (payload.type === "EV_AMEND") {
         const input = {text:payload.text};
-        for (const field of ["conditions","fragments","expectedVersionId","changeImpact"])
+        for (const field of ["conditions","fragments","expectedVersionId","changeImpact","carryForward"])
           if (Object.prototype.hasOwnProperty.call(payload,field)) input[field] = payload[field];
         plan = await Core.planAmendment(state,payload.conclusionId,input,payload.operationId);
       } else if (payload.type === "EV_ADOPT") {
@@ -1097,6 +1117,11 @@ async function handleEvidence(payload, sender) {
         plan = await Core.planWithdrawal(state, payload.conclusionId, payload.reason, payload.operationId);
       else
         plan = await Core.importPackage(state, payload.pkg, payload.operationId);
+      if(payload.type==="EV_AMEND"||payload.type==="EV_WITHDRAW"){
+        const wording=payload.type==="EV_AMEND"&&plan.writes?.version?.changeImpact==="wording"&&plan.writes?.version?.carryForward;
+        if(wording)carryEvidenceWording(state,plan);
+        else recordEvidenceChange(state,plan,payload.operationId);
+      }
       await evidenceBudget(state,plan);
       const result = await ThreadLineEvidenceDB.applyPlan(db,plan);
       // Once authority committed, projection failure must never report the write as failed.

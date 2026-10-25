@@ -610,8 +610,8 @@
           links:Object.fromEntries(pkg.links.map(l=>[l.id,l])),projects:{[pkg.projectId]:pkg.project}};
         research.validateResearch(pkg.project.research,state,pkg.projectId);
         if((pkg.project.research.reviews||[]).length||
-          (pkg.project.research.events||[]).some(e=>["change","reviewCompleted"].includes(e.kind)))
-          throw Error("此研究备份包含 S3/S4 的变化或复核历史；S2 独立版本不会降级覆盖，请使用完整版本恢复");
+          (pkg.project.research.events||[]).some(e=>e.kind==="reviewCompleted"))
+          throw Error("此备份包含 S4 复核历史；S3 独立版本不会降级覆盖，请使用完整版本恢复");
       }
       if(pkg.project.handoffs) {
         if(!Array.isArray(pkg.project.handoffs)||pkg.project.handoffs.length>100)throw Error("交接历史数量无效");

@@ -97,13 +97,19 @@
         if(v.conditions)lines.push("适用条件："+v.conditions);
         for(const l of Object.values(state.links).filter(l=>l.versionId===v.id)){const s=state.sources[l.sourceId];lines.push("依据（"+l.relation+"；"+s.completeness+"）："+s.selection,"来源："+(s.url||s.conversationId||"仅片段")+"；消息 "+(s.messageId||"未知")+"；来源哈希 "+s.textHash);}
       }
+      const pendingEdges=Research.inspect(state,id).edges.filter(e=>e.active&&e.status==="pending");
+      if(pendingEdges.length)lines.push("","待核对必要前提：",...pendingEdges.map(e=>e.upstreamConclusionId+" → "+e.downstreamConclusionId+"："+e.reason));
+      for(const event of Research.notifications(state,id))
+        for(const target of event.affected.filter(r=>r.pending))
+          lines.push("[待核对影响] "+target.conclusionId+"；根结论 "+event.conclusionId+" 版本变更 "+
+            event.fromVersion+" → "+event.toVersion+"；不能据此断言下游判断为假。");
       lines.push("","已知未知项：来源可能只含文本或选区；未逐项核验。复制、人工看过与模型理解是不同事实。");
       const text=lines.join("\n");if(Core.bytes(text)>128*1024)throw Error("交接材料超过 128 KiB，请缩小课题范围或使用完整备份；未截断");return text;
     }
     const commands=new Set(["EV_PROJECTS","EV_BACKUP","EV_DELETE_PREVIEW","EV_DELETE_COMMIT",
       "EV_RESTORE_PREVIEW","EV_RESTORE_COMMIT","EV_ADOPT_CAPTURE","EV_ADOPT_FORK",
       "EV_HANDOFF_PREPARE","EV_HANDOFF_VALIDATE","EV_HANDOFF_RECORD",
-      "EV_RESEARCH_LIST","EV_RESEARCH_COMMAND","EV_DEPENDENCY_PROMPT","EV_SUGGESTIONS_PREVIEW"]);
+      "EV_RESEARCH_LIST","EV_RESEARCH_COMMAND","EV_DEPENDENCY_PROMPT","EV_SUGGESTIONS_PREVIEW","EV_IMPACT_CONTEXT"]);
     async function handle(payload) {
       if(!commands.has(payload.type))return undefined;
       return env.serialize(async()=>{
@@ -186,7 +192,24 @@
           return commit(authority,{replay:replay.result});
         }
         const currentScope=scope(state,id),scopeHash=await Core.hashRequest(currentScope),inspected=Research.inspect(state,id);
-        if(type==="EV_RESEARCH_LIST")return {project:p,rows:env.rows(state,id),...inspected,scopeHash};
+        if(type==="EV_RESEARCH_LIST")return {project:p,rows:env.rows(state,id),...inspected,scopeHash,notifications:Research.notifications(state,id)};
+        if(type==="EV_IMPACT_CONTEXT"){
+          const event=inspected.research.events.find(e=>e.kind==="change"&&e.triggerEventId===payload.triggerEventId);
+          if(!event || !event.affected.some(row=>row.conclusionId===payload.targetConclusionId))
+            throw Error("该变更与目标结论无关联");
+          const before=state.versions[event.fromVersion],after=state.versions[event.toVersion];
+          const target=state.conclusions[payload.targetConclusionId],current=state.versions[target?.currentVersionId];
+          if(!before||!after||!current||target.projectId!==id)throw Error("核查材料的版本身份无效");
+          const excerpts=version=>Object.values(state.links).filter(l=>l.versionId===version.id).map(l=>({
+            relation:l.relation,selection:state.sources[l.sourceId]?.selection||"",
+            completeness:state.sources[l.sourceId]?.completeness||"unknown",
+            url:state.sources[l.sourceId]?.url||null
+          }));
+          return {triggerEventId:event.triggerEventId,scopeRevision:p.evidenceRevision,
+            changeKind:event.changeKind,before:{text:before.text,conditions:before.conditions,sources:excerpts(before)},
+            after:{text:after.text,conditions:after.conditions,sources:excerpts(after)},
+            target:{id:target.id,text:current.text,conditions:current.conditions,sources:excerpts(current)}};
+        }
         if(type==="EV_DEPENDENCY_PROMPT")return {scopeHash,prompt:"请仅建议必须成立的前提关系，不推断事实真伪。返回 JSON {scopeHash,proposals:[{upstreamConclusionId,downstreamConclusionId,reason}]}；没有可靠关系时 proposals 为空。每条建议仍须人工确认。\\nscopeHash="+scopeHash+"\\n"+JSON.stringify(env.rows(state,id).map(r=>({id:r.conclusion.id,version:r.current.id,text:r.current.text,conditions:r.current.conditions})))};
         if(type==="EV_SUGGESTIONS_PREVIEW"){
           if(typeof payload.json!=="string"||Core.bytes(payload.json)>200*1024)throw Error("建议文件超过 200 KiB");
@@ -204,10 +227,11 @@
           if(!["addDependency","removeDependency","confirmDependency"].includes(payload.command?.kind))
             throw Error("S2 仅允许人工必要依赖操作");
           const command={...payload.command,scopeManifestHash:scopeHash};
-          // S2 never silently acknowledges S3 change events; explicit
-          // per-event coverage only arrives with S3's dedicated review UI.
-          if(command.kind==="confirmDependency")command.coveredChanges=[];
-          else delete command.coveredChanges;
+          if(command.kind==="confirmDependency"){
+            if(payload.command.coveredChanges!==undefined&&!Array.isArray(payload.command.coveredChanges))
+              throw Error("变更确认必须逐项登记具体事件");
+            command.coveredChanges=payload.command.coveredChanges||[];
+          } else delete command.coveredChanges;
           const changed=Research.update(state,id,command,{id:recordId,at:Date.now()});
           return commit(authority,await planMetadata(state,id,payload,changed.research,undefined,changed.result));
         }

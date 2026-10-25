@@ -5,6 +5,7 @@ test("S2 extends S1 without exposing S3-S5 worker commands or UI",()=>{
  const background=ext("background.js"),workflows=ext("evidence-workflows.js"),html=ext("panel.html");
  assert.ok(background.includes('research-core.js'));
  assert.ok(workflows.includes("EV_RESEARCH_COMMAND"));
+ assert.ok(workflows.includes("EV_IMPACT_CONTEXT"));
  assert.ok(!workflows.includes("EV_REVIEW_PREPARE"));
  assert.ok(!workflows.includes("EV_REVIEW_COMPLETE"));
  assert.ok(!html.includes('src="research-ui.js"'));
