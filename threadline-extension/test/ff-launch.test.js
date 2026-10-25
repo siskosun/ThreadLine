@@ -11,7 +11,7 @@ const CaptureCore = require('../capture-core.js');
 // Background-level tests for the P2 dual-branch engine. The 0-send invariant is
 // asserted at the code level: every tab message and every tab creation is
 // recorded and inspected.
-function system() {
+function system({captureInjectionFails=false}={}) {
   const records = new Map(), runs = new Map(), pageStore = new Map();
   const session = new Map(), local = new Map(), events = {}, sent = [], newTabs = [], updates = [];
   let nextTab = 100;
@@ -60,7 +60,7 @@ function system() {
         return {ok:true};
       }
     },
-    scripting:{async executeScript(){}},
+    scripting:{async executeScript(){if(captureInjectionFails)throw Error('SIMULATED_INJECTION_FAILURE')}},
     sidePanel:{setPanelBehavior:async()=>{}},
     storage:{
       local:{async get(k){return {[k]:local.get(k)};},async set(v){for(const [k,x] of Object.entries(v))local.set(k,x);}},
@@ -459,4 +459,31 @@ test('K=4: FF_CAPTURE and FF_REPREFILL address every branch of the experiment',a
     branch:'E'},s.ffSender),/invalid branch/);
   await assert.rejects(s.message({type:'FF_REPREFILL',experimentId:created.id,
     branch:'E',operationId:'k4re_000000002'},s.ffSender),/invalid branch/);
+});
+
+test('F3 startup injection failure is visible and cannot masquerade as capturing',async()=>{
+  const s=system({captureInjectionFails:true});
+  const created=await s.setupExperiment('create_op_failinject_0001');
+  const launched=await s.message({type:'FF_LAUNCH',experimentId:created.id,
+    operationId:'launch_op_failinject_0001'},s.ffSender);
+  const tabId=launched.tabIds.A;
+  await s.message({type:'HANDOFF_BEGIN'},s.tabSender(tabId,'https://chatgpt.com/'));
+  await s.message({type:'HANDOFF_ACK'},s.tabSender(tabId,'https://chatgpt.com/'));
+  const conv='https://chatgpt.com/c/synthetic-f3-error';
+  s.tabsById.get(tabId).url=conv;
+  await s.message({type:'OBSERVE',href:conv,title:'合成失败会话',streaming:false,
+    assistantBytes:50},s.tabSender(tabId,conv));
+  const started=await s.message({type:'FF_CAPTURE',experimentId:created.id,branch:'A'},s.ffSender);
+  assert.equal(started.started,false,'injection failure must not report capture started');
+  assert.match(started.error,/SIMULATED_INJECTION_FAILURE/);
+  assert.equal(s.runs.get(started.runId).status,'error','source run keeps failure metadata');
+  const info=await s.message({type:'FF_CAPTURE_STATUS',experimentId:created.id,
+    branch:'A',runId:started.runId},s.ffSender);
+  assert.equal(info.state,'error');
+  assert.match(info.error,/SIMULATED_INJECTION_FAILURE/);
+  assert.equal(info.branchStatus,'pending','the branch is not falsely completed');
+  await assert.rejects(s.message({type:'FF_CAPTURE_STATUS',experimentId:created.id,
+    branch:'B',runId:started.runId},s.ffSender),/does not belong|invalid|capture/i);
+  assert.ok(!s.sent.some(([,type])=>type==='TL_CAPTURE_START'),
+    'failed injection must not send a capture start to any tab');
 });
