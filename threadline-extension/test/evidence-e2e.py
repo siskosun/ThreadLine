@@ -157,7 +157,12 @@ def run():
             panel.on("pageerror", lambda error: panel_errors.append(str(error)))
             panel.reload(wait_until="domcontentloaded")
             panel.get_by_role("tab", name="证据与交接").click()
-            panel.locator("#evidence-accordion > summary").click()
+            # Research navigation may already expand the accordion. Do not
+            # accidentally close it by blindly toggling the summary.
+            accordion = panel.locator("#evidence-accordion")
+            if accordion.get_attribute("open") is None:
+                accordion.locator("summary").click()
+            assert accordion.get_attribute("open") is not None
             panel.wait_for_function(
                 "id => [...document.querySelector('#evidence-project').options]"
                 ".some(option => option.value === id)", arg=project_id)
