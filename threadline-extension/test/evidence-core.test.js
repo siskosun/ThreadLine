@@ -304,3 +304,33 @@ test('actual DB snapshot indexes the durable operation ledger by operationId', a
   assert.deepEqual(snapshot.operations['op_snapshot001'],row);
   assert.equal(snapshot.operations.undefined,undefined);
 });
+
+test('backup validation rejects detached versions and source excerpts', async () => {
+  const state={conclusions:{},versions:{},sources:{},links:{},projects:{p1:Core.newProjectRecord('p1')},operations:{}};
+  const plan=await Core.planAdoption(state,adoption('成链结论'),'op_orphan000001'),w=plan.writes;
+  for(const [n,x] of [['conclusions',w.conclusion],['versions',w.version],['projects',w.project],['operations',w.ledger]]) state[n][n==='projects'?x.projectId:n==='operations'?x.operationId:x.id]=x;
+  w.sources.forEach(x=>state.sources[x.id]=x); w.links.forEach(x=>state.links[x.id]=x);
+  const pkg=Core.exportPackage(state,'p1');
+  const detached=structuredClone(pkg);
+  detached.versions.push({...detached.versions[0],id:'ver_detached001',predecessorId:null});
+  await assert.rejects(Core.validateExportPackage(detached),/孤立版本/);
+  const orphanSource=structuredClone(pkg);
+  orphanSource.sources.push({...orphanSource.sources[0],id:'src_orphan00001'});
+  await assert.rejects(Core.validateExportPackage(orphanSource),/孤立来源/);
+  const dangling=structuredClone(pkg);
+  dangling.links[0].sourceId='src_missing0001';
+  await assert.rejects(Core.validateExportPackage(dangling),/来源链接/);
+});
+
+test('non-adoption writes repair takeover for legacy evidence projects', async () => {
+  const state={conclusions:{},versions:{},sources:{},links:{},projects:{p1:Core.newProjectRecord('p1')},operations:{}};
+  const first=await Core.planAdoption(state,adoption('旧记录'),'op_repair000001'),w=first.writes;
+  state.conclusions[w.conclusion.id]=w.conclusion;state.versions[w.version.id]=w.version;w.sources.forEach(x=>state.sources[x.id]=x);w.links.forEach(x=>state.links[x.id]=x);
+  state.projects.p1={...w.project,takeover:false};
+  const amend=await Core.planAmendment(state,w.conclusion.id,{text:'修订'},'op_repair000002');
+  assert.equal(amend.writes.project.takeover,true);
+  state.projects.p1={...w.project,takeover:false};
+  const withdraw=await Core.planWithdrawal(state,w.conclusion.id,'理由','op_repair000003');
+  assert.equal(withdraw.writes.project.takeover,true);
+  assert.equal(Core.exportPackage(state,'p1').project.takeover,true);
+});
