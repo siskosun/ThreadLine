@@ -1030,6 +1030,25 @@ test("stale editor cannot amend a newer version, but its committed retry still r
   assert.deepEqual(retry.replay, first);
 });
 
+test("stale withdraw is rejected without mutating the newer version; exact retry still replays", async () => {
+  const db = mockIdb({ projects: { p1: Core.newProjectRecord("p1") } });
+  const adopted = await DB.applyPlan(db, await Core.planAdoption(
+    await stateFrom(db), adoption("初版"), "op_wdversion00001"));
+  const amended = await DB.applyPlan(db, await Core.planAmendment(
+    await stateFrom(db), adopted.conclusionId,
+    { text: "新版本", expectedVersionId: adopted.versionId }, "op_wdversion00002"));
+  const before = await stateFrom(db);
+  await assert.rejects(Core.planWithdrawal(before, adopted.conclusionId,
+    "旧窗口撤回", "op_wdversion00003", adopted.versionId), /其他窗口修订/);
+  assert.deepEqual(await stateFrom(db), before);
+  const accepted = await DB.applyPlan(db, await Core.planWithdrawal(before,
+    adopted.conclusionId, "核对后撤回", "op_wdversion00004", amended.versionId));
+  assert.equal(accepted.status, "withdrawn");
+  const replay = await Core.planWithdrawal(await stateFrom(db), adopted.conclusionId,
+    "核对后撤回", "op_wdversion00004", amended.versionId);
+  assert.deepEqual(replay.replay, accepted);
+});
+
 test("adoption, backup and project constructor reject inherited-key IDs", async () => {
   for (const projectId of ["__proto__", "constructor", "prototype", "toString", "valueOf", "hasOwnProperty", "toLocaleString", "__defineGetter__", "bad/id", "", "x".repeat(129)]) {
     assert.equal(Core.validProjectId(projectId), false, projectId);
