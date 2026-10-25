@@ -129,7 +129,7 @@
     const branch = decision.mapping[label];
     const attempt = value.branches[branch] && value.branches[branch].attempts.at(-1);
     const reply = replyText || "";
-    const sessionId = attempt && attempt.evidence && attempt.evidence.sessionId;
+    const evidence = attempt && attempt.evidence;
     const status = document.createElement("span");
     status.className = "subtle";
     const adopt = document.createElement("button");
@@ -138,23 +138,19 @@
     adopt.addEventListener("click", async () => {
       adopt.disabled = true;
       try {
-        const snapshot = await chrome.storage.local.get("threadline_state_v1");
-        const projects = ((snapshot["threadline_state_v1"] || {}).projects) || [];
-        if (!projects.length) throw new Error("尚无课题：请先在研线面板创建课题");
-        const names = projects.map(p => p.id + "：" + (p.name || p.id)).join("\n");
-        const chosen = prompt("采纳到哪个课题？\n" + names + "\n（输入课题 ID）", projects[0].id);
-        if (!chosen) return;
-        const project = projects.find(p => p.id === chosen);
-        if (!project) throw new Error("课题不存在：" + chosen);
-        const result = await send({ type: "EV_ADOPT", projectId: project.id,
-          text: "【Fork " + value.id.slice(0, 12) + " · " + label + "】" + reply.slice(0, 3900),
-          fragments: [{
-            selection: reply.slice(0, 2000), before: "", after: "",
-            relation: "cites", completeness: "complete", kind: "capture",
-            conversationId: sessionId || null
-          }],
-          operationId: "op_adopt_" + crypto.randomUUID().replace(/-/g, "").slice(0, 10) });
-        status.textContent = result.dedupe ? "已存在相同采纳（未重复创建）" : "已采纳：" + result.conclusionId.slice(0, 14) + "…";
+        if (!evidence?.captureRunId || !evidence?.messageId || !reply)
+          throw new Error("此旧实验缺少完整回复来源，无法精确采纳；请重新采集该分支");
+        await ThreadLineEvidenceAdoption.open({sources:[{
+          label:"Fork " + label + " · 已采集最终回复",
+          experimentId:value.id,branch:branch,attemptId:attempt.id,
+          captureRunId:evidence.captureRunId,messageId:evidence.messageId,
+          coverage:evidence.captureComplete?"原始采集：分页完成":"原始采集：部分历史",
+          nonText:!!evidence.hasNonText,aiCoverage:"不适用（Fork 原始回复）"
+        }],submit:form=>send({type:"EV_ADOPT_FORK",projectId:form.projectId,text:form.text,conditions:form.conditions,
+          experimentId:value.id,branch:form.source.branch,attemptId:form.source.attemptId,
+          selection:form.selection,relation:form.relation,
+          operationId:"op_fork_adopt_"+crypto.randomUUID().replace(/-/g,"").slice(0,12)})});
+        status.textContent = "已提交采纳；请在研线面板的证据结论中查看。";
       } catch (e) { status.textContent = "采纳失败：" + e.message; }
       finally { adopt.disabled = false; }
     });

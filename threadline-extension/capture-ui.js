@@ -52,13 +52,35 @@
     }catch(e){showError("读取采集结果失败："+e.message);}
     finally{watchBusy=false;}
   }
-  function row(title,items){
+  function sourcesForCandidate(item){
+    if(!currentRun)return [];
+    const refs=Array.isArray(item.sources)?item.sources:(item.source?[item.source]:[]);
+    const indexes=refs.map(n=>Number(String(n).replace(/^M/i,""))-1).filter(n=>Number.isInteger(n)&&n>=0&&messages[n]);
+    // A candidate without a model/rule reference is not silently attached to a
+    // summary. The user must choose an actual captured message in the dialog.
+    const candidates=indexes.length?indexes:messages.map((_,n)=>n);
+    return [...new Set(candidates)].slice(0,200).map(n=>{const m=messages[n];return {
+      label:`M${n+1} · ${m.role||"未知"} · ${String(m.content||"").slice(0,80)}`,
+      captureRunId:currentRun.id,messageIndex:n,coverage:currentRun.complete?"原始采集：分页完成":"原始采集：部分历史",
+      nonText:!!m.hasNonText,aiCoverage:currentRun.aiCoverage?.complete?"本次采集全部文本":"未确认或部分",messageId:m.id||null
+    };});
+  }
+  async function adoptCandidate(item){
+    try { await ThreadLineEvidenceAdoption.open({sources:sourcesForCandidate(item),submit:form=>reply({
+      type:"EV_ADOPT_CAPTURE",projectId:form.projectId,text:form.text,conditions:form.conditions,
+      selections:[{captureRunId:form.source.captureRunId,messageIndex:form.source.messageIndex,selection:form.selection,relation:form.relation}],
+      operationId:"op_capture_adopt_"+crypto.randomUUID().replace(/-/g,"").slice(0,12)
+    })}); }
+    catch(e){$("report-promote-hint").textContent="无法采纳此条："+e.message;}
+  }
+  function row(title,items,adoptable=false){
     const host=document.createElement("section");host.className="digest-group";
     const h=document.createElement("h3");h.textContent=title;host.appendChild(h);
     const ul=document.createElement("ul");host.appendChild(ul);
     if(!items.length){const li=document.createElement("li");li.textContent="本次提取没有发现明确条目";ul.appendChild(li);}
     for(const item of items){const li=document.createElement("li");const t=document.createElement("span");t.textContent=item.text;li.appendChild(t);
-      if(item.sources?.length){const src=document.createElement("span");src.className="source";src.textContent=` [模型引用 ${item.sources.map(n=>`M${n}`).join(", ")}]`;li.appendChild(src);}else if(item.source){const src=document.createElement("span");src.className="source";src.textContent=` [消息 ${item.source}]`;li.appendChild(src);}else if(brief?.mode==="ai"){const src=document.createElement("span");src.className="source";src.textContent=" [未提供来源编号]";li.appendChild(src);}ul.appendChild(li);
+      if(item.sources?.length){const src=document.createElement("span");src.className="source";src.textContent=` [模型引用 ${item.sources.map(n=>`M${n}`).join(", ")}]`;li.appendChild(src);}else if(item.source){const src=document.createElement("span");src.className="source";src.textContent=` [消息 ${item.source}]`;li.appendChild(src);}else if(brief?.mode==="ai"){const src=document.createElement("span");src.className="source";src.textContent=" [未提供来源编号，请手选原始消息]";li.appendChild(src);}
+      if(adoptable){const btn=document.createElement("button");btn.type="button";btn.className="secondary";btn.textContent="采纳此条为证据结论";btn.addEventListener("click",()=>adoptCandidate(item));li.appendChild(btn);}ul.appendChild(li);
     }
     return host;
   }
@@ -82,7 +104,7 @@
     $("ai-reset").hidden=brief.mode!=="ai";
     const holder=$("report-groups");holder.replaceChildren();
     if(brief.latestQuestion)holder.appendChild(row("最近的研究提问",[{text:brief.latestQuestion}]));
-    holder.appendChild(row(brief.mode==="ai"?"关键结论（需核查）":"结论线索（需核查）",brief.conclusions));
+    holder.appendChild(row(brief.mode==="ai"?"关键结论（需核查）":"结论线索（需核查）",brief.conclusions,true));
     if(brief.mode==="ai")holder.appendChild(row("已完成的工作",brief.completed));
     holder.appendChild(row("未解决与证据缺口",brief.pending));
     if(brief.mode==="ai")holder.appendChild(row("已否定或被替代的方案",brief.superseded));
@@ -112,37 +134,15 @@
   let promoteDraft=null;
   async function promoteAnalysisToProject(){
     if(!currentRun?.aiReport || !brief || !linkedProjectId){aiStatus('请先完成 AI 分析并关联进行中的课题',true);return;}
-    try {
-      const snap=await reply({type:'SNAPSHOT'});
-      const key=`chat:${currentRun.conversationId}`;
-      const linked=snap.state.chats[key];
-      const project=snap.state.projects.find(p=>p.id===linkedProjectId);
-      if(!linked || linked.projectId!==linkedProjectId || !project || project.stage!=='active')throw new Error('来源对话不在进行中的课题中');
-      const proposed=(brief.conclusions||[]).slice(0,3).map(row=>row.text).join('；').slice(0,950);
-      if(!proposed)throw new Error('没有可发布的结论候选');
-      promoteDraft={projectId:project.id,key,revision:snap.state.revision,runId:currentRun.id};
-      $('promote-review-text').value=proposed;
-      $('promote-review-check').checked=false;
-      $('promote-review-save').disabled=true;
-      $('promote-review-notice').textContent=`目标课题：${project.name}。${currentRun.complete?'分页采集已结束，但仍需核验历史覆盖':'历史采集不完整，尤其需要核对缺失的证据'}。本操作不关闭课题、不改变其他分支研究。`;
-      $('promote-review').hidden=false;
-      $('promote-review-text').focus();
-    }catch(e){$('report-promote-hint').textContent='无法打开审核：'+e.message;}
+    const candidate=(brief.conclusions||[])[0];
+    if(!candidate){$('report-promote-hint').textContent='没有可采纳的结论候选';return;}
+    await adoptCandidate(candidate);
   }
   function cancelPromote(){promoteDraft=null;$('promote-review').hidden=true;$('promote-review-check').checked=false;}
   async function savePromoted(){
-    if(!promoteDraft || !$('promote-review-check').checked)return;
-    const decision=$('promote-review-text').value.trim();
-    if(!decision){$('report-promote-hint').textContent='有效结论不能为空';return;}
-    try {
-      const target=promoteDraft;
-      if(!currentRun || currentRun.id!==target.runId)throw new Error('来源报告已切换，未发布');
-      await reply({type:'MUTATE',action:{type:'updateProject',expectedRevision:target.revision,projectId:target.projectId,sourceKey:target.key,patch:{decision}}});
-      cancelPromote();
-      const fresh=await ThreadLineCaptureDB.getRun(currentRun.id);
-      if(fresh)await showReport(fresh);
-      $('report-promote-hint').textContent='经人工确认的有效结论已发布，其他分支将显示具体变化。';
-    }catch(e){$('report-promote-hint').textContent='发布未完成：'+e.message+'。如其他窗口有更新，请关闭并重新审核。';}
+    // Kept only for older panel markup. New flow is per-candidate adoption.
+    cancelPromote();
+    $('report-promote-hint').textContent='请使用候选条目旁的“采纳此条为证据结论”。';
   }
   async function remoteAction(action){
     if(!currentRun || currentRun.status!=="done")return;
