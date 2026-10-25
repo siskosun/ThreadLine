@@ -52,8 +52,8 @@ test("browser bundle runs under an isolated script-src self CSP", async (t) => {
   const browser = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
   if (!require("node:fs").existsSync(browser)) return t.skip("Chrome is unavailable on this host");
   const extension = join(__dirname, "..");
-  const build = spawnSync(process.execPath, ["scripts/build-argdown.mjs"], { cwd: extension, encoding: "utf8" });
-  assert.equal(build.status, 0, build.stderr);
+  const reproduction = spawnSync(process.execPath, ["scripts/check-argdown-build.mjs"], { cwd: extension, encoding: "utf8" });
+  assert.equal(reproduction.status, 0, reproduction.stderr);
   const bundle = readFileSync(join(extension, "vendor", "argdown-adapter.js"), "utf8");
   assert.doesNotMatch(bundle, /\beval\s*\(|\bnew\s+Function\b/);
   const probe = `try { const result = ThreadLineArgdown.parse("[con_abcdefgh]: A\\n  +> [con_ijklmnop]: B"); document.body.textContent = "TL_ARGDOWN_OK " + JSON.stringify(result.relations); } catch (error) { document.body.textContent = "TL_ARGDOWN_ERROR " + error.message; }`;

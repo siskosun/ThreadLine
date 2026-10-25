@@ -11,7 +11,8 @@
     "test:e2e": "python test/extension-e2e.py && python test/handoff-e2e.py && python test/ff-core-e2e.py && python test/evidence-e2e.py",
     "check:plan": "node ../scripts/check-plan.mjs",
     "build:argdown": "node scripts/build-argdown.mjs",
-    "argdown:preview": "node scripts/argdown-preview.mjs"
+    "argdown:preview": "node scripts/argdown-preview.mjs",
+    "check:argdown-build": "node scripts/check-argdown-build.mjs"
   },
   "engines": {
     "node": ">=22"
@@ -19,5 +20,8 @@
   "devDependencies": {
     "@argdown/core": "2.0.1",
     "esbuild": "0.25.2"
+  },
+  "overrides": {
+    "lodash-es": "4.18.1"
   }
 }
