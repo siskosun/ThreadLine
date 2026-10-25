@@ -28,11 +28,11 @@ function fixture(){
    c.events.push({id:"event_"+j,kind,rootConclusionId,critical:j===0,sourceCorpusSha256,carryForwardConfirmed,
      goldAffectedIds,frozenState});
    observations.records.push({caseId:c.id,eventId:"event_"+j,arms:{
-    A:{correctContinuation:false,wronglyRevisedTrueClaim:false,elapsedMs:100000,humanInterventions:3,modelCalls:2,
+    A:{correctContinuation:false,wronglyRevisedTrueClaim:false,elapsedMs:100000,learningMs:0,humanInterventions:3,modelCalls:2,
       receiptId:"synthetic-A-"+i+"-"+j,modelVersion:"synthetic",sourceCorpusSha256},
-    B:{correctContinuation:true,wronglyRevisedTrueClaim:false,elapsedMs:70000,humanInterventions:1,modelCalls:1,
+    B:{correctContinuation:true,wronglyRevisedTrueClaim:false,elapsedMs:70000,learningMs:0,humanInterventions:1,modelCalls:1,
       receiptId:"synthetic-B-"+i+"-"+j,modelVersion:"synthetic",sourceCorpusSha256},
-    C:{correctContinuation:false,wronglyRevisedTrueClaim:true,elapsedMs:120000,humanInterventions:4,modelCalls:3,
+    C:{correctContinuation:false,wronglyRevisedTrueClaim:true,elapsedMs:120000,learningMs:0,humanInterventions:4,modelCalls:3,
       receiptId:"synthetic-C-"+i+"-"+j,modelVersion:"synthetic",sourceCorpusSha256}
    }});
   }
@@ -95,4 +95,15 @@ test("cluster comparisons use independent cases, not thirty independent trials",
  assert.equal(result.caseSummary.meanAccuracyDeltaBvsA,1);
  assert.equal(result.caseSummary.clusterIntervals.deltaBvsA.method.includes("case-cluster"),true);
  assert.equal(result.caseSummary.medianBvsAGain,0.3);
+});
+
+test("learning overhead is included in screening and separately disclosed",()=>{
+ const {protocol,observations,hash}=fixture();
+ observations.records[0].arms.B.learningMs=50000;
+ const result=evaluateData(protocol,observations,hash);
+ assert.equal(result.cases[0].gainBvsA,0.2);
+ assert.equal(result.cases[0].gainBvsAExcludingLearning,0.3);
+ assert.equal(result.caseSummary.medianBvsAGainExcludingLearning,0.3);
+ delete observations.records[0].arms.B.learningMs;
+ assert.throws(()=>evaluateData(protocol,observations,hash),/学习成本/);
 });

@@ -16,7 +16,8 @@
           "modelCalls": null,
           "receiptId": null,
           "modelVersion": null,
-          "sourceCorpusSha256": null
+          "sourceCorpusSha256": null,
+          "learningMs": null
         },
         "B": {
           "correctContinuation": null,
@@ -26,7 +27,8 @@
           "modelCalls": null,
           "receiptId": null,
           "modelVersion": null,
-          "sourceCorpusSha256": null
+          "sourceCorpusSha256": null,
+          "learningMs": null
         },
         "C": {
           "correctContinuation": null,
@@ -36,7 +38,8 @@
           "modelCalls": null,
           "receiptId": null,
           "modelVersion": null,
-          "sourceCorpusSha256": null
+          "sourceCorpusSha256": null,
+          "learningMs": null
         }
       }
     }
