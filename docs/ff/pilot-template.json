@@ -1,1 +1,23 @@
-{"note":"S2 frozen-truth template only; synthetic identifiers do not demonstrate benefit.","cases":[{"id":"synthetic-example","truthEdges":[{"upstream":"con_input","downstream":"con_decision"}],"enteredEdges":[{"upstream":"con_input","downstream":"con_decision"}],"events":[{"id":"synthetic-change","truthAffected":["con_decision"],"predictedAffected":["con_decision"],"criticalAffected":["con_decision"]}],"operationLog":[{"at":0,"action":"synthetic-only"}]}]}
+{
+  "note": "S2 frozen-truth protocol template only. All IDs and observations are synthetic; this file is not a real study and cannot pass the six-case gate.",
+  "protocolVersion": "threadline-s2-pilot/1",
+  "frozenAt": "2026-10-25T00:00:00Z",
+  "cases": [
+    {
+      "id": "synthetic_case_one",
+      "conclusionIds": ["con_input0001", "con_decision01", "con_downstream1"],
+      "truthEdges": [
+        {"upstreamConclusionId": "con_input0001", "downstreamConclusionId": "con_decision01"},
+        {"upstreamConclusionId": "con_decision01", "downstreamConclusionId": "con_downstream1"}
+      ],
+      "criticalTruthEdges": [{"upstreamConclusionId": "con_input0001", "downstreamConclusionId": "con_decision01"}],
+      "enteredEdges": [{"upstreamConclusionId": "con_input0001", "downstreamConclusionId": "con_decision01"}],
+      "events": [{"id": "synthetic-change-1", "changedIds": ["con_input0001"], "truthAffected": ["con_decision01", "con_downstream1"], "criticalAffected": ["con_decision01"]}],
+      "operationLog": [
+        {"kind": "registration", "startMs": 0, "endMs": 12000, "baselineMs": 12000},
+        {"kind": "review", "startMs": 13000, "endMs": 21000, "baselineMs": 9000},
+        {"kind": "continuation", "startMs": 22000, "endMs": 36000, "baselineMs": 18000, "correct": true}
+      ]
+    }
+  ]
+}
