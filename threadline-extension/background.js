@@ -1,5 +1,5 @@
 importScripts("core.js", "backup-core.js", "capture-core.js", "capture-db.js", "organize-core.js", "ff-core.js", "ff-db.js",
-  "evidence-core.js", "evidence-db.js", "evidence-source.js", "evidence-lifecycle.js", "evidence-workflows.js");
+  "research-core.js", "evidence-core.js", "evidence-db.js", "evidence-source.js", "evidence-lifecycle.js", "evidence-workflows.js");
 const STORE_KEY = "threadline_state_v1";
 const SNAPSHOT_KEY = "threadline_state_snapshots";
 const CAPTURE_PREFIX = "tl_capture_owner_";
@@ -900,7 +900,7 @@ async function evidenceBudget(state,plan) {
 }
 function evidenceWorkflows() {
   if(!evidenceWorkflowsInstance)evidenceWorkflowsInstance=ThreadLineEvidenceWorkflows.create({chrome,Core:ThreadLineEvidenceCore,DB:ThreadLineEvidenceDB,
-    Lifecycle:ThreadLineEvidenceLifecycle,Source:ThreadLineEvidenceSource,TopicCore:ThreadLineCore,
+    Lifecycle:ThreadLineEvidenceLifecycle,Source:ThreadLineEvidenceSource,Research:ThreadLineResearchCore,TopicCore:ThreadLineCore,
     CaptureDB:{getRun:(...args)=>ThreadLineCaptureDB.getRun(...args),pages:(...args)=>ThreadLineCaptureDB.pages(...args)},
     CaptureCore:{assemble:(...args)=>ThreadLineCaptureCore.assemble(...args)},FFDB:{read:(...args)=>ThreadLineFFDB.read(...args)},db:evidenceDb,serialize,
     loadAuthority:loadEvidenceAuthorityLocked,reconcile:reconcileEvidenceLocked,rows:evidenceRows,budget:evidenceBudget});
