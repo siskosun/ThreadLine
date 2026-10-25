@@ -26,7 +26,8 @@ def run():
      "fragments":[{"selection":"依据 "+s,"relation":"cites","completeness":"partial"}],
      "operationId":"op_s5adopt_"+s})
    a,b=adopt("one"),adopt("two")
-   page.locator("#argdown-loader").evaluate("(e)=>e.open=true")
+   page.locator("#nav-evidence").click()
+   page.locator("#argdown-loader > summary").click()
    page.locator("#argdown-loader button").click()
    page.wait_for_function("()=>typeof ThreadLineArgdown === 'object' && !!document.getElementById('argdown-workbench')",timeout=15000)
    assert page.evaluate("ThreadLineArgdownUI.relationKind('attack')")=="oppose"
