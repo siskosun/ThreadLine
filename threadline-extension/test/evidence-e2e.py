@@ -349,6 +349,19 @@ def run():
                         link["id"] = f"lnk_collision_{i:08d}"; link["versionId"] = vmap[link["versionId"]]
                     source = bad["sources"][0]; source["selection"] = "不得覆盖旧来源"
                     source["textHash"] = hashlib.sha256((source["before"] + source["selection"] + source["after"]).encode()).hexdigest()
+                    # S3+ research events reference exact conclusion/version IDs.
+                    # First verify the mutated graph is rejected without writes.
+                    # Then use a fresh, empty but valid research manifest so
+                    # the source-ID collision is actually reached and tested.
+                    if bad.get("project", {}).get("research", {}).get("events"):
+                        malformed = send(restored_page, {"type": "EV_IMPORT", "pkg": bad,
+                            "operationId": "op_native_graphrefs01"})
+                        assert not malformed["ok"] and "变更事件引用无效" in malformed["error"], malformed
+                        assert raw_evidence(restored_page) == before_invalid
+                        bad["project"]["research"] = {
+                            "schema": 1, "edges": [], "confirmations": [],
+                            "events": [], "reviews": []
+                        }
                     failed = send(restored_page, {"type": "EV_IMPORT", "pkg": bad, "operationId": "op_native_collision1"})
                     assert not failed["ok"] and "冲突" in failed["error"], failed
                     assert raw_evidence(restored_page) == before_invalid, "invalid import must leave every store unchanged"
