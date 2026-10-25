@@ -9,9 +9,15 @@
     "lint:syntax": "node scripts/check-syntax.mjs",
     "verify": "npm run lint:syntax && npm run check && npm run check:plan && npm test",
     "test:e2e": "python test/extension-e2e.py && python test/handoff-e2e.py && python test/ff-core-e2e.py && python test/evidence-e2e.py",
-    "check:plan": "node ../scripts/check-plan.mjs"
+    "check:plan": "node ../scripts/check-plan.mjs",
+    "build:argdown": "node scripts/build-argdown.mjs",
+    "argdown:preview": "node scripts/argdown-preview.mjs"
   },
   "engines": {
     "node": ">=22"
+  },
+  "devDependencies": {
+    "@argdown/core": "2.0.1",
+    "esbuild": "0.25.2"
   }
 }
