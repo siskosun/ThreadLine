@@ -100,18 +100,25 @@
     return {research:r,edges,neighbors};
   }
   function impacts(s,p,changedIds) {
-    const r=normal(s.projects?.[p]?.research||base()),next=graph(r.edges),queue=[...new Set(changedIds||[])].filter(id=>owns(s,p,id)).sort().map(id=>({id,root:id,path:[id],edgeIds:[]})),visited=new Set(),out=new Map();
+    const r=normal(s.projects?.[p]?.research||base()),next=graph(r.edges),queue=[...new Set(changedIds||[])].filter(id=>owns(s,p,id)).sort().map(id=>({id,root:id,path:[id],edgeIds:[]})),seen=new Map(),out=new Map();
     while(queue.length) {
-      const item=queue.shift(),seenKey=item.root+"|"+item.id;
-      if(visited.has(seenKey))continue;visited.add(seenKey);
+      const item=queue.shift(),seenKey=item.root+"|"+item.id, priorEdges=seen.get(seenKey)||new Set(), itemEdges=new Set(item.edgeIds);
+      let changed=false;
+      for(const id of itemEdges)if(!priorEdges.has(id)){priorEdges.add(id);changed=true;}
+      if(!changed&&seen.has(seenKey))continue;
+      seen.set(seenKey,priorEdges);
       for(const edge of next.get(item.id)||[]) {
         const target=edge.downstreamConclusionId,cause={rootConclusionId:item.root,path:[...item.path,target],edgeIds:[...item.edgeIds,edge.id]},row=out.get(target)||{conclusionId:target,versionId:cur(s,target)?.id||null,causes:[]};
-        if(!row.causes.some(x=>x.rootConclusionId===cause.rootConclusionId&&x.path.join("/")===cause.path.join("/")))row.causes.push(cause);
+        const rootCause=row.causes.find(x=>x.rootConclusionId===cause.rootConclusionId);
+        if(rootCause) {
+          for(const id of cause.edgeIds)if(!rootCause.contributingEdgeIds.includes(id))rootCause.contributingEdgeIds.push(id);
+          if(cause.path.join("/")<rootCause.path.join("/"))rootCause.path=cause.path;
+        } else row.causes.push({...cause,contributingEdgeIds:[...cause.edgeIds]});
         out.set(target,row);
         if(!item.path.includes(target))queue.push({id:target,root:item.root,path:cause.path,edgeIds:cause.edgeIds});
       }
     }
-    return [...out.values()].map(row=>({...row,causes:row.causes.sort((a,b)=>a.path.join("/").localeCompare(b.path.join("/")))})).sort((a,b)=>a.conclusionId.localeCompare(b.conclusionId));
+    return [...out.values()].map(row=>({...row,causes:row.causes.map(c=>({...c,contributingEdgeIds:c.contributingEdgeIds.sort()})).sort((a,b)=>a.rootConclusionId.localeCompare(b.rootConclusionId))})).sort((a,b)=>a.conclusionId.localeCompare(b.conclusionId));
   }
   function recordChange(s,p,cmd,raw={}) {
     if(!cmd||!valid(cmd.triggerEventId,"evt_")||!owns(s,p,cmd.conclusionId))throw Error("变更事件无效");
@@ -127,25 +134,53 @@
     const r=normal(s.projects?.[p]?.research||base()),o=options(raw);
     if(r.reviews.length>=MAX_REVIEWS||!valid(cmd?.targetConclusionId,"con_")||!owns(s,p,cmd.targetConclusionId)||!valid(cmd.targetVersionId,"ver_")||cur(s,cmd.targetConclusionId)?.id!==cmd.targetVersionId||typeof cmd.scopeManifestHash!=="string"||!cmd.scopeManifestHash||!Array.isArray(cmd.sourceSnapshots)||!Array.isArray(cmd.blindMaterials))throw Error("复核准备数据无效");
     const state={...s,projects:{...s.projects,[p]:{...s.projects[p],research:r}}},incoming=inspect(state,p).edges.filter(e=>e.active&&e.downstreamConclusionId===cmd.targetConclusionId).map(e=>({edgeId:e.id,edgeRevision:e.revision,upstreamVersionId:e.upstreamVersionId,downstreamVersionId:e.downstreamVersionId}));
-    const review={id:o.id(),status:"prepared",projectId:p,targetConclusionId:cmd.targetConclusionId,targetVersionId:cmd.targetVersionId,scopeManifestHash:cmd.scopeManifestHash,sourceSnapshots:copy(cmd.sourceSnapshots),blindMaterials:copy(cmd.blindMaterials),incoming,at:o.at};
+    const review={id:o.id(),projectId:p,targetConclusionId:cmd.targetConclusionId,targetVersionId:cmd.targetVersionId,scopeManifestHash:cmd.scopeManifestHash,sourceSnapshots:copy(cmd.sourceSnapshots),blindMaterials:copy(cmd.blindMaterials),incoming,completions:[],at:o.at};
     r.reviews.push(review);return {research:r,result:{reviewId:review.id,review}};
   }
   function completeReview(s,p,cmd,raw={}) {
     const r=normal(s.projects?.[p]?.research||base()),o=options(raw),review=r.reviews.find(x=>x.id===cmd?.reviewId);
-    if(!review||review.projectId!==p||review.status!=="prepared"||!["keep","revise","withdraw","inconclusive"].includes(cmd.outcome)||typeof cmd.reason!=="string"||!cmd.reason.trim())throw Error("复核完成数据无效");
-    const stale=cur(s,review.targetConclusionId)?.id!==review.targetVersionId;
-    review.status="completed";review.outcome=cmd.outcome;review.reason=cmd.reason;review.completedAt=o.at;review.stale=stale;
-    const edgesToConfirm=stale||cmd.outcome!=="keep"?[]:review.incoming.filter(pair=>pair.upstreamVersionId===cur(s,s.versions[pair.upstreamVersionId]?.conclusionId)?.id&&pair.downstreamVersionId===review.targetVersionId);
+    if(!review||review.projectId!==p||review.completions?.length||!["keep","revise","withdraw","inconclusive"].includes(cmd.outcome)||typeof cmd.reason!=="string"||!cmd.reason.trim())throw Error("复核完成数据无效");
+    const sourceChanged=review.sourceSnapshots.some(x=>!x||typeof x.id!=="string"||typeof x.hash!=="string"||s.sources?.[x.id]?.textHash!==x.hash);
+    const targetChanged=cur(s,review.targetConclusionId)?.id!==review.targetVersionId||s.conclusions[review.targetConclusionId]?.status==="withdrawn";
+    const incomingChanged=review.incoming.some(pair=>{const e=r.edges.find(x=>x.id===pair.edgeId),up=s.versions?.[pair.upstreamVersionId],down=s.versions?.[pair.downstreamVersionId];return !e||!e.active||e.revision!==pair.edgeRevision||!up||!down||up.conclusionId!==e.upstreamConclusionId||down.conclusionId!==e.downstreamConclusionId||cur(s,e.upstreamConclusionId)?.id!==pair.upstreamVersionId||cur(s,e.downstreamConclusionId)?.id!==pair.downstreamVersionId||s.conclusions[e.upstreamConclusionId]?.status==="withdrawn"||s.conclusions[e.downstreamConclusionId]?.status==="withdrawn";});
+    const stale=sourceChanged||targetChanged||incomingChanged;
+    const completion={id:o.id(),outcome:cmd.outcome,reason:cmd.reason,at:o.at,stale};
+    review.completions.push(completion);
+    const edgesToConfirm=stale||cmd.outcome!=="keep"?[]:copy(review.incoming);
     appendEvent(r,{kind:"reviewCompleted",reviewId:review.id,outcome:cmd.outcome,reason:cmd.reason,stale,edgesToConfirm:edgesToConfirm.map(x=>x.edgeId)},o);
-    return {research:r,result:{reviewId:review.id,stale,edgesToConfirm}};
+    return {research:r,result:{reviewId:review.id,completionId:completion.id,stale,edgesToConfirm}};
   }
   function validateResearch(input,s,p) {
-    const r=normal(input),all=[...r.edges,...r.confirmations,...r.events,...r.reviews].map(x=>x.id);
+    const r=normal(input),all=[...r.edges,...r.confirmations,...r.events,...r.reviews,...r.reviews.flatMap(x=>Array.isArray(x.completions)?x.completions:[])].map(x=>x.id);
     if(new Set(all).size!==all.length||!all.every(id=>valid(id,"dep_")))throw Error("研究记录 ID 无效或重复");
     for(const edge of r.edges)if(edge.projectId!==p||edge.type!=="necessary"||!Number.isSafeInteger(edge.revision)||edge.revision<1||typeof edge.active!=="boolean"||!owns(s,p,edge.upstreamConclusionId)||!owns(s,p,edge.downstreamConclusionId)||edge.upstreamConclusionId===edge.downstreamConclusionId)throw Error("依赖边无效");
     for(const edge of r.edges.filter(x=>x.active))if(reaches(r.edges.filter(x=>x.active&&x.id!==edge.id),edge.downstreamConclusionId,edge.upstreamConclusionId))throw Error("依赖存在环");
     for(const c of r.confirmations){const e=r.edges.find(x=>x.id===c.edgeId),up=s.versions?.[c.acknowledgedUpstreamVersion],down=s.versions?.[c.confirmedForDownstreamVersion];if(!e||!Number.isSafeInteger(c.edgeRevision)||c.edgeRevision<1||!up||!down||up.conclusionId!==e.upstreamConclusionId||down.conclusionId!==e.downstreamConclusionId||typeof c.scopeManifestHash!=="string"||!c.scopeManifestHash||typeof c.reason!=="string"||!c.reason.trim()||!Number.isSafeInteger(c.at))throw Error("依赖确认无效");}
-    for(const event of r.events)if(!Number.isSafeInteger(event.at)||typeof event.kind!=="string")throw Error("依赖事件无效");
+    for(const event of r.events) {
+      if(!Number.isSafeInteger(event.at)||!["added","reactivated","removed","confirmed","change","reviewCompleted"].includes(event.kind))throw Error("依赖事件无效");
+      if(["added","reactivated","removed","confirmed"].includes(event.kind)) {
+        const edge=r.edges.find(x=>x.id===event.edgeId);
+        if(!edge||!Number.isSafeInteger(event.edgeRevision)||event.edgeRevision<1||typeof event.reason!=="string")throw Error("依赖事件引用无效");
+        if(["added","reactivated","confirmed"].includes(event.kind)) {
+          const up=s.versions?.[event.upstreamVersionId],down=s.versions?.[event.downstreamVersionId];
+          if(!up||!down||up.conclusionId!==edge.upstreamConclusionId||down.conclusionId!==edge.downstreamConclusionId)throw Error("依赖事件版本无效");
+        }
+        if(event.kind==="confirmed"&&!r.confirmations.some(c=>c.id===event.confirmationId&&c.edgeId===edge.id))throw Error("依赖确认事件无效");
+      } else if(event.kind==="change") {
+        const from=s.versions?.[event.fromVersion],to=s.versions?.[event.toVersion];
+        if(!valid(event.triggerEventId,"evt_")||!owns(s,p,event.conclusionId)||!from||!to||from.conclusionId!==event.conclusionId||to.conclusionId!==event.conclusionId||!["amend","withdraw"].includes(event.changeKind)||!Array.isArray(event.affected)||event.affected.length>MAX_EDGES)throw Error("变更事件引用无效");
+        for(const row of event.affected)if(!owns(s,p,row.conclusionId)||!s.versions?.[row.versionId]||s.versions[row.versionId].conclusionId!==row.conclusionId||!Array.isArray(row.causes)||row.causes.length>MAX_EDGES)throw Error("变更影响记录无效");
+      } else if(event.kind==="reviewCompleted") {
+        if(!r.reviews.some(review=>review.id===event.reviewId)||typeof event.reason!=="string"||typeof event.stale!=="boolean"||!Array.isArray(event.edgesToConfirm))throw Error("复核事件引用无效");
+      }
+    }
+    for(const review of r.reviews) {
+      if(review.projectId!==p||!owns(s,p,review.targetConclusionId)||!s.versions?.[review.targetVersionId]||s.versions[review.targetVersionId].conclusionId!==review.targetConclusionId||typeof review.scopeManifestHash!=="string"||!review.scopeManifestHash||review.scopeManifestHash.length>2048||!Array.isArray(review.sourceSnapshots)||review.sourceSnapshots.length>64||!Array.isArray(review.blindMaterials)||review.blindMaterials.length>64||!Array.isArray(review.incoming)||review.incoming.length>MAX_EDGES||!Array.isArray(review.completions)||review.completions.length>1||!Number.isSafeInteger(review.at))throw Error("复核记录无效");
+      for(const source of review.sourceSnapshots)if(!source||!valid(source.id,"src_")||typeof source.hash!=="string"||!/^[a-f0-9]{64}$/i.test(source.hash))throw Error("复核来源快照无效");
+      for(const material of review.blindMaterials)if(!material||typeof material!=="object"||JSON.stringify(material).length>65536)throw Error("复核盲材料无效");
+      for(const pair of review.incoming){const edge=r.edges.find(x=>x.id===pair.edgeId),up=s.versions?.[pair.upstreamVersionId],down=s.versions?.[pair.downstreamVersionId];if(!edge||!Number.isSafeInteger(pair.edgeRevision)||!up||!down||up.conclusionId!==edge.upstreamConclusionId||down.conclusionId!==edge.downstreamConclusionId)throw Error("复核依赖快照无效");}
+      for(const completion of review.completions)if(!["keep","revise","withdraw","inconclusive"].includes(completion.outcome)||typeof completion.reason!=="string"||!completion.reason.trim()||typeof completion.stale!=="boolean"||!Number.isSafeInteger(completion.at))throw Error("复核完成记录无效");
+    }
     return true;
   }
   const Research={base,update,inspect,impacts,recordChange,prepareReview,completeReview,validateResearch,MAX_EDGES,MAX_CONFIRMATIONS,MAX_EVENTS,MAX_REVIEWS};

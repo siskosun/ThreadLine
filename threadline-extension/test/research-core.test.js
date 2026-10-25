@@ -54,13 +54,17 @@ test("changed conclusion or withdrawal never lets a prior confirmation silence t
   s.conclusions[a].status = "withdrawn";
   assert.match(Research.inspect(s, "p1").edges[0].reason, /上游已撤回/);
 });
-test("diamond impacts keep one target and all causal paths without exponential traversal", () => {
+test("diamond impacts retain every branch cause for a tail without exponential paths", () => {
   const s = state(), a = "con_aaaaaaaa", b = "con_bbbbbbbb", c = "con_cccccccc", d = "con_dddddddd";
   add(s, a, b); add(s, a, c); add(s, b, d); add(s, c, d);
+  s.conclusions.con_ffffffff = {id:"con_ffffffff",projectId:"p1",status:"adopted",currentVersionId:"ver_ffffffff"};
+  s.versions.ver_ffffffff = {id:"ver_ffffffff",conclusionId:"con_ffffffff",text:"tail"};
+  add(s, d, "con_ffffffff");
   const impact = Research.impacts(s, "p1", [a]);
-  assert.deepEqual(impact.map(x => x.conclusionId), [b, c, d]);
-  assert.equal(impact.at(-1).causes.length, 2);
-  assert.deepEqual(impact.at(-1).causes.map(x => x.path), [[a, b, d], [a, c, d]]);
+  assert.deepEqual(impact.map(x => x.conclusionId), [b, c, d, "con_ffffffff"]);
+  const tail = impact.at(-1).causes[0];
+  assert.equal(tail.rootConclusionId, a);
+  assert.equal(tail.contributingEdgeIds.length, 5);
 });
 test("recorded change is idempotent and never removes prior impacts", () => {
   const s = state(), a = "con_aaaaaaaa", b = "con_bbbbbbbb";
@@ -73,15 +77,17 @@ test("recorded change is idempotent and never removes prior impacts", () => {
   assert.equal(replay.result.replay, true);
   assert.equal(s.projects.p1.research.events.filter(e => e.kind === "change").length, 1);
 });
-test("prepared review preserves stale result as history and only keep yields exact pairs", () => {
+test("prepared review preserves immutable scope; any incoming or source change makes all pairs stale", () => {
   const s = state(), a = "con_aaaaaaaa", b = "con_bbbbbbbb", edgeId = add(s, a, b);
-  const prepared = Research.prepareReview(s, "p1", { targetConclusionId: b, targetVersionId: "ver_bbbbbbbb", scopeManifestHash: "scope-review", sourceSnapshots: [{ id: "src_x", hash: "h" }], blindMaterials: [{ kind: "source", id: "src_x" }] }, opts());
+  s.sources = {src_abcdefgh:{id:"src_abcdefgh",textHash:"a".repeat(64)}};
+  const prepared = Research.prepareReview(s, "p1", { targetConclusionId: b, targetVersionId: "ver_bbbbbbbb", scopeManifestHash: "scope-review", sourceSnapshots: [{ id: "src_abcdefgh", hash: "a".repeat(64) }], blindMaterials: [{ kind: "source", id: "src_abcdefgh" }] }, opts());
   s.projects.p1.research = prepared.research;
-  s.versions.ver_later = { id: "ver_later", conclusionId: b, text: "later" }; s.conclusions[b].currentVersionId = "ver_later";
+  s.sources.src_abcdefgh.textHash = "b".repeat(64);
   const completed = Research.completeReview(s, "p1", { reviewId: prepared.result.reviewId, outcome: "keep", reason: "reviewed old scope" }, opts());
   assert.equal(completed.result.stale, true);
   assert.deepEqual(completed.result.edgesToConfirm, []);
-  assert.equal(completed.research.reviews[0].status, "completed");
+  assert.equal(completed.research.reviews[0].completions.length, 1);
+  assert.equal(completed.research.reviews[0].targetVersionId, "ver_bbbbbbbb");
   assert.equal(edgeId, completed.research.reviews[0].incoming[0].edgeId);
 });
 test("validator rejects forged confirmation ownership and duplicate record IDs", () => {
@@ -94,4 +100,17 @@ test("validator rejects forged confirmation ownership and duplicate record IDs",
   const duplicate = structuredClone(s.projects.p1.research);
   duplicate.events[0].id = duplicate.edges[0].id;
   assert.throws(() => Research.validateResearch(duplicate, s, "p1"), /重复/);
+});
+test("validator rejects forged review and event references", () => {
+  const s = state(), edgeId = add(s, "con_aaaaaaaa", "con_bbbbbbbb");
+  s.sources = {src_abcdefgh:{id:"src_abcdefgh",textHash:"a".repeat(64)}};
+  const prepared = Research.prepareReview(s, "p1", {targetConclusionId:"con_bbbbbbbb",targetVersionId:"ver_bbbbbbbb",scopeManifestHash:"scope",sourceSnapshots:[{id:"src_abcdefgh",hash:"a".repeat(64)}],blindMaterials:[]}, opts());
+  s.projects.p1.research = prepared.research;
+  assert.equal(Research.validateResearch(s.projects.p1.research, s, "p1"), true);
+  const badReview = structuredClone(s.projects.p1.research);
+  badReview.reviews[0].incoming[0].upstreamVersionId = "ver_eeeeeeee";
+  assert.throws(() => Research.validateResearch(badReview, s, "p1"), /复核依赖/);
+  const badEvent = structuredClone(s.projects.p1.research);
+  badEvent.events.find(x => x.edgeId === edgeId).edgeId = "dep_missing0001";
+  assert.throws(() => Research.validateResearch(badEvent, s, "p1"), /事件引用/);
 });
