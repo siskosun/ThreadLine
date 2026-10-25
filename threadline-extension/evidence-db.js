@@ -142,12 +142,13 @@
             );
           }
           const add = (store, value) => {
-            if (typeof stores[store].add === "function")
-              stores[store].add(value);
-            else stores[store].put(value); // test doubles must still enforce collision separately.
+            stores[store].add(value);
           };
           try {
-            if (w.conclusion) stores.conclusions.put(w.conclusion);
+            if (w.conclusion) {
+              if (w.ledger.kind === "adopt") add("conclusions",w.conclusion);
+              else stores.conclusions.put(w.conclusion);
+            }
             if (w.version) add("versions", w.version);
             for (const s of w.sources || []) add("sources", s);
             for (const l of w.links || []) add("links", l);

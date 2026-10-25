@@ -60,17 +60,13 @@ test('canonical plan contains all required tasks and no unverified done claims',
   assert.equal(actual.tasks.length,12);
   // Done claims must stay limited to tasks with real merged-PR evidence JSONs.
   assert.deepEqual(actual.done.map(x=>x.task.id).sort(),
-    ['BETA-RELEASE','P1-CORE','P2-FORK','P3-REPORT','P4-AUTO','R-REUSE','S0A-PROTOTYPE','S0B-LOCATE','S1A-PERSIST','S1B-ADOPT','Z0-BASE','Z0-LIVE']);
+    ['BETA-RELEASE','P1-CORE','P2-FORK','P3-REPORT','P4-AUTO','R-REUSE','Z0-BASE','Z0-LIVE']);
   // Phase-eleven tasks are registered but not claimable as done yet.
   assert.deepEqual(actual.tasks.filter(x=>x.id.startsWith('S')).map(x=>x.id),
     ['S0A-PROTOTYPE','S0B-LOCATE','S1A-PERSIST','S1B-ADOPT']);
-  assert.ok(['in_review','done'].includes(actual.tasks.find(x=>x.id==='S0A-PROTOTYPE').status),
-    'S0A progresses only through the review/done contract');
-  assert.ok(['in_review','done','planned'].includes(actual.tasks.find(x=>x.id==='S0B-LOCATE').status),
-    'S0B progresses only through the review/done contract');
-  assert.ok(['in_review','done','planned'].includes(actual.tasks.find(x=>x.id==='S1A-PERSIST').status),
-    'S1A progresses only through the review/done contract');
-  assert.ok(['planned','in_review','done'].includes(actual.tasks.find(x=>x.id==='S1B-ADOPT').status));
+  assert.deepEqual(actual.tasks.filter(x=>x.id.startsWith('S')).map(x=>x.status),
+    ['blocked','blocked','blocked','blocked'], 'failed acceptance must reopen all affected stages');
+  assert.ok(actual.tasks.filter(x=>x.id.startsWith('S')).every(x=>x.evidence==='docs/ff/BLOCKED.md'));
 });
 
 test('missing/duplicate plan markers and missing tasks are rejected',async()=>{

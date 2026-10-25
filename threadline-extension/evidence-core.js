@@ -51,6 +51,13 @@
     } = f;
     if (typeof selection !== "string" || !selection.trim())
       throw Error("片段选区不能为空");
+    if (typeof before !== "string" || typeof after !== "string") throw Error("片段上下文必须是文本");
+    for (const field of ["kind", "captureRunId", "conversationId", "messageId", "url"])
+      if (f[field] != null && (typeof f[field] !== "string" || f[field].length > 2048))
+        throw Error("来源身份字段无效：" + field);
+    for (const field of ["capturedAt", "identityCapturedAt"])
+      if (f[field] != null && (!Number.isSafeInteger(f[field]) || f[field] < 0))
+        throw Error("来源时间无效");
     if (codePoints(before) > 500 || codePoints(after) > 500)
       throw Error("片段上下文超过 500 code points");
     if (!["cites", "supports", "opposes", "background"].includes(relation))
@@ -79,6 +86,7 @@
     if (typeof i.text !== "string" || !i.text.trim())
       throw Error("结论正文不能为空");
     if (codePoints(i.text) > 4000) throw Error("结论正文超过 4000 code points");
+    if (i.conditions !== undefined && typeof i.conditions !== "string") throw Error("适用条件必须是文本");
     validateFragments(i.fragments || [], { required: true });
   }
   function norm(f) {
@@ -161,7 +169,7 @@
         id,
         identityCapturedAt: f.capturedAt,
         textHash: await hashText(f.before + f.selection + f.after),
-        capturedAt: f.capturedAt || at,
+        capturedAt: f.capturedAt ?? at,
       });
       links.push({
         id: "lnk_" + uuid() + suffix + n,
@@ -231,6 +239,7 @@
         conclusionId,
         text: input.text,
         conditions: input.conditions,
+        sourceCount: input.fragments.length,
         changeType: "create",
         predecessorId: null,
         createdAt: at,
@@ -287,8 +296,9 @@
     if (!isId(id, "con_") || !i || typeof i.text !== "string" || !i.text.trim())
       throw Error("修订输入无效");
     if (codePoints(i.text) > 4000) throw Error("结论正文超过 4000 code points");
-    const hasFragments = Object.hasOwn(i, "fragments"),
-      hasConditions = Object.hasOwn(i, "conditions"),
+    if (i.conditions !== undefined && typeof i.conditions !== "string") throw Error("适用条件必须是文本");
+    const hasFragments = i.fragments !== undefined,
+      hasConditions = i.conditions !== undefined,
       raw = {
         conclusionId: id,
         text: i.text,
@@ -296,6 +306,7 @@
         fragments: hasFragments ? (i.fragments || []).map(norm) : null,
         conditionsOmitted: !hasConditions,
         fragmentsOmitted: !hasFragments,
+        expectedVersionId: i.expectedVersionId ?? null,
       },
       replay = await prior(s, "amend", raw, operationId);
     if (replay) return { replay };
@@ -303,6 +314,8 @@
       old = c && s.versions[c.currentVersionId],
       project = c && s.projects[c.projectId];
     if (!c || !old || !project) throw Error("权威记录缺失");
+    if (i.expectedVersionId != null && i.expectedVersionId !== c.currentVersionId)
+      throw Error("结论已在其他窗口修订，请刷新后核对；未覆盖当前版本");
     if (c.status === "withdrawn")
       throw Error("结论已撤回：请重新采纳而不是修订");
     if (hasFragments) validateFragments(i.fragments || []);
@@ -320,6 +333,7 @@
         conclusionId: id,
         text: i.text,
         conditions,
+        sourceCount: hasFragments ? (i.fragments || []).length : fragments(s, old.id).length,
         changeType: "amend",
         predecessorId: old.id,
         createdAt: now(),
@@ -481,6 +495,11 @@
       throw Error("未知导出包格式");
     if (bytes(JSON.stringify(pkg)) > LIMITS.packageBytes)
       throw Error("导入包超过 20 MiB");
+    for (const n of ["conclusions", "versions", "sources", "links"]) {
+      if (!Array.isArray(pkg[n])) throw Error("导入包缺少 " + n);
+      unique(pkg[n], n);
+    }
+    if (typeof pkg.projectId !== "string" || !pkg.projectId.trim()) throw Error("课题 ID 无效");
     if (
       pkg.format.endsWith("/2") &&
       (!pkg.project ||
@@ -491,10 +510,6 @@
             pkg.project.legacyNote.verified !== false)))
     )
       throw Error("课题元数据无效");
-    for (const n of ["conclusions", "versions", "sources", "links"]) {
-      if (!Array.isArray(pkg[n])) throw Error("导入包缺少 " + n);
-      unique(pkg[n], n);
-    }
     const cs = new Map(pkg.conclusions.map((x) => [x.id, x])),
       vs = new Map(pkg.versions.map((x) => [x.id, x])),
       ss = new Map(pkg.sources.map((x) => [x.id, x]));
@@ -514,6 +529,7 @@
         !isId(v.id, "ver_") ||
         !cs.has(v.conclusionId) ||
         typeof v.text !== "string" ||
+        !v.text.trim() ||
         codePoints(v.text) > 4000 ||
         typeof v.conditions !== "string" ||
         !["create", "amend"].includes(v.changeType) ||
@@ -564,7 +580,9 @@
       const fs = pkg.links
         .filter((l) => l.versionId === v.id)
         .map((l) => ss.get(l.sourceId));
-      validateFragments(fs);
+      validateFragments(fs, { required: v.changeType === "create" });
+      if (v.sourceCount !== undefined && (!Number.isSafeInteger(v.sourceCount) || v.sourceCount !== fs.length))
+        throw Error("版本依据数量与快照不一致");
     }
     return true;
   }
@@ -579,6 +597,7 @@
       input = { pkg },
       replay = await prior(s, "import", input, id);
     if (replay) return { replay };
+    if (!cleanPkg.conclusions.length) throw Error("空证据包没有可恢复的结论，未修改课题");
     const project = s.projects[cleanPkg.projectId];
     if (!project) throw Error("目标课题不存在");
     if (

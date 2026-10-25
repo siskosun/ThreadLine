@@ -26,7 +26,7 @@ function system(options={}){
   sidePanel:{async setPanelBehavior(){},async close(){calls.push(['close']);}},
   scripting:{async executeScript(){calls.push(['inject']);}}};
  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'..','background.js'),'utf8'),{
-  importScripts(){},chrome,ThreadLineCore:Core,ThreadLineCaptureCore:CaptureCore,
+  importScripts(){},chrome,...require('./helpers/empty-evidence.js')(),ThreadLineCore:Core,ThreadLineCaptureCore:CaptureCore,
   crypto:globalThis.crypto,URL,Date,Promise,setTimeout,clearTimeout,console
  });
  const send=(sender,payload={type:'NEW_CHAT',handoff:'FICTIONAL SOURCE TEST',windowId:4})=>

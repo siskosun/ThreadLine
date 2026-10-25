@@ -25,7 +25,7 @@ function bootstrap(){
    },
    tabs:{query:async({active})=>active?tabs.filter(t=>t.active):tabs,onUpdated:{addListener:()=>{}},onRemoved:{addListener:fn=>listeners.removed=fn}}
   };
-  const env={chrome,structuredClone,URL,Date,Promise,crypto:globalThis.crypto,setTimeout,clearTimeout,importScripts:()=>{}};
+  const env={...require('./helpers/empty-evidence.js')(),chrome,structuredClone,URL,Date,Promise,crypto:globalThis.crypto,setTimeout,clearTimeout,importScripts:()=>{}};
   vm.createContext(env);
   vm.runInContext(fs.readFileSync(path.join(files,'core.js'),'utf8'),env);
   vm.runInContext(fs.readFileSync(path.join(files,'backup-core.js'),'utf8'),env);

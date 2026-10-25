@@ -56,6 +56,11 @@ function mockIdb(initial = {}) {
               staged.set(name + ":" + key, structuredClone(value));
               return req(value);
             },
+            add(value) {
+              const key = name === "projects" ? value.projectId : name === "operations" ? value.operationId : value.id;
+              if (stores[name].has(key) || staged.has(name + ":" + key)) throw new Error("ConstraintError");
+              return this.put(value);
+            },
           };
         },
       };
@@ -902,6 +907,13 @@ test("import enforces semantic status, metadata, per-version limits and existing
   w.links.forEach((x) => (state.links[x.id] = x));
   const pkg = Core.exportPackage(state, "p1");
   const badStatus = structuredClone(pkg);
+  const noEvidence = structuredClone(pkg);
+  noEvidence.links = []; noEvidence.sources = [];
+  delete noEvidence.versions[0].sourceCount;
+  await assert.rejects(Core.validateExportPackage(noEvidence), /至少|依据|片段/);
+  const wrongCount = structuredClone(pkg);
+  wrongCount.versions[0].sourceCount = 2;
+  await assert.rejects(Core.validateExportPackage(wrongCount), /数量/);
   badStatus.conclusions[0].status = "forged";
   await assert.rejects(Core.validateExportPackage(badStatus), /状态/);
   const badMeta = structuredClone(pkg);
@@ -1001,4 +1013,19 @@ test("amend replay is bound to raw user intent before current status", async () 
     ).replay,
     firstAmend,
   );
+});
+
+test("stale editor cannot amend a newer version, but its committed retry still replays", async () => {
+  const db = mockIdb({ projects: { p1: Core.newProjectRecord("p1") } });
+  const original = await DB.applyPlan(db, await Core.planAdoption(
+    await stateFrom(db), adoption("原文"), "op_editor00001"));
+  const intent = { text: "第一窗口修订", expectedVersionId: original.versionId };
+  const first = await DB.applyPlan(db, await Core.planAmendment(
+    await stateFrom(db), original.conclusionId, intent, "op_editor00002"));
+  const before = await stateFrom(db);
+  await assert.rejects(Core.planAmendment(before, original.conclusionId,
+    { text: "过期窗口修订", expectedVersionId: original.versionId }, "op_editor00003"), /其他窗口修订/);
+  assert.deepEqual(await stateFrom(db), before);
+  const retry = await Core.planAmendment(before, original.conclusionId, intent, "op_editor00002");
+  assert.deepEqual(retry.replay, first);
 });

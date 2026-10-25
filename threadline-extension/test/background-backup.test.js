@@ -9,7 +9,7 @@ function env(){
  storage:{local:{get:async key=>get(local,key),set:async val=>Object.assign(local,val)},
  session:{get:async key=>get(session,key),set:async val=>Object.assign(session,val),remove:async key=>{for(const k of Array.isArray(key)?key:[key])delete session[k];}}}
  };
- const sandbox={chrome,URL,Date,Promise,structuredClone,crypto:globalThis.crypto,console,importScripts:()=>{}};
+ const sandbox={...require('./helpers/empty-evidence.js')(),chrome,URL,Date,Promise,structuredClone,crypto:globalThis.crypto,console,importScripts:()=>{}};
  vm.createContext(sandbox);
  for(const file of ['core.js','backup-core.js','background.js'])vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),sandbox);
  const send=input=>new Promise(resolve=>listener(input,{id:'backup-test',url:'chrome-extension://backup-test/panel.html'},resolve));
