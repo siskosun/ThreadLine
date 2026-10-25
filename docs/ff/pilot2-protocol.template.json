@@ -40,7 +40,8 @@
             "projects": {},
             "conclusions": {},
             "versions": {}
-          }
+          },
+          "sourceCorpusSha256": null
         }
       ]
     }

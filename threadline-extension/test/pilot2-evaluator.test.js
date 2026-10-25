@@ -1,7 +1,9 @@
-import test from "node:test";
-import assert from "node:assert/strict";
-import {createHash} from "node:crypto";
-import {evaluateData} from "../../scripts/evaluate-pilot2.mjs";
+const test=require("node:test");
+const assert=require("node:assert/strict");
+const {createHash}=require("node:crypto");
+const evaluate=import("../../scripts/evaluate-pilot2.mjs");
+let evaluateData;
+test.before(async()=>{({evaluateData}=await evaluate);});
 const digest=x=>createHash("sha256").update(x).digest("hex");
 function fixture(){
  const protocol={format:"threadline-pilot2-protocol/1",status:"FROZEN",
@@ -21,17 +23,17 @@ function fixture(){
     goldNecessaryEdgePairs:[[root,dependent]],events:[]};
   const kinds=["premise_error","definition_change","source_lost","wording_only","unrelated"];
   for(let j=0;j<kinds.length;j++){
-   const kind=kinds[j],carryForwardConfirmed=kind==="wording_only",
+   const kind=kinds[j],sourceCorpusSha256=digest("shared synthetic source "+i+"/"+j),carryForwardConfirmed=kind==="wording_only",
       rootConclusionId=kind==="unrelated"?unrelated:root,goldAffectedIds=j<3?[dependent]:[];
-   c.events.push({id:"event_"+j,kind,rootConclusionId,critical:j===0,carryForwardConfirmed,
+   c.events.push({id:"event_"+j,kind,rootConclusionId,critical:j===0,sourceCorpusSha256,carryForwardConfirmed,
      goldAffectedIds,frozenState});
    observations.records.push({caseId:c.id,eventId:"event_"+j,arms:{
     A:{correctContinuation:false,wronglyRevisedTrueClaim:false,elapsedMs:100000,humanInterventions:3,modelCalls:2,
-      receiptId:"synthetic-A-"+i+"-"+j,modelVersion:"synthetic"},
+      receiptId:"synthetic-A-"+i+"-"+j,modelVersion:"synthetic",sourceCorpusSha256},
     B:{correctContinuation:true,wronglyRevisedTrueClaim:false,elapsedMs:70000,humanInterventions:1,modelCalls:1,
-      receiptId:"synthetic-B-"+i+"-"+j,modelVersion:"synthetic"},
+      receiptId:"synthetic-B-"+i+"-"+j,modelVersion:"synthetic",sourceCorpusSha256},
     C:{correctContinuation:false,wronglyRevisedTrueClaim:true,elapsedMs:120000,humanInterventions:4,modelCalls:3,
-      receiptId:"synthetic-C-"+i+"-"+j,modelVersion:"synthetic"}
+      receiptId:"synthetic-C-"+i+"-"+j,modelVersion:"synthetic",sourceCorpusSha256}
    }});
   }
   protocol.cases.push(c);

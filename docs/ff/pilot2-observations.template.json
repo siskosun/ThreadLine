@@ -15,7 +15,8 @@
           "humanInterventions": null,
           "modelCalls": null,
           "receiptId": null,
-          "modelVersion": null
+          "modelVersion": null,
+          "sourceCorpusSha256": null
         },
         "B": {
           "correctContinuation": null,
@@ -24,7 +25,8 @@
           "humanInterventions": null,
           "modelCalls": null,
           "receiptId": null,
-          "modelVersion": null
+          "modelVersion": null,
+          "sourceCorpusSha256": null
         },
         "C": {
           "correctContinuation": null,
@@ -33,7 +35,8 @@
           "humanInterventions": null,
           "modelCalls": null,
           "receiptId": null,
-          "modelVersion": null
+          "modelVersion": null,
+          "sourceCorpusSha256": null
         }
       }
     }
