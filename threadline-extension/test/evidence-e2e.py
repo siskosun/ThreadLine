@@ -156,6 +156,7 @@ def run():
             panel_errors = []
             panel.on("pageerror", lambda error: panel_errors.append(str(error)))
             panel.reload(wait_until="domcontentloaded")
+            panel.get_by_role("tab", name="证据与交接").click()
             panel.locator("#evidence-accordion > summary").click()
             panel.wait_for_function(
                 "id => [...document.querySelector('#evidence-project').options]"
