@@ -52,12 +52,18 @@
     if (typeof selection !== "string" || !selection.trim())
       throw Error("片段选区不能为空");
     if (typeof before !== "string" || typeof after !== "string") throw Error("片段上下文必须是文本");
-    for (const field of ["kind", "captureRunId", "conversationId", "messageId", "url"])
+    for (const field of ["kind", "captureRunId", "conversationId", "messageId", "url", "sourceLocalId", "sourceRole", "captureMode", "captureNotice"])
       if (f[field] != null && (typeof f[field] !== "string" || f[field].length > 2048))
         throw Error("来源身份字段无效：" + field);
     for (const field of ["capturedAt", "identityCapturedAt"])
       if (f[field] != null && (!Number.isSafeInteger(f[field]) || f[field] < 0))
         throw Error("来源时间无效");
+    for (const field of ["sourceLength","selectionStart","selectionEnd"])
+      if (f[field] != null && (!Number.isSafeInteger(f[field]) || f[field] < 0)) throw Error("来源范围无效");
+    if (f.selectionStart != null && (f.selectionEnd !== f.selectionStart + f.selection.length || f.selectionEnd > f.sourceLength))
+      throw Error("来源范围与选区不一致");
+    for (const field of ["captureComplete","hasNonText"])
+      if (f[field] != null && typeof f[field] !== "boolean") throw Error("来源完整性标志无效");
     if (codePoints(before) > 500 || codePoints(after) > 500)
       throw Error("片段上下文超过 500 code points");
     if (!["cites", "supports", "opposes", "background"].includes(relation))
@@ -87,6 +93,7 @@
       throw Error("结论正文不能为空");
     if (codePoints(i.text) > 4000) throw Error("结论正文超过 4000 code points");
     if (i.conditions !== undefined && typeof i.conditions !== "string") throw Error("适用条件必须是文本");
+    if(i.changeImpact!==undefined&&!["wording","substantive","conditions"].includes(i.changeImpact))throw Error("变更类型无效");
     validateFragments(i.fragments || [], { required: true });
   }
   function norm(f) {
@@ -104,6 +111,8 @@
       after: f.after || "",
       relation: f.relation || "cites",
       completeness: f.completeness || "unknown",
+      ...Object.fromEntries(["sourceLocalId","sourceRole","sourceLength","selectionStart","selectionEnd",
+        "captureComplete","captureMode","captureNotice","hasNonText"].filter(k=>f[k]!==undefined).map(k=>[k,f[k]])),
     };
   }
   async function fingerprint(text, conditions, fragments) {
@@ -144,6 +153,7 @@
       r.requestHash !== (await hashRequest({ schema: 2, kind, input }))
     )
       throw Error("操作 ID 已用于不同请求，已拒绝");
+    if(r.redacted)throw Error("旧操作所属数据已删除或替换，不能重放");
     return r.result;
   }
   async function ledger(kind, input, id, result) {
@@ -307,6 +317,8 @@
         conditionsOmitted: !hasConditions,
         fragmentsOmitted: !hasFragments,
         expectedVersionId: i.expectedVersionId ?? null,
+        changeImpact: i.changeImpact||"substantive",
+        carryForward: i.carryForward===true,
       },
       replay = await prior(s, "amend", raw, operationId);
     if (replay) return { replay };
@@ -322,6 +334,8 @@
     const conditions = hasConditions
       ? i.conditions || ""
       : old.conditions || "";
+    if(raw.changeImpact==="wording"&&(hasFragments||conditions!==(old.conditions||"")))throw Error("仅措辞不能改变适用条件或来源连接");
+    if(raw.carryForward&&raw.changeImpact!=="wording")throw Error("只有明确的仅措辞修订可承接依赖确认");
     if (
       Object.values(s.versions).filter((v) => v.conclusionId === id).length >=
       50
@@ -335,6 +349,8 @@
         conditions,
         sourceCount: hasFragments ? (i.fragments || []).length : fragments(s, old.id).length,
         changeType: "amend",
+        changeImpact:raw.changeImpact,
+        carryForward:raw.carryForward,
         predecessorId: old.id,
         createdAt: now(),
         creator: "user",
@@ -455,7 +471,7 @@
       project = s.projects[p];
     if (!project) throw Error("课题不存在");
     const pkg = {
-      format: "threadline-evidence/2",
+      format: project.research || project.handoffs ? "threadline-evidence/3" : "threadline-evidence/2",
       projectId: p,
       exportedAt: now(),
       includesOriginalExcerpts: true,
@@ -463,6 +479,8 @@
         takeover: !!project.takeover || conclusions.length > 0,
         legacyNote: project.legacyNote ? { ...project.legacyNote } : null,
         legacyNoteUnavailable: !!project.legacyNoteUnavailable,
+        ...(project.research ? {research:structuredClone(project.research)} : {}),
+        ...(project.handoffs ? {handoffs:structuredClone(project.handoffs)} : {}),
       },
       counts: {
         conclusions: conclusions.length,
@@ -490,7 +508,7 @@
   async function validateExportPackage(pkg) {
     if (
       !pkg ||
-      !["threadline-evidence/1", "threadline-evidence/2"].includes(pkg.format)
+      !["threadline-evidence/1", "threadline-evidence/2", "threadline-evidence/3"].includes(pkg.format)
     )
       throw Error("未知导出包格式");
     if (bytes(JSON.stringify(pkg)) > LIMITS.packageBytes)
@@ -501,7 +519,7 @@
     }
     if (typeof pkg.projectId !== "string" || !pkg.projectId.trim()) throw Error("课题 ID 无效");
     if (
-      pkg.format.endsWith("/2") &&
+      !pkg.format.endsWith("/1") &&
       (!pkg.project ||
         (pkg.conclusions.length && pkg.project.takeover !== true) ||
         (pkg.project.legacyNote &&
@@ -584,6 +602,23 @@
       if (v.sourceCount !== undefined && (!Number.isSafeInteger(v.sourceCount) || v.sourceCount !== fs.length))
         throw Error("版本依据数量与快照不一致");
     }
+    if (pkg.project?.research || pkg.project?.handoffs) {
+      if(pkg.format!=="threadline-evidence/3")throw Error("研究历史需要 /3 备份格式，旧格式不能静默忽略");
+      const research=typeof module!=="undefined"&&module.exports?require("./research-core.js"):globalThis.ThreadLineResearchCore;
+      const state={conclusions:Object.fromEntries(cs),versions:Object.fromEntries(vs),sources:Object.fromEntries(ss),links:Object.fromEntries(pkg.links.map(l=>[l.id,l])),projects:{[pkg.projectId]:pkg.project}};
+      if(pkg.project.research)research.validateResearch(pkg.project.research,state,pkg.projectId);
+      for(const review of pkg.project.research?.reviews||[])if(review.scopeManifest&&await hashRequest(review.scopeManifest)!==review.scopeManifestHash)throw Error("复核范围哈希不一致");
+      if(pkg.project.handoffs) {
+        if(!Array.isArray(pkg.project.handoffs)||pkg.project.handoffs.length>100)throw Error("交接历史数量无效");
+        const seen=new Set();
+        for(const h of pkg.project.handoffs) {
+          if(!isId(h.id,"dep_")||seen.has(h.id)||typeof h.text!=="string"||bytes(h.text)>128*1024||h.materialHash!==await hashText(h.text)||!Array.isArray(h.scope)||h.scopeHash!==await hashRequest(h.scope)||!Array.isArray(h.events)||h.events.length>100)throw Error("交接历史格式或哈希无效");
+          seen.add(h.id);
+          for(const row of h.scope)if(!cs.has(row.id)||vs.get(row.versionId)?.conclusionId!==row.id||!Array.isArray(row.sources)||row.sources.some(x=>!ss.has(x.id)||ss.get(x.id).textHash!==x.hash))throw Error("交接历史引用无效");
+          for(const e of h.events)if(!isId(e.id,"dep_")||!["copied","human-read"].includes(e.event)||typeof e.text!=="string"||bytes(e.text)>128*1024||e.materialHash!==await hashText(e.text)||!Number.isSafeInteger(e.at))throw Error("交接事件无效");
+        }
+      }
+    }
     return true;
   }
   async function importPackage(s, pkg, id) {
@@ -612,9 +647,11 @@
       links: cleanPkg.links,
     }))
       for (const x of xs) if (s[n][x.id]) throw Error(n + " ID 冲突：" + x.id);
-    const meta = cleanPkg.format.endsWith("/2")
+    const meta = !cleanPkg.format.endsWith("/1")
       ? cleanPkg.project || {}
       : { takeover: true, legacyNoteUnavailable: true };
+    for(const field of ["research","handoffs"])if(meta[field]&&project[field]&&stable(meta[field])!==stable(project[field]))
+      throw Error("研究历史冲突：请使用带预览的完整恢复，不能覆盖现有记录");
     if (
       meta.legacyNote &&
       project.legacyNote &&
@@ -627,6 +664,8 @@
         projectionTodo: true,
         takeover: true,
         legacyNote: project.legacyNote || meta.legacyNote || null,
+        ...(meta.research ? {research:structuredClone(meta.research)} : {}),
+        ...(meta.handoffs ? {handoffs:structuredClone(meta.handoffs)} : {}),
         ...(!project.legacyNote && !meta.legacyNote
           ? { legacyNoteUnavailable: true }
           : {}),

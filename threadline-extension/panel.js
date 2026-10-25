@@ -98,7 +98,7 @@
     $("#clear-closed").disabled=!state.projects.some(p=>p.stage==="closed");
   }
   function setWorkspace(next, focusCapture=false) {
-    workspace = next === "research" ? "research" : "switch";
+    workspace = ["switch","research","evidence"].includes(next) ? next : "switch";
     document.querySelectorAll("[data-workspace]").forEach(button => {
       const selected = button.dataset.workspace === workspace;
       button.classList.toggle("selected",selected);
@@ -107,11 +107,13 @@
     });
     $("#workspace-switch").hidden = workspace !== "switch";
     $("#workspace-research").hidden = workspace !== "research";
+    $("#workspace-evidence").hidden = workspace !== "evidence";
     if (workspace === "research" && focusCapture) {
       const tab = activeTab();
       const select = $("#capture-source");
       if (tab && Array.from(select.options).some(o => o.value === String(tab.id))) select.value = String(tab.id);
     }
+    if(workspace==="evidence")renderEvidence().catch(error=>notify(error.message,true));
     window.scrollTo(0,0);
   }
   function activeSourceKey(projectId) {
@@ -433,48 +435,56 @@
   });
   const ev$ = id => document.getElementById(id);
   let evidenceHandoffStamp = null;
+  let evidenceRequest = 0,evidenceDirectory=0,handoffGeneration=0,handoffEdits=0,handoffProject=null,handoffPending=null,evidenceHasRows=false;
+  const handoffDrafts=new Map();
 
   async function renderEvidence() {
-    const snapshot = await evSend({ type: "SNAPSHOT" });
-    const state = snapshot.state || snapshot;
+    const ticket=++evidenceDirectory,snapshot = await evSend({ type: "EV_PROJECTS" });
+    if(ticket!==evidenceDirectory)return;
     const select = ev$("evidence-project");
     const current = select.value;
     select.replaceChildren();
-    for (const project of (state.projects || [])) {
+    for (const project of (snapshot.projects || []).filter(p=>!p.deleted)) {
       const option = document.createElement("option");
       option.value = project.id;
-      option.textContent = project.name || project.id;
+      option.textContent = (project.name || project.id)+(project.unavailable?"（需恢复）":"");
       select.appendChild(option);
     }
     if ([...select.options].some(o => o.value === current)) select.value = current;
-    await renderEvidenceProject();
+    if(select.value!==current)select.dispatchEvent(new Event("change"));
+    else await renderEvidenceProject();
   }
 
   async function renderEvidenceProject() {
-    const projectId = ev$("evidence-project").value;
-    if (!projectId) { ev$("evidence-summary").textContent = "暂无课题。"; ev$("evidence-list").replaceChildren(); return; }
+    const request=++evidenceRequest,projectId = ev$("evidence-project").value;
+    if (!projectId) { evidenceHasRows=false; ev$("evidence-handoff").disabled=true; ev$("evidence-summary").textContent = "暂无课题。先在“对话切换 → 全部课题与管理”创建课题，再从整理结果逐条采纳。"; ev$("evidence-list").replaceChildren(); return; }
     let data;
     try { data = await evSend({ type: "EV_LIST", projectId }); }
     catch (e) {
+      if(request!==evidenceRequest)return;
       ev$("evidence-summary").textContent = "证据库不可用：" + e.message;
       ev$("evidence-list").replaceChildren();
       // Preserve any manually edited draft, but stop presenting it as current.
       ev$("evidence-handoff-copy").disabled = true;
+      ev$("evidence-handoff-read").disabled = true;evidenceHasRows=false;
+      ev$("evidence-handoff").disabled = true;
       evidenceHandoffStamp = null;
       return;
     }
-    ev$("evidence-summary").textContent = data.rows.length
-      ? data.summary + (data.projectionPending ? "\n已保存；共享摘要待更新。" : "\n（来源：证据库当前修订；完整内容见下方列表）")
-      : "尚无采纳结论。首次采纳后，旧“有效结论”字段将封口为只读投影。";
+    if(request!==evidenceRequest||projectId!==ev$("evidence-project").value)return;
+    evidenceHasRows=!!data.rows.length;ev$("evidence-handoff").disabled=!evidenceHasRows||!!handoffPending;
+    const adopted=data.rows.filter(r=>r.conclusion.status!=="withdrawn").length,withdrawn=data.rows.length-adopted;
+    ev$("evidence-summary").textContent=data.rows.length?`已采纳 ${adopted} 条 · 已撤回 ${withdrawn} 条 · 共 ${data.rows.reduce((n,r)=>n+r.versions.length,0)} 个版本`+(data.projectionPending?"\n证据已保存，共享摘要待更新。":"\n点击依据查看原文；修订和撤回均保留历史。") : "尚无采纳结论。先在“研究整理”或 Fork 对照结果中逐条采纳，再记录依赖与复核。";
     const holder = ev$("evidence-list");
     holder.replaceChildren();
+    if(data.project?.legacyNote?.text){const legacy=document.createElement("details"),title=document.createElement("summary"),body=document.createElement("pre");title.textContent="接管前的课题备注（未核验）";body.textContent=data.project.legacyNote.text;legacy.append(title,body);holder.append(legacy);}
     for (const row of data.rows) {
       const item = document.createElement("div");
       item.className = "evidence-item";
       const head = document.createElement("p");
       const c = row.conclusion;
       head.textContent = (c.status === "withdrawn" ? "[已撤回] " : "") +
-        (row.current ? row.current.text.slice(0, 90) : c.id) +
+        (row.current ? row.current.text : c.id) +
         (row.versions && row.versions.length > 1 ? "（修订 " + (row.versions.length - 1) + " 次）" : "");
       item.appendChild(head);
       if (row.current?.conditions) {
@@ -485,7 +495,7 @@
       for (const fragment of row.fragments || []) {
         const box = document.createElement("details");
         const summary = document.createElement("summary");
-        summary.textContent = "依据片段 · " + (fragment.relation || "cites") +
+        summary.textContent = "依据片段 · " + ({cites:"引用",supports:"支持",opposes:"反对",background:"背景"}[fragment.relation] || "引用") +
           (fragment.conversationId ? " · 会话 " + String(fragment.conversationId).slice(0, 8) + "…" : " · 仅片段（来源不可定位）");
         const pre = document.createElement("pre");
         pre.style.whiteSpace = "pre-wrap";
@@ -523,13 +533,18 @@
         const amend = document.createElement("button");
         amend.type = "button"; amend.className = "secondary"; amend.textContent = "修订";
         amend.addEventListener("click", async () => {
-          const text = prompt("修订结论正文（生成新版本，历史保留）：", row.current ? row.current.text : "");
-          if (text === null) return;
-          try {
-            await evSend({ type: "EV_AMEND", conclusionId: c.id, text, expectedVersionId:row.current.id,
-              operationId: "op_amend_" + crypto.randomUUID().replace(/-/g, "").slice(0, 12) });
-            await renderEvidenceProject();
-          } catch (e) { alert("修订失败：" + e.message); }
+          let signature=null,operationId=null;
+          const result=await ThreadLineDialogs.form({title:"修订结论",description:"保存后生成新版本，原有正文和依据保留。",submitLabel:"保存新版本",fields:[
+            {name:"text",label:"结论正文",type:"textarea",value:row.current.text,required:true,maxPoints:4000},
+            {name:"conditions",label:"适用条件",type:"textarea",rows:2,value:row.current.conditions||""},
+            {name:"changeImpact",label:"变更类型",type:"select",value:"substantive",options:[{value:"substantive",label:"实质修改"},{value:"wording",label:"仅调整措辞"},{value:"conditions",label:"适用条件变化"}]},
+            {name:"carryForward",label:"仅措辞时，我确认原依赖关系继续适用",type:"checkbox",value:false,hint:"不会替你确认上游的新版本。"}
+          ],onSubmit:async values=>{
+            if(values.carryForward&&values.changeImpact!=="wording")throw Error("承接依赖仅适用于“仅调整措辞”");
+            const nextSignature=JSON.stringify(values);if(signature!==nextSignature){signature=nextSignature;operationId="op_amend_"+crypto.randomUUID().replace(/-/g,"");}
+            return evSend({type:"EV_AMEND",conclusionId:c.id,...values,expectedVersionId:row.current.id,operationId});
+          }});
+          if(result){await renderEvidenceProject();window.dispatchEvent(new Event("threadline-evidence-changed"));notify(result.projectionPending?"新版本已保存，共享摘要待更新":"新版本已保存，历史已保留");}
         });
         const withdraw = document.createElement("button");
         withdraw.type = "button"; withdraw.className = "secondary"; withdraw.textContent = "撤回";
@@ -549,59 +564,63 @@
   }
 
   ev$("evidence-refresh").addEventListener("click", () => renderEvidenceProject());
-  ev$("evidence-project").addEventListener("change", () => renderEvidenceProject());
-  ev$("evidence-handoff").addEventListener("click", async () => {
-    const projectId = ev$("evidence-project").value;
-    if (!projectId) return;
-    try {
-      const data = await evSend({ type: "EV_LIST", projectId });
-      const corrected = [], withdrawn = [], active = [];
-      for (const row of data.rows) {
-        const c = row.conclusion;
-        if (c.status === "withdrawn") { withdrawn.push(row); continue; }
-        if (row.versions && row.versions.length > 1) corrected.push(row);
-        else active.push(row);
-      }
-      const lines = ["【交接材料 · " + (ev$("evidence-project").selectedOptions[0]?.textContent || projectId) + "】", ""];
-      const append = r => {
-        lines.push("- " + r.current.text + "（版本 " + r.current.id + "）");
-        if (r.current.conditions) lines.push("  适用条件：" + r.current.conditions);
-        for (const f of r.fragments) lines.push("  依据（" + f.relation + "，" + f.completeness + "）：" +
-          f.selection + (f.conversationId ? "；会话 " + f.conversationId : "；仅片段") +
-          (f.messageId ? "；消息 " + f.messageId : ""));
-      };
-      lines.push("■ 已采纳结论（" + active.length + "）");
-      for (const r of active) append(r);
-      lines.push("", "■ 更正过的结论（" + corrected.length + "，以最新为准）");
-      for (const r of corrected) append(r);
-      lines.push("", "■ 已撤回（" + withdrawn.length + "，请勿继续引用）");
-      for (const r of withdrawn) lines.push("- " + (r.current?.text || "").slice(0, 80));
-      lines.push("", "■ 已知未知项：未逐条核验外部资料；来源定位失败时仅有片段。");
-      const view = ev$("evidence-handoff-view");
-      view.hidden = false;
-      view.value = lines.join("\n");
-      evidenceHandoffStamp = {projectId,revision:data.project?.evidenceRevision || 0};
-      ev$("evidence-handoff-copy").hidden = false;
-      ev$("evidence-handoff-copy").disabled = false;
-    } catch (e) { alert("交接生成失败：" + e.message); }
+  ev$("evidence-handoff-view").addEventListener("input",()=>{++handoffEdits;});
+  ev$("evidence-project").addEventListener("change",()=>{
+    const view=ev$("evidence-handoff-view");
+    if(handoffProject&&!view.hidden)handoffDrafts.set(handoffProject,{text:view.value,stamp:evidenceHandoffStamp});
+    ++handoffGeneration;++handoffEdits;handoffPending=null;evidenceHasRows=false;ev$("evidence-handoff").disabled=true;handoffProject=ev$("evidence-project").value;
+    const saved=handoffDrafts.get(handoffProject);view.value=saved?.text||"";view.hidden=!saved;evidenceHandoffStamp=saved?.stamp||null;
+    for(const id of ["evidence-handoff-copy","evidence-handoff-read"]){ev$(id).hidden=!saved;ev$(id).disabled=!saved?.stamp;}
+    renderEvidenceProject();
+  });
+  ev$("evidence-handoff").addEventListener("click",async()=>{
+    const projectId=ev$("evidence-project").value;if(!projectId||handoffPending)return;
+    const generation=++handoffGeneration,edits=handoffEdits;handoffPending={generation,projectId};ev$("evidence-handoff").disabled=true;
+    const applies=()=>generation===handoffGeneration&&projectId===ev$("evidence-project").value&&edits===handoffEdits;
+    try{
+      const data=await evSend({type:"EV_LIST",projectId});if(!applies())return;
+      const result=await evSend({type:"EV_HANDOFF_PREPARE",projectId,expectedRevision:data.project.evidenceRevision,operationId:"op_handoff_"+crypto.randomUUID().replace(/-/g,"")});
+      if(!applies()){notify("新预览已保存到原课题历史；当前编辑的草稿已保留。");return;}
+      const view=ev$("evidence-handoff-view");view.hidden=false;view.value=result.handoff.text;handoffProject=projectId;
+      evidenceHandoffStamp={projectId,handoffId:result.handoff.id};handoffDrafts.set(projectId,{text:view.value,stamp:evidenceHandoffStamp});
+      for(const id of ["evidence-handoff-copy","evidence-handoff-read"]){ev$(id).hidden=false;ev$(id).disabled=false;}
+      window.dispatchEvent(new Event("threadline-evidence-changed"));
+    }catch(error){if(generation===handoffGeneration)notify("交接生成未确认："+error.message+"。原草稿仍保留。",true);}
+    finally{if(handoffPending?.generation===generation){handoffPending=null;ev$("evidence-handoff").disabled=!evidenceHasRows;}}
   });
   ev$("evidence-handoff-copy").addEventListener("click", async () => {
+    let copied=false;
     try {
       const stamp = evidenceHandoffStamp;
       if (!stamp || stamp.projectId !== ev$("evidence-project").value) throw new Error("课题已变化，请重新生成预览；当前草稿仍保留");
-      const data = await evSend({type:"EV_LIST",projectId:stamp.projectId});
-      if ((data.project?.evidenceRevision || 0) !== stamp.revision) throw new Error("证据已变化，请重新核对预览；当前草稿仍保留");
-      await navigator.clipboard.writeText(ev$("evidence-handoff-view").value);
+      const text=ev$("evidence-handoff-view").value;
+      await evSend({type:"EV_HANDOFF_VALIDATE",projectId:stamp.projectId,handoffId:stamp.handoffId,text});
+      await navigator.clipboard.writeText(text);
+      copied=true;
+      const data=await evSend({type:"EV_LIST",projectId:stamp.projectId});
+      await evSend({type:"EV_HANDOFF_RECORD",projectId:stamp.projectId,handoffId:stamp.handoffId,text,event:"copied",
+        expectedRevision:data.project.evidenceRevision,operationId:"op_copied_"+crypto.randomUUID().replace(/-/g,"")});
       notify("已复制编辑后的交接材料");
-    } catch (e) { notify(e.message || "复制失败，请核对后手动复制", true); }
+    } catch (e) { notify((copied?"文本已复制，但复制记录未保存：":"复制未完成：")+(e.message||"请核对当前状态"), true); }
   });
+  ev$("evidence-handoff-read").addEventListener("click",async()=>{
+    try {
+      const stamp=evidenceHandoffStamp;if(!stamp||stamp.projectId!==ev$("evidence-project").value)throw Error("请先生成本课题交接预览");
+      const text=ev$("evidence-handoff-view").value;
+      const data=await evSend({type:"EV_LIST",projectId:stamp.projectId});
+      await evSend({type:"EV_HANDOFF_RECORD",projectId:stamp.projectId,handoffId:stamp.handoffId,text,
+        event:"human-read",expectedRevision:data.project.evidenceRevision,operationId:"op_read_"+crypto.randomUUID().replace(/-/g,"")});
+      notify("已记录你看过此份材料；这不表示模型已理解。");
+    } catch(e){notify(e.message,true);}
+  });
+  window.addEventListener("threadline-evidence-changed",()=>{renderEvidence().catch(e=>notify(e.message,true));refresh(true);});
   renderEvidence().catch(() => {});
   document.querySelector(".workspace-tabs").addEventListener("keydown", e => {
-    if (!["ArrowLeft","ArrowRight"].includes(e.key)) return;
+    if (!["ArrowLeft","ArrowRight","Home","End"].includes(e.key)) return;
     e.preventDefault();
-    const next = workspace === "switch" ? "research" : "switch";
-    setWorkspace(next);
-    $(next === "switch" ? "#nav-switch" : "#nav-research").focus();
+    const names=["switch","research","evidence"],index=names.indexOf(workspace);
+    const next=e.key==="Home"?names[0]:e.key==="End"?names.at(-1):names[(index+(e.key==="ArrowLeft"?-1:1)+names.length)%names.length];
+    setWorkspace(next);$("#nav-"+next).focus();
   });
   setWorkspace("switch");
   refresh(true);

@@ -1,5 +1,5 @@
 importScripts("core.js", "backup-core.js", "capture-core.js", "capture-db.js", "organize-core.js", "ff-core.js", "ff-db.js",
-  "evidence-core.js", "evidence-db.js");
+  "research-core.js", "evidence-core.js", "evidence-db.js", "evidence-source.js", "evidence-lifecycle.js", "evidence-workflows.js");
 const STORE_KEY = "threadline_state_v1";
 const SNAPSHOT_KEY = "threadline_state_snapshots";
 const CAPTURE_PREFIX = "tl_capture_owner_";
@@ -206,10 +206,11 @@ async function receiveCapture(payload,sender){
   }
 }
 async function openChatWithDraft(handoff,windowId,projectId){
-  const text=String(handoff||"").slice(0,30000);
+  const text=String(handoff||"");
+  if(new TextEncoder().encode(text).length>128*1024)throw new Error("接续材料超过 128 KiB，请缩小范围；未截断");
   if(!text)throw new Error("没有可用于接续的研究信息");
   const tab=await chrome.tabs.create({url:"https://chatgpt.com/",active:true,...(Number.isInteger(windowId)?{windowId}:{})});
-  await chrome.storage.session.set({[`tl_handoff_${tab.id}`]:{text,createdAt:Date.now()}});
+  await chrome.storage.session.set({[`tl_handoff_${tab.id}`]:{text,projectId:projectId||null,createdAt:Date.now()}});
   if(projectId){
     const state=await readState();const project=ThreadLineCore.getProject(state,projectId);
     if(project?.stage==="active"){
@@ -398,12 +399,10 @@ async function ffSignals(tabId) {
   return r[`${FF_SIG_PREFIX}${tabId}`] || {sawStreaming:false, lastABytes:-1, stableSince:0, signals:[]};
 }
 function ffExtractFromCapture(pages) {
-  const rows = [...(pages || [])]
-    .sort((a, b) => (a.pageIndex || 0) - (b.pageIndex || 0) || (a.chunkIndex || 0) - (b.chunkIndex || 0))
-    .flatMap(p => p.messages || []);
+  const rows = ThreadLineCaptureCore.assemble(pages || []);
   const users = rows.filter(m => m.role === "user");
   const assistants = rows.filter(m => m.role === "assistant");
-  return {taskCount:users.length,
+  return {taskCount:users.length,message:assistants.at(-1) || null,
     reply:assistants.length ? assistants[assistants.length - 1].content : "",
     // The session data's own end marker on the final assistant message maps to
     // the attested "generation" kind (generation ended per session data).
@@ -479,7 +478,9 @@ async function ffCaptureEnded(run, tabId) {
   const sig = await ffSignals(tabId);
   const signals = [...new Set([...(sig.signals || []), "final"])];
   const pages = await ThreadLineCaptureDB.pages(run.id);
-  const {taskCount, reply, lastFinished} = ffExtractFromCapture(pages);
+  const {taskCount, reply, lastFinished, message} = ffExtractFromCapture(pages);
+  const provenance = {captureRunId:run.id,messageId:message?.id || null,hasNonText:!!message?.hasNonText,
+    captureMode:run.mode || "unknown",captureNotice:run.notice || "",sourceUrl:run.url || null};
   if (lastFinished && !signals.includes("generation")) signals.push("generation");
   const existing = await ThreadLineFFDB.read(bind.experimentId);
   const attempt = existing?.branches[bind.branch]?.attempts.find(a => a.id === bind.attemptId);
@@ -496,13 +497,13 @@ async function ffCaptureEnded(run, tabId) {
     await ffAdvance(bind, {status:"done", phase:"capturing",
       operationId:`${bind.operationId}_${bind.branch}_done`,
       reason:"capture completed; completion contract satisfied",
-      updates:{captureComplete:true, persisted:true, reply, taskCount,
+      updates:{...provenance,captureComplete:true, persisted:true, reply, taskCount,
         endSignals:signals, capturedAt:Date.now(), timing}});
   } else {
     await ffAdvance(bind, {status:"pending", phase:"capturing",
       operationId:`${bind.operationId}_captry_${run.id}`,
       reason:"capture finished but completion contract unmet; branch stays pending",
-      updates:{captureComplete:run.complete === true, persisted:true, reply, taskCount, endSignals:signals}});
+      updates:{...provenance,captureComplete:run.complete === true, persisted:true, reply, taskCount, endSignals:signals}});
   }
 }
 async function ffRecoverBindings() {
@@ -873,6 +874,79 @@ function evidenceDb() {
   return evidenceDbPromise;
 }
 const EVIDENCE_SUMMARY_PREFIX = "tl_evidence_summary_";
+let evidenceWorkflowsInstance;
+function evidenceRows(state,id) {
+  return Object.values(state.conclusions).filter(c=>c.projectId===id).map(c=>({conclusion:c,current:state.versions[c.currentVersionId],
+    versions:Object.values(state.versions).filter(v=>v.conclusionId===c.id).map(v=>v.id),
+    fragments:Object.values(state.links).filter(l=>l.versionId===c.currentVersionId).map(l=>({...state.sources[l.sourceId],relation:l.relation}))}));
+}
+function evidenceStateAfter(state,plan) {
+  if(plan.replay)return state;
+  const next=structuredClone(state),w=plan.writes;
+  for(const [store,ids] of Object.entries(w.deleteIds||{}))for(const id of ids)delete next[store][id];
+  for(const [store,single,bulk] of [["conclusions","conclusion","bulkConclusions"],["versions","version","bulkVersions"],["sources",null,"bulkSources"],["links",null,"bulkLinks"]]) {
+    if(single&&w[single])next[store][w[single].id]=w[single];
+    for(const row of [...(w[bulk]||[]),...(!single?w[store]||[]:[])])next[store][row.id]=row;
+  }
+  for(const operation of w.redactedOperations||[])next.operations[operation.operationId]=operation;
+  next.projects[w.project.projectId]=w.project;next.operations[w.ledger.operationId]=w.ledger;return next;
+}
+async function evidenceBudget(state,plan) {
+  if(plan.replay)return;
+  const next=evidenceStateAfter(state,plan);
+  if(ThreadLineEvidenceCore.bytes(JSON.stringify(next))>100*1024*1024)throw Error("证据库超过 100 MiB 产品预算，请先备份并整理；未执行写入");
+  // The same validator guards writes and imports, so saved metadata stays exportable.
+  if(!plan.writes.project.deleted)await ThreadLineEvidenceCore.validateExportPackage(ThreadLineEvidenceCore.exportPackage(next,plan.writes.project.projectId));
+}
+function recordEvidenceChange(state,plan,operationId) {
+  const c=plan.writes?.conclusion,old=c&&state.conclusions[c.id];if(!old)return plan;
+  const next=evidenceStateAfter(state,plan);
+  const changed=ThreadLineResearchCore.recordChange(next,c.projectId,{triggerEventId:"evt_"+operationId.slice(3),
+    conclusionId:c.id,fromVersion:old.currentVersionId,toVersion:c.currentVersionId,kind:c.status==="withdrawn"?"withdraw":"amend"},
+    {id:()=>"dep_"+crypto.randomUUID().replace(/-/g,""),at:Date.now()});
+  plan.writes.project.research=changed.research;return plan;
+}
+function carryEvidenceWording(state,plan) {
+  const v=plan.writes?.version,c=plan.writes?.conclusion;
+  if(!v?.carryForward||v.changeImpact!=="wording"||!c)return;
+  const carried=ThreadLineResearchCore.carryForward(evidenceStateAfter(state,plan),c.projectId,{conclusionId:c.id,fromVersion:v.predecessorId,toVersion:v.id,reason:"用户明确确认仅措辞修改，原依赖关系继续适用"},{id:()=>"dep_"+crypto.randomUUID().replace(/-/g,""),at:Date.now()});
+  plan.writes.project.research=carried.research;
+}
+async function completeEvidenceReview(authority,payload,planMetadata,commit) {
+  const {state}=authority,id=payload.projectId,Core=ThreadLineEvidenceCore,Research=ThreadLineResearchCore;
+  const changed=Research.completeReview(state,id,payload,{id:()=>"dep_"+crypto.randomUUID().replace(/-/g,""),at:Date.now()});
+  const review=changed.research.reviews.find(r=>r.id===payload.reviewId);
+  if(payload.analysis!==undefined&&(typeof payload.analysis!=="string"||Core.bytes(payload.analysis)>32*1024))throw Error("独立分析必须为不超过 32 KiB 的文本");
+  if(payload.branchUrl!==undefined&&(typeof payload.branchUrl!=="string"||payload.branchUrl.length>2048||payload.branchUrl&&!/^https:\/\//i.test(payload.branchUrl)))throw Error("复核对话链接须为 HTTPS 地址");
+  Object.assign(review.completions.at(-1),{analysis:payload.analysis||"",branchUrl:payload.branchUrl||""});
+  let plan=await planMetadata(state,id,payload,changed.research,undefined,{...changed.result,outcome:payload.outcome});
+  if(!changed.result.stale&&(payload.outcome==="revise"||payload.outcome==="withdraw")) {
+    const edit=payload.outcome==="revise"?{text:payload.text,expectedVersionId:review.targetVersionId}:null;
+    if(edit&&Object.hasOwn(payload,"conditions"))edit.conditions=payload.conditions;
+    const corePlan=edit?await Core.planAmendment(state,review.targetConclusionId,edit,payload.operationId):await Core.planWithdrawal(state,review.targetConclusionId,payload.reason,payload.operationId);
+    corePlan.writes.project=plan.writes.project;corePlan.writes.ledger=plan.writes.ledger;
+    corePlan.result={...plan.result,...corePlan.result};corePlan.writes.ledger.result=corePlan.result;
+    plan=recordEvidenceChange(state,corePlan,payload.operationId);
+  } else if(!changed.result.stale&&payload.outcome==="keep") {
+    let temporary={...state,projects:{...state.projects,[id]:plan.writes.project}};
+    for(const pair of changed.result.edgesToConfirm) {
+      const confirmed=Research.update(temporary,id,{kind:"confirmDependency",edgeId:pair.edgeId,upstreamVersionId:pair.upstreamVersionId,
+        downstreamVersionId:pair.downstreamVersionId,scopeManifestHash:review.scopeManifestHash,
+        coveredChanges:(changed.result.coveredChanges||[]).filter(t=>changed.research.events.some(e=>e.kind==="change"&&e.triggerEventId===t.triggerEventId&&e.affected.some(r=>r.conclusionId===review.targetConclusionId&&r.causes.some(c=>c.contributingEdgeIds.includes(pair.edgeId))))),
+        reason:payload.reason},{id:()=>"dep_"+crypto.randomUUID().replace(/-/g,""),at:Date.now()});
+      plan.writes.project.research=confirmed.research;temporary.projects[id]=plan.writes.project;
+    }
+  }
+  return commit(authority,plan);
+}
+function evidenceWorkflows() {
+  if(!evidenceWorkflowsInstance)evidenceWorkflowsInstance=ThreadLineEvidenceWorkflows.create({chrome,Core:ThreadLineEvidenceCore,DB:ThreadLineEvidenceDB,
+    Lifecycle:ThreadLineEvidenceLifecycle,Source:ThreadLineEvidenceSource,Research:ThreadLineResearchCore,TopicCore:ThreadLineCore,
+    CaptureDB:{getRun:(...args)=>ThreadLineCaptureDB.getRun(...args),pages:(...args)=>ThreadLineCaptureDB.pages(...args)},
+    CaptureCore:{assemble:(...args)=>ThreadLineCaptureCore.assemble(...args)},FFDB:{read:(...args)=>ThreadLineFFDB.read(...args)},db:evidenceDb,serialize,
+    loadAuthority:loadEvidenceAuthorityLocked,reconcile:reconcileEvidenceLocked,rows:evidenceRows,budget:evidenceBudget,completeReview:completeEvidenceReview});
+  return evidenceWorkflowsInstance;
+}
 function evidenceUnavailable(detail) {
   return new Error("证据权威库缺失或不完整，已停止使用旧结论：" + detail + "。请保留当前数据并检查备份。");
 }
@@ -880,11 +954,12 @@ function evidenceUnavailable(detail) {
  * Persisted summaries and topic markers detect a missing/replaced authority
  * store; they are never used to reconstruct evidence or permit legacy edits. */
 async function loadEvidenceAuthorityLocked() {
+  await evidenceWorkflows().cleanupPending();
   const db = await evidenceDb();
   const state = await ThreadLineEvidenceDB.snapshot(db);
   const local = await chrome.storage.local.get(null);
   const topic = ThreadLineCore.normalizedState(local[STORE_KEY]);
-  const taken = new Set(Object.values(state.projects).filter(p => p.takeover).map(p => p.projectId));
+  const taken = new Set(Object.values(state.projects).filter(p => p.takeover && !p.deleted).map(p => p.projectId));
   for (const c of Object.values(state.conclusions)) {
     taken.add(c.projectId);
     const version = state.versions[c.currentVersionId];
@@ -910,6 +985,7 @@ async function loadEvidenceAuthorityLocked() {
       markers.push({id:key.slice(EVIDENCE_SUMMARY_PREFIX.length),revision:value.evidenceRevision});
   for (const marker of markers) {
     const p = state.projects[marker.id];
+    if (p?.deleted) continue;
     if (!p || !Number.isSafeInteger(p.evidenceRevision) || p.evidenceRevision < marker.revision ||
         !Object.values(state.conclusions).some(c => c.projectId === marker.id))
       throw evidenceUnavailable("已接管课题与持久标记不一致");
@@ -979,7 +1055,8 @@ async function guardEvidenceMutationLocked(previous,action) {
     throw new Error("该课题已由证据库接管：旧结论只读；完整证据删除协议完成前禁止删除或批量清理。请先导出并保留证据。");
 }
 async function guardEvidenceRestoreLocked(previous,restored) {
-  const {taken} = await loadEvidenceAuthorityLocked();
+  const {taken,state} = await loadEvidenceAuthorityLocked();
+  if(restored.projects.some(p=>state.projects[p.id]?.deleted))throw Error("旧备份不能复活已删除课题，请使用明确的证据恢复流程");
   // A legacy restore replaces the entire topic store, including omitted topics.
   if ([...previous.projects,...restored.projects].some(p=>taken.has(p.id) || p.evidenceTakeover))
     throw new Error("已有课题由证据库接管：旧备份恢复/回滚会覆盖或移除证据课题，已拒绝。请使用证据备份恢复。");
@@ -992,6 +1069,8 @@ async function handleEvidence(payload, sender) {
   if (!ownPages.includes(senderPath))
     throw new Error("证据消息仅限扩展页面");
   const Core = ThreadLineEvidenceCore;
+  const advanced = await evidenceWorkflows().handle(payload);
+  if (advanced !== undefined) return advanced;
   if (payload.type === "EV_ENSURE") {
     return serialize(async () => {
       const {db} = await loadEvidenceAuthorityLocked();
@@ -1038,7 +1117,7 @@ async function handleEvidence(payload, sender) {
       let plan;
       if (payload.type === "EV_AMEND") {
         const input = {text:payload.text};
-        for (const field of ["conditions","fragments","expectedVersionId"])
+        for (const field of ["conditions","fragments","expectedVersionId","changeImpact","carryForward"])
           if (Object.prototype.hasOwnProperty.call(payload,field)) input[field] = payload[field];
         plan = await Core.planAmendment(state,payload.conclusionId,input,payload.operationId);
       } else if (payload.type === "EV_ADOPT") {
@@ -1059,6 +1138,9 @@ async function handleEvidence(payload, sender) {
         plan = await Core.planWithdrawal(state, payload.conclusionId, payload.reason, payload.operationId);
       else
         plan = await Core.importPackage(state, payload.pkg, payload.operationId);
+      if(payload.type==="EV_AMEND"||payload.type==="EV_WITHDRAW")recordEvidenceChange(state,plan,payload.operationId);
+      if(payload.type==="EV_AMEND")carryEvidenceWording(state,plan);
+      await evidenceBudget(state,plan);
       const result = await ThreadLineEvidenceDB.applyPlan(db,plan);
       // Once authority committed, projection failure must never report the write as failed.
       try { await reconcileEvidenceLocked(); return {...result,projectionPending:false}; }
@@ -1078,7 +1160,7 @@ async function handleEvidence(payload, sender) {
       const {state} = await loadEvidenceAuthorityLocked();
       await Core.importPackage(state,payload.pkg,payload.operationId);
       return {format:payload.pkg.format,projectId:payload.pkg.projectId,
-        counts:payload.pkg.counts,includesOriginalExcerpts:true,
+        counts:Object.fromEntries(["conclusions","versions","sources","links"].map(k=>[k,payload.pkg[k].length])),includesOriginalExcerpts:true,
         legacyNoteUnavailable:payload.pkg.format === "threadline-evidence/1"};
     });
   }

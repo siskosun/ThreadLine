@@ -98,6 +98,8 @@ function system() {
     ThreadLineCaptureCore: CaptureCore, ThreadLineCaptureDB: captureDB,
     ThreadLineFFCore: FFCore, ThreadLineFFDB: ffdb,
     ThreadLineEvidenceCore: EvidenceCore, ThreadLineEvidenceDB: EvidenceDB,
+    ThreadLineResearchCore: require('../research-core.js'), ThreadLineEvidenceSource: require('../evidence-source.js'),
+    ThreadLineEvidenceLifecycle: require('../evidence-lifecycle.js'), ThreadLineEvidenceWorkflows: require('../evidence-workflows.js'),
     chrome, crypto: webcrypto, console, Date, Promise, URL, TextEncoder, structuredClone
   });
   const panelSender = { id: 'ev-bg-test', url: 'chrome-extension://ev-bg-test/panel.html' };
