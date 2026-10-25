@@ -102,7 +102,9 @@ def run():
         bad(panel,{"type":"EV_HANDOFF_VALIDATE","projectId":p1,"handoffId":handoff["id"],"text":handoff["text"]},"证据已变化")
         backup = good(panel,{"type":"EV_BACKUP","projectId":p1})
         assert backup["format"] == "threadline-project-backup/1" and backup["evidence"]["project"]["research"]["edges"]
+        backup_p2 = good(panel,{"type":"EV_BACKUP","projectId":p2})
         backup_revision = evidence_revision(panel, p1)
+        backup_p2_revision = evidence_revision(panel, p2)
         # Keep chrome.storage markers but discard just the native authority.  A backup
         # restore must allocate a revision above that marker, rather than resurrecting
         # a stale revision from the package.
@@ -113,9 +115,16 @@ def run():
         restore_preview = good(panel,{"type":"EV_RESTORE_PREVIEW","backup":backup,"replace":True})
         restored = good(panel,{"type":"EV_RESTORE_COMMIT","backup":backup,"preview":restore_preview["preview"],"replace":True,"operationId":op("restoreloss")})
         assert restored["revision"] > backup_revision
+        # The authoritative store was lost for two marked projects.  Restoring
+        # only one must not make the global consistency guard silently accept
+        # the remaining missing project.
+        bad(proto,{"type":"EV_LIST","projectId":p1},"不一致")
+        restore_p2_preview = good(panel,{"type":"EV_RESTORE_PREVIEW","backup":backup_p2,"replace":True})
+        restored_p2 = good(panel,{"type":"EV_RESTORE_COMMIT","backup":backup_p2,"preview":restore_p2_preview["preview"],"replace":True,"operationId":op("restorep2")})
+        assert restored_p2["revision"] > backup_p2_revision
         after_loss = good(proto,{"type":"EV_LIST","projectId":p1})
         assert after_loss["project"]["takeover"] is True
-        good(proto, {"type":"EV_ADOPT", "projectId":p2, "text":"恢复后保留结论", "fragments":[{**source,"selection":"恢复后依据"}], "operationId":op("readoptsurv")})
+        assert good(proto,{"type":"EV_LIST","projectId":p2})["project"]["takeover"] is True
         # Preview binds an exact revision. A concurrent amendment makes the old delete preview unusable.
         preview = good(panel,{"type":"EV_DELETE_PREVIEW","projectId":p1})
         current = good(proto,{"type":"EV_LIST","projectId":p1})["rows"]
