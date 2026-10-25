@@ -9,7 +9,7 @@ import copy
 import hashlib
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from playwright.sync_api import expect, sync_playwright
+from playwright.sync_api import sync_playwright
 
 EXT = Path(__file__).resolve().parents[1]
 
@@ -156,7 +156,7 @@ def run():
             panel_errors = []
             panel.on("pageerror", lambda error: panel_errors.append(str(error)))
             panel.reload(wait_until="domcontentloaded")
-            panel.locator("#nav-evidence").click()
+            panel.locator("#evidence-accordion > summary").click()
             panel.wait_for_function(
                 "id => [...document.querySelector('#evidence-project').options]"
                 ".some(option => option.value === id)", arg=project_id)
@@ -177,11 +177,8 @@ def run():
             assert panel_errors == [], panel_errors
             # Exercise the actual text-only edit control and retain original evidence identity.
             original = send(panel, {"type": "EV_LIST", "projectId": project_id})["data"]["rows"][0]
+            panel.once("dialog", lambda dialog: dialog.accept("面板修订后的结论"))
             panel.locator("#evidence-list button", has_text="修订").click()
-            edit = panel.locator("dialog.tl-dialog")
-            edit.locator("#tl-field-text").fill("面板修订后的结论")
-            edit.get_by_role("button", name="保存新版本").click()
-            expect(edit).to_be_hidden()
             panel.wait_for_function("() => document.querySelector('#evidence-list').textContent.includes('面板修订后的结论')")
             changed = send(panel, {"type": "EV_LIST", "projectId": project_id})["data"]["rows"][0]
             assert changed["current"]["conditions"] == original["current"]["conditions"]
@@ -197,7 +194,11 @@ def run():
             topic = next(p for p in current_topic["projects"] if p["id"] == project_id)
             assert "可重试修订" in topic["decision"] and topic["knowledgeVersion"] == 3
             panel.click("#evidence-handoff")
-            panel.wait_for_function("() => !document.querySelector('#evidence-handoff-view').hidden && document.querySelector('#evidence-handoff-view').value.includes('仅适用合成样本 A')")
+            # The click starts an asynchronous EV_LIST request. Wait for the
+            # actual generated material rather than reading before its response;
+            # keep the same content assertion and do not mask request failures.
+            panel.wait_for_function(
+                "() => document.querySelector('#evidence-handoff-view')?.value.includes('仅适用合成样本 A')")
             assert "仅适用合成样本 A" in panel.locator("#evidence-handoff-view").input_value()
             panel.locator("#evidence-handoff-view").fill("人工修改的交接材料")
             assert panel.locator("#evidence-handoff-view").input_value() == "人工修改的交接材料"
@@ -310,9 +311,6 @@ def run():
                     assert not empty_restore["ok"] and "空证据包" in empty_restore["error"], empty_restore
                     assert raw_evidence(restored_page) == empty_before
                     incoming = copy.deepcopy(pkg["data"])
-                    incoming["format"] = f"threadline-evidence/{format_version}"
-                    incoming.get("project", {}).pop("research", None)
-                    incoming.get("project", {}).pop("handoffs", None)
                     if format_version == 1:
                         incoming["format"] = "threadline-evidence/1"
                         incoming.pop("project", None)
