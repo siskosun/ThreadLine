@@ -49,6 +49,7 @@ function validateProtocol(p) {
    if(!["premise_error","definition_change","source_lost","wording_only","unrelated"].includes(e.kind))fail("变化类型无效");
    if(!e.frozenState?.projects?.[c.projectId]||!e.frozenState?.conclusions?.[e.rootConclusionId])fail("B 臂缺少事先冻结的真实图状态");
    if(e.goldAffectedIds.includes(e.rootConclusionId))fail("下游真值不能把变化根结论自身算作依赖影响");
+   if(e.carryForwardConfirmed===true&&e.kind!=="wording_only")fail("仅措辞承接只能用于 wording_only 事件");
    if(e.critical===true)critical++;
    // Prevent sample construction that accidentally mixes different projects.
    for(const id of e.goldAffectedIds)if(e.frozenState.conclusions?.[id]?.projectId!==c.projectId)fail("真值下游结论不属于该案例");
@@ -108,7 +109,10 @@ export function evaluateData(protocol,observations,protocolSha256){
   for(const e of c.events){
    const item=byKey.get(c.id+"/"+e.id);if(!item)fail("观测缺失或事件身份改变："+c.id+"/"+e.id);
    // The extension's actual Research.impacts is the only B prediction source.
-   const computed=Research.impacts(e.frozenState,c.projectId,[e.rootConclusionId]).map(row=>row.conclusionId);
+   // S3 intentionally emits NO change event for a user-confirmed wording-only
+   // carry-forward; other events use the production Research.impacts routine.
+   const computed=e.carryForwardConfirmed===true?[]:
+     Research.impacts(e.frozenState,c.projectId,[e.rootConclusionId]).map(row=>row.conclusionId);
    const counts=score(computed,e.goldAffectedIds),missed=counts.fn>0&&e.critical===true;
    cTP+=counts.tp;cFP+=counts.fp;cFN+=counts.fn;if(missed)criticalCaseMisses++;
    for(const arm of ARM){
