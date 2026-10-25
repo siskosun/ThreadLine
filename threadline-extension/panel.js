@@ -479,22 +479,22 @@
         pre.textContent = (fragment.before || "") + "【" + fragment.selection + "】" + (fragment.after || "");
         box.appendChild(summary); box.appendChild(pre);
         if (fragment.conversationId) {
-          const locateRow = document.createElement(div);
-          locateRow.className = line;
-          const btn = document.createElement(button);
-          btn.type = button; btn.className = secondary; btn.textContent = 在对话中定位;
-          const note = document.createElement(span);
-          note.className = subtle;
-          btn.addEventListener(click, async () => {
+          const locateRow = document.createElement("div");
+          locateRow.className = "line";
+          const btn = document.createElement("button");
+          btn.type = "button"; btn.className = "secondary"; btn.textContent = "在对话中定位";
+          const note = document.createElement("span");
+          note.className = "subtle";
+          btn.addEventListener("click", async () => {
             note.textContent = "定位中…";
             try {
-              const r = await evSend({ type: EV_LOCATE,
+              const r = await evSend({ type: "EV_LOCATE",
                 conversationId: fragment.conversationId,
                 messageId: fragment.messageId || null,
                 role: null, contentPrefix: fragment.selection.slice(0, 40) });
               note.textContent = r.located && r.verified
-                ? 已定位到原消息
-                : (r.reason === conversation-not-open
+                ? "已定位到原消息"
+                : (r.reason === "conversation-not-open"
                     ? "对话未打开（仅片段）：https://chatgpt.com/c/" + fragment.conversationId
                     : "定位不可靠，仅显示片段");
             } catch (e) { note.textContent = "定位失败（仅片段）"; }

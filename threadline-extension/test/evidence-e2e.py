@@ -114,9 +114,35 @@ def run():
             adopted2 = page.evaluate(
                 "payload => new Promise(res => chrome.runtime.sendMessage(payload, res))",
                 {"type": "EV_ADOPT", "projectId": project_id, "text": "封口课题的第一条结论",
-                 "fragments": [{"selection": "封口用片段", "before": "前", "after": "后"}],
+                 "fragments": [{"selection": "封口用片段", "before": "前", "after": "后",
+                                "conversationId": "synthetic-evidence-conversation",
+                                "messageId": "synthetic-evidence-message"}],
                  "operationId": "op_s1a_e2e_0001"})
             assert adopted2["ok"], adopted2
+            # Render the real panel, not only the prototype/message handlers.
+            # No ChatGPT tab is opened: location must show the fragment fallback.
+            panel_errors = []
+            panel.on("pageerror", lambda error: panel_errors.append(str(error)))
+            panel.reload(wait_until="domcontentloaded")
+            panel.locator("#evidence-accordion > summary").click()
+            panel.wait_for_function(
+                "id => [...document.querySelector('#evidence-project').options]"
+                ".some(option => option.value === id)", arg=project_id)
+            panel.select_option("#evidence-project", project_id)
+            panel.click("#evidence-refresh")
+            try:
+                panel.locator("#evidence-list .evidence-item").wait_for(timeout=5000)
+            except Exception as error:
+                raise AssertionError(f"evidence panel failed to render: {panel_errors}") from error
+            assert panel.locator("#evidence-list .evidence-item").count() == 1
+            assert panel.locator("#evidence-list button", has_text="修订").count() == 1
+            assert panel.locator("#evidence-list button", has_text="撤回").count() == 1
+            panel.locator("#evidence-list details > summary").click()
+            panel.locator("#evidence-list button", has_text="在对话中定位").click()
+            panel.wait_for_function(
+                "() => document.querySelector('#evidence-list').textContent"
+                ".includes('对话未打开（仅片段）')")
+            assert panel_errors == [], panel_errors
             sealed = panel.evaluate(
                 "payload => new Promise(res => chrome.runtime.sendMessage(payload, res))",
                 {"type": "MUTATE", "action": {"type": "updateProject",
@@ -167,7 +193,8 @@ def run():
                   "withdraw-with-history, export package, collision refusal, "
                   "storage.estimate probe; S1a one-way chrome.storage "
                   "projection, legacy-decision sealing at message level, "
-                  "projection across restart")
+                  "projection across restart; real panel renders conversation-backed evidence, "
+                  "amend/withdraw controls and fragment-only location fallback")
 
 
 if __name__ == "__main__":

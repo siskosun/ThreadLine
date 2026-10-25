@@ -1,0 +1,56 @@
+{
+  "baseline": "f43fd072eb6f85dc78bddcc9853899c103293b73",
+  "scope": "Synthetic pure modules, actual DB snapshot transformation, existing background VM harness. Not real ChatGPT acceptance.",
+  "results": {
+    "ledger": {
+      "keys": [
+        "undefined"
+      ],
+      "reusedIdWithDifferentBodyAccepted": true
+    },
+    "sourceDedupe": {
+      "differentSourceAndConditionMerged": true
+    },
+    "amendMetadata": {
+      "conditions": "",
+      "source": [
+        {
+          "kind": "capture",
+          "captureRunId": null,
+          "url": null,
+          "capturedAt": 1792902272372
+        }
+      ]
+    },
+    "restore": {
+      "takeover": false,
+      "legacyNote": null
+    },
+    "importCollision": {
+      "existingSourceId": "src_6b61cfbeb6b7493f_0",
+      "overwrittenSourceId": "src_6b61cfbeb6b7493f_0",
+      "invalidHashAccepted": true
+    },
+    "importDangling": {
+      "accepted": true
+    },
+    "projection": {
+      "legacyDecision": "旧的自由文本结论",
+      "knowledgeVersion": 0
+    },
+    "topicEditRejected": true,
+    "deletion": {
+      "topicPresent": false,
+      "retainedSources": 1
+    },
+    "legacyRestore": {
+      "topicPresent": false,
+      "retainedSources": 1
+    },
+    "missingAuthority": {
+      "projectionStillPresent": true,
+      "returnedEmptySuccess": true,
+      "legacyEditAccepted": true
+    }
+  }
+}
