@@ -1080,7 +1080,7 @@ async function handleEvidence(payload, sender) {
   if (payload.type === "EV_ENSURE") {
     return serialize(async () => {
       const {db} = await loadEvidenceAuthorityLocked();
-      if (typeof payload.projectId !== "string" || !payload.projectId.trim()) throw new Error("缺少课题 ID");
+      Core.requireProjectId(payload.projectId);
       return {project:await ThreadLineEvidenceDB.ensureProject(db,payload.projectId,Core)};
     });
   }
