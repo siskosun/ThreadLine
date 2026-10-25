@@ -1,0 +1,41 @@
+{
+  "format": "threadline-pilot2-observations/1",
+  "status": "NOT_EXECUTED",
+  "protocolSha256": null,
+  "explanation": "No actual operator experiment, second rater or model calls have been executed.",
+  "records": [
+    {
+      "caseId": "case-id",
+      "eventId": "event-id",
+      "arms": {
+        "A": {
+          "correctContinuation": null,
+          "wronglyRevisedTrueClaim": null,
+          "elapsedMs": null,
+          "humanInterventions": null,
+          "modelCalls": null,
+          "receiptId": null,
+          "modelVersion": null
+        },
+        "B": {
+          "correctContinuation": null,
+          "wronglyRevisedTrueClaim": null,
+          "elapsedMs": null,
+          "humanInterventions": null,
+          "modelCalls": null,
+          "receiptId": null,
+          "modelVersion": null
+        },
+        "C": {
+          "correctContinuation": null,
+          "wronglyRevisedTrueClaim": null,
+          "elapsedMs": null,
+          "humanInterventions": null,
+          "modelCalls": null,
+          "receiptId": null,
+          "modelVersion": null
+        }
+      }
+    }
+  ]
+}
