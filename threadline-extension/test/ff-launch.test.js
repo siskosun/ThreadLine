@@ -282,9 +282,10 @@ test("FF comparison, verdict and export: gated, blind, deterministic, self-conta
     const conv='https://chatgpt.com/c/conv-p3-'+branch.toLowerCase();
     await s.message({type:'OBSERVE',href:conv,title:'会话',streaming:false},
       s.tabSender(tabId,conv));
-    const runId='cap_p3_'+branch;
-    s.runs.set(runId,{id:runId,tabId,conversationId:'conv-p3-'+branch.toLowerCase(),
-      url:conv,status:'capturing',createdAt:Date.now(),complete:false});
+    s.tabsById.get(tabId).url=conv;
+    const started=await s.message({type:'FF_CAPTURE',experimentId:created.id,branch},s.ffSender);
+    assert.equal(started.started,true);
+    const runId=started.runId;
     s.pageStore.set(`${runId}_0_0`,{id:runId,pageIndex:0,chunkIndex:0,messages:[
       {id:'m1',role:'user',content:frozen,finished:true},
       {id:'m2',role:'assistant',content:'回复 '+branch,finished:true}]});
