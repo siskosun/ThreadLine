@@ -178,7 +178,7 @@
           const t0 = performance.now();
           try {
             await send({ type: "EV_WITHDRAW", conclusionId: row.conclusion.id,
-              reason: "原型协议撤回", operationId: "op_wd_" + crypto.randomUUID().replace(/-/g, "").slice(0, 12) });
+              reason: "原型协议撤回", expectedVersionId: row.current.id, operationId: "op_wd_" + crypto.randomUUID().replace(/-/g, "").slice(0, 12) });
             record("withdraw", performance.now() - t0, true, {});
             notice("已撤回（历史保留）。");
             await refresh();
