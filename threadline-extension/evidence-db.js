@@ -10,8 +10,14 @@
   "use strict";
   const DB_NAME = "threadline_evidence_v1";
   const DB_VERSION = 1;
-  const STORES = Object.freeze(
-    ["conclusions", "versions", "sources", "links", "projects", "operations"]);
+  const STORES = Object.freeze([
+    "conclusions",
+    "versions",
+    "sources",
+    "links",
+    "projects",
+    "operations",
+  ]);
 
   function open() {
     return new Promise((resolve, reject) => {
@@ -20,13 +26,16 @@
         const db = req.result;
         for (const name of STORES) {
           if (db.objectStoreNames.contains(name)) continue;
-          if (name === "projects") db.createObjectStore(name, { keyPath: "projectId" });
-          else if (name === "operations") db.createObjectStore(name, { keyPath: "operationId" });
+          if (name === "projects")
+            db.createObjectStore(name, { keyPath: "projectId" });
+          else if (name === "operations")
+            db.createObjectStore(name, { keyPath: "operationId" });
           else db.createObjectStore(name, { keyPath: "id" });
         }
       };
       req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error || new Error("evidence DB open failed"));
+      req.onerror = () =>
+        reject(req.error || new Error("evidence DB open failed"));
     });
   }
 
@@ -41,15 +50,16 @@
   async function snapshot(db) {
     const tx = db.transaction(STORES, "readonly");
     const [conclusions, versions, sources, links, projects, operations] =
-      await Promise.all(STORES.map(s => getAll(tx, s)));
-    const toMap = (rows, key) => Object.fromEntries(rows.map(r => [r[key], r]));
+      await Promise.all(STORES.map((s) => getAll(tx, s)));
+    const toMap = (rows, key) =>
+      Object.fromEntries(rows.map((r) => [r[key], r]));
     return {
       conclusions: toMap(conclusions, "id"),
       versions: toMap(versions, "id"),
       sources: toMap(sources, "id"),
       links: toMap(links, "id"),
-      projects: Object.fromEntries(projects.map(p => [p.projectId, p])),
-      operations: toMap(operations, "operationId")
+      projects: Object.fromEntries(projects.map((p) => [p.projectId, p])),
+      operations: toMap(operations, "operationId"),
     };
   }
 
@@ -62,16 +72,30 @@
     if (plan.replay) return Promise.resolve(plan.replay);
     return new Promise((resolve, reject) => {
       let settled = false;
-      const done = value => { if (!settled) { settled = true; resolve(value); } };
-      const fail = error => { if (!settled) { settled = true; reject(error); } };
+      const done = (value) => {
+        if (!settled) {
+          settled = true;
+          resolve(value);
+        }
+      };
+      const fail = (error) => {
+        if (!settled) {
+          settled = true;
+          reject(error);
+        }
+      };
       let tx;
-      try { tx = db.transaction(STORES, "readwrite"); }
-      catch (e) { return fail(e); }
+      try {
+        tx = db.transaction(STORES, "readwrite");
+      } catch (e) {
+        return fail(e);
+      }
       // Do not resolve a durable replay until the read-only transaction has
       // actually completed: a request callback is not a commit boundary.
       let completedResult = plan.result;
       tx.oncomplete = () => done(completedResult);
-      tx.onabort = () => fail(tx.error || new Error("证据事务中止：无部分写入"));
+      tx.onabort = () =>
+        fail(tx.error || new Error("证据事务中止：无部分写入"));
       tx.onerror = () => fail(tx.error || new Error("证据事务失败"));
       const stores = {};
       for (const name of STORES) stores[name] = tx.objectStore(name);
@@ -82,8 +106,14 @@
       ledgerReq.onsuccess = () => {
         const prior = ledgerReq.result;
         if (prior) {
-          if (prior.schema !== 2 || prior.kind !== w.ledger.kind || prior.requestHash !== w.ledger.requestHash) {
-            try { tx.abort(); } catch { }
+          if (
+            prior.schema !== 2 ||
+            prior.kind !== w.ledger.kind ||
+            prior.requestHash !== w.ledger.requestHash
+          ) {
+            try {
+              tx.abort();
+            } catch {}
             return fail(new Error("操作 ID 已用于不同请求，已拒绝"));
           }
           completedResult = prior.result;
@@ -92,15 +122,28 @@
         const projectReq = stores.projects.get(w.project.projectId);
         projectReq.onsuccess = () => {
           const current = projectReq.result;
-          const expected = plan.expectedRevision === undefined
-            ? w.project.evidenceRevision - 1 : plan.expectedRevision;
+          const expected =
+            plan.expectedRevision === undefined
+              ? w.project.evidenceRevision - 1
+              : plan.expectedRevision;
           if (!current || current.evidenceRevision !== expected) {
-            try { tx.abort(); } catch { /* already aborting */ }
-            return fail(new Error("证据版本冲突（CAS）：请刷新后重试，本地修订 " +
-              (current ? current.evidenceRevision : "无") + " ≠ 期望 " + expected));
+            try {
+              tx.abort();
+            } catch {
+              /* already aborting */
+            }
+            return fail(
+              new Error(
+                "证据版本冲突（CAS）：请刷新后重试，本地修订 " +
+                  (current ? current.evidenceRevision : "无") +
+                  " ≠ 期望 " +
+                  expected,
+              ),
+            );
           }
           const add = (store, value) => {
-            if (typeof stores[store].add === "function") stores[store].add(value);
+            if (typeof stores[store].add === "function")
+              stores[store].add(value);
             else stores[store].put(value); // test doubles must still enforce collision separately.
           };
           try {
@@ -115,13 +158,17 @@
             stores.projects.put(w.project);
             add("operations", w.ledger);
           } catch (e) {
-            try { tx.abort(); } catch { }
+            try {
+              tx.abort();
+            } catch {}
             return fail(e);
           }
         };
-        projectReq.onerror = () => fail(projectReq.error || new Error("projects 读取失败"));
+        projectReq.onerror = () =>
+          fail(projectReq.error || new Error("projects 读取失败"));
       };
-      ledgerReq.onerror = () => fail(ledgerReq.error || new Error("operations 读取失败"));
+      ledgerReq.onerror = () =>
+        fail(ledgerReq.error || new Error("operations 读取失败"));
     });
   }
 
@@ -132,11 +179,24 @@
   function clearProjectionTodo(db, projectId, expectedRevision) {
     return new Promise((resolve, reject) => {
       let settled = false;
-      const done = v => { if (!settled) { settled = true; resolve(v); } };
-      const fail = e => { if (!settled) { settled = true; reject(e); } };
+      const done = (v) => {
+        if (!settled) {
+          settled = true;
+          resolve(v);
+        }
+      };
+      const fail = (e) => {
+        if (!settled) {
+          settled = true;
+          reject(e);
+        }
+      };
       let tx;
-      try { tx = db.transaction(["projects"], "readwrite"); }
-      catch (e) { return fail(e); }
+      try {
+        tx = db.transaction(["projects"], "readwrite");
+      } catch (e) {
+        return fail(e);
+      }
       tx.oncomplete = () => done({ cleared: true });
       tx.onabort = () => fail(tx.error || new Error("投影事务中止"));
       tx.onerror = () => fail(tx.error || new Error("投影事务失败"));
@@ -144,11 +204,16 @@
       req.onsuccess = () => {
         const current = req.result;
         if (!current || current.evidenceRevision !== expectedRevision) {
-          try { tx.abort(); } catch { }
+          try {
+            tx.abort();
+          } catch {}
           return done({ cleared: false, stale: true });
         }
-        tx.objectStore("projects").put({ ...current,
-          projectionRevision: expectedRevision, projectionTodo: false });
+        tx.objectStore("projects").put({
+          ...current,
+          projectionRevision: expectedRevision,
+          projectionTodo: false,
+        });
       };
       req.onerror = () => fail(req.error);
     });
@@ -163,7 +228,10 @@
       tx.onabort = () => reject(tx.error || new Error("证据课题初始化中止"));
       tx.onerror = () => reject(tx.error || new Error("证据课题初始化失败"));
       req.onsuccess = () => {
-        if (req.result) { created = req.result; return; }
+        if (req.result) {
+          created = req.result;
+          return;
+        }
         const record = Core.newProjectRecord(projectId);
         tx.objectStore("projects").put(record);
         created = record;
@@ -172,7 +240,16 @@
     });
   }
 
-  const DB = { DB_NAME, DB_VERSION, STORES, open, snapshot, applyPlan, ensureProject, clearProjectionTodo };
+  const DB = {
+    DB_NAME,
+    DB_VERSION,
+    STORES,
+    open,
+    snapshot,
+    applyPlan,
+    ensureProject,
+    clearProjectionTodo,
+  };
   if (typeof module !== "undefined" && module.exports) module.exports = DB;
   else globalThis.ThreadLineEvidenceDB = DB;
 })();
