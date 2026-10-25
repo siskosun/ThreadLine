@@ -115,7 +115,7 @@ test("restore of an absent project uses null CAS and cannot overwrite another pr
 
 test("delete and restore refuse inherited Object.prototype project IDs", async () => {
   const s = await state(false), pkg = Core.exportPackage(s, "p_target");
-  for(const id of ["__proto__", "constructor", "prototype"]) {
+  for(const id of ["__proto__", "constructor", "prototype", "toString", "valueOf", "hasOwnProperty"]) {
     await assert.rejects(Lifecycle.planDelete(s, id, "op_protected_0000001", 0), /课题 ID/);
     const corrupt=structuredClone(pkg);
     corrupt.projectId=id;
