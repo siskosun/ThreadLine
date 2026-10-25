@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>研线 · 临时课题面板</title>
+  <title>研线 · 研究工作台</title>
   <link rel="stylesheet" href="panel.css"/>
+  <link rel="stylesheet" href="ui-polish.css"/>
 </head>
 <body>
   <main id="app">
@@ -16,6 +17,7 @@
     <nav class="workspace-tabs" aria-label="研线功能" role="tablist">
       <button id="nav-switch" data-workspace="switch" role="tab" aria-selected="true" aria-controls="workspace-switch" class="selected"><span class="nav-icon" aria-hidden="true">⇄</span> 对话切换</button>
       <button id="nav-research" data-workspace="research" role="tab" aria-selected="false" aria-controls="workspace-research"><span class="nav-icon" aria-hidden="true">◎</span> 研究整理</button>
+      <button id="nav-evidence" data-workspace="evidence" role="tab" aria-selected="false" aria-controls="workspace-evidence"><span class="nav-icon" aria-hidden="true">◇</span> 证据与复核</button>
     </nav>
     <section id="workspace-switch" class="workspace-pane" role="tabpanel" aria-labelledby="nav-switch">
     <section class="surface current" id="current-section">
@@ -78,7 +80,7 @@
     </section>
     <section id="workspace-research" class="workspace-pane" role="tabpanel" aria-labelledby="nav-research" hidden>
     <section class="capture-section" id="capture-section">
-      <div class="capture-header"><h2>跨对话采集与接续</h2><span class="badge muted">新功能</span></div>
+      <div class="capture-header"><h2>跨对话采集与接续</h2><span class="badge muted">按需采集</span></div>
       <p class="capture-subtitle">选择当前浏览器中一个已经保存的 ChatGPT 对话，逐页采集历史，在右侧面板查看提要与思维导图。无需上传下载。</p>
       <div class="capture-picker">
         <label class="sr-only" for="capture-source">要采集的对话</label>
@@ -93,7 +95,7 @@
         <p id="report-ai-meta" class="report-ai-meta" hidden></p>
         <div id="report-groups"></div>
         <section class="ai-workbench" aria-label="AI 深度分析">
-          <div class="ai-head"><h3>AI 深度整理</h3><span class="badge muted">v0.5</span></div>
+          <div class="ai-head"><h3>AI 深度整理</h3><span class="badge muted">可选</span></div>
           <p class="ai-help">优先使用已登录的 ChatGPT 网页进行分析，不需要安装 Ollama。网页自动分析属于实验模式，运行前会要求你确认；结果将更新报告和导图，不会自动修改课题收口状态。</p>
           <div class="ai-field"><label for="ai-provider">分析方式</label><select id="ai-provider">
             <option value="webui" selected>ChatGPT 网页自动分析（实验性，需确认）</option>
@@ -110,7 +112,7 @@
             <div class="ai-actions"><button class="primary" id="ai-run">使用 ChatGPT 网页分析并更新导图</button><button id="ai-stop" hidden>停止分析</button></div>
           </div>
           <div class="ai-actions"><button id="ai-copy-prompt">复制 ChatGPT 结构化提示</button><button id="ai-import-clipboard">从剪贴板导入结果</button></div>
-          <details class="ai-import-details"><summary>或手动粘贴 ChatGPT 返回的 JSON</summary><textarea id="ai-json" rows="5" placeholder='粘贴包含 version、objective、findings、completed、pending、next、superseded、closure 字段的 JSON'></textarea><button id="ai-import-manual">校验并更新摘要与导图</button></details>
+          <details class="ai-import-details"><summary>或手动粘贴 ChatGPT 返回的 JSON</summary><textarea aria-label="粘贴结构化分析 JSON" id="ai-json" rows="5" placeholder='粘贴包含 version、objective、findings、completed、pending、next、superseded、closure 字段的 JSON'></textarea><button id="ai-import-manual">校验并更新摘要与导图</button></details>
           <p class="ai-status" id="ai-status" role="status" aria-live="polite"></p>
           <div class="ai-actions"><button id="ai-reset" hidden>恢复原始规则提要</button></div>
           <p class="ai-help">自动模式会将采集到的对话文本发往所选模型服务。官方 ChatGPT 计划 OAuth 授权暂未接入；网页实验模式通过已登录的页面发送提示词，并非官方 Responses API 授权。扩展不读取登录令牌，也不持久保存独立 API Key。</p>
@@ -125,7 +127,7 @@
           <p id="report-organize-status" class="remote-status" role="status" aria-live="polite"></p>
           <button id="report-open-source" class="remote-source" hidden>打开源对话，手动检查操作结果</button>
         </section>
-        <div class="report-actions"><button id="report-promote-state" class="promote-btn" hidden>审核并发布 AI 候选结论</button></div>
+        <div class="report-actions"><button id="report-promote-state" class="promote-btn" hidden>逐条选择候选结论</button></div>
         <section id="promote-review" class="promote-review" hidden aria-label="审核课题有效结论">
           <h3>审核即将共享的结论</h3>
           <p id="promote-review-notice" class="report-note"></p>
@@ -141,19 +143,19 @@
       </section>
     </section>
     </section>
-    <footer><span class="small-dot"></span> 课题状态保存在本地；点击采集后，对话文本暂存于浏览器本地，3 天后清理。仅你明确开启模型分析时，采集文本才会发送至选定模型服务。</footer>
-    <div id="toast" role="status" aria-live="polite"></div>
-    <details class="manage-accordion" id="evidence-accordion">
-    <summary>证据结论（S1b）</summary>
+    <section id="workspace-evidence" class="workspace-pane" role="tabpanel" aria-labelledby="nav-evidence" hidden>
+      <div class="workspace-intro"><h2>证据与复核</h2><p>采纳重要结论，记录前提，在变化后从原始依据继续。</p></div>
+    <details class="manage-accordion" id="evidence-accordion" open>
+    <summary>已采纳结论与依据</summary>
     <section id="evidence-section">
-      <p class="subtle">逐条采纳的重要结论与依据片段。旧“有效结论”一经采纳即封口为只读投影；修订生成新版本并保留历史。</p>
+      <p class="subtle">管理已经采纳的重要结论，随时回看依据。后续修订在此生成新版本，旧正文与撤回记录都会保留。</p>
       <div class="line">
         <label for="evidence-project">课题
           <select id="evidence-project"></select>
         </label>
         <button class="secondary" id="evidence-refresh" type="button">刷新</button>
       </div>
-      <div id="evidence-summary" class="subtle"></div>
+      <p id="evidence-summary" class="subtle" role="status" aria-live="polite"></p>
       <div id="evidence-list"></div>
       <div class="line">
         <button class="secondary" id="evidence-handoff" type="button">生成交接预览</button>
@@ -163,6 +165,9 @@
       <button class="secondary" id="evidence-handoff-read" type="button" hidden>我已看过此份材料</button>
     </section>
   </details>
+    </section>
+    <footer><span class="small-dot"></span> 采集缓存 3 天后清理；已采纳的证据、版本与复核记录独立保存，不随缓存清理，请定期备份。仅你明确开启模型分析时，采集文本才会发送至选定模型服务。</footer>
+    <div id="toast" role="status" aria-live="polite"></div>
 </main>
   <script src="core.js"></script>
   <script src="backup-core.js"></script>
@@ -171,6 +176,7 @@
   <script src="capture-db.js"></script>
   <script src="ai-core.js"></script>
   <script src="ai-providers.js"></script>
+  <script src="ui-dialogs.js"></script>
   <script src="evidence-adoption-ui.js"></script>
   <script src="capture-ui.js"></script>
   <script src="panel.js"></script>

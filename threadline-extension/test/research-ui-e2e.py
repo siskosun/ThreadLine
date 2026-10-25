@@ -56,14 +56,14 @@ def run():
             first = good(prototype, {"type": "EV_ADOPT", "projectId": project_id, "text": "上游结论", "fragments": [source], "operationId": "op_ui_arg_up"})
             second = good(prototype, {"type": "EV_ADOPT", "projectId": project_id, "text": "下游结论", "fragments": [{**source, "selection": "下游依据"}], "operationId": "op_ui_arg_down"})
             backup = good(panel, {"type": "EV_BACKUP", "projectId": project_id})
-            panel.locator("#evidence-accordion > summary").click()
+            panel.locator("#nav-evidence").click()
             expect(panel.locator("#evidence-maintenance")).to_be_visible()
 
             # Existing project + restore false: the maintenance UI must keep the
             # replacement control visible, then preview and commit only after it is checked.
             panel.evaluate("() => { window.confirm = () => true; }")
             maintenance = panel.locator("#evidence-maintenance")
-            maintenance.locator("summary").click()
+            maintenance.locator("summary").first.click()
             file_input = maintenance.locator('input[type="file"]')
             file_input.set_input_files({
                 "name": "existing-project.json", "mimeType": "application/json",

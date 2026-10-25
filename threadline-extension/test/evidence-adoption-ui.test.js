@@ -9,13 +9,13 @@ const fork=fs.readFileSync(path.join(base,'ff-page.js'),'utf8');
 
 test('adoption dialog requires explicit conclusion and source excerpt without truncation',()=>{
   assert.match(ui,/结论正文超过 4,000 字符/);
-  assert.match(ui,/每条依据都必须填写并核对片段/);
+  assert.match(ui,/请核对并填写每条依据片段/);
   assert.match(ui,/ThreadLineEvidenceAdoption/);
   assert.doesNotMatch(ui,/\.slice\(0,\s*(?:2000|3900)\)/);
   assert.doesNotMatch(ui,/maxLength/);
   assert.match(ui,/原始消息全文（只读）/);
   assert.match(ui,/使用上方选中文本/);
-  assert.match(ui,/每条结论最多 8 个依据片段/);
+  assert.match(ui,/最多 8 条依据/);
   assert.match(ui,/selectionStart/);
 });
 test('ordinary findings use capture-backed adoption instead of legacy decision mutation',()=>{

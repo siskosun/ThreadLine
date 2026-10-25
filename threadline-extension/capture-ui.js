@@ -3,7 +3,7 @@
   const $=id=>document.getElementById(id);
   let tabs=[],currentId="",lastCompleted="",currentRun=null,brief=null,rulesBrief=null,messages=[],collapsed=new Set(),zoom=0.8,timer=0,watchBusy=false;
   let aiAbort=null;
-  let organizing=false;
+  let organizing=false,captureStarting=false;
   let webHelperTabId=null;
   let linkedProjectId=null;
   const htmlEsc=s=>String(s??"").replace(/[&<>"']/g,x=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[x]));
@@ -18,7 +18,7 @@
       if(document.activeElement===sel)return;
       sel.replaceChildren();
       if(!tabs.length){sel.add(new Option("没有打开的已保存 ChatGPT 对话",""));$("capture-start").disabled=true;return;}
-      $("capture-start").disabled=false;
+      $("capture-start").disabled=captureStarting||currentRun?.status==="capturing";
       for(const tab of tabs){const name=(tab.title||"未命名对话").replace(/\s*[-–|]\s*ChatGPT\s*$/i,"").trim();sel.add(new Option(`${tab.active?"● ":""}${name.slice(0,66)}（窗口 ${tab.windowId}）`,String(tab.id)));}
       if(tabs.some(t=>String(t.id)===previous))sel.value=previous;
       else{const active=tabs.find(t=>t.active);if(active)sel.value=String(active.id);}
@@ -26,11 +26,12 @@
   }
   async function begin(){
     const tab=tabs.find(t=>String(t.id)===$("capture-source").value);if(!tab)return;
-    if(currentRun?.status==="capturing")return;
+    if(captureStarting||currentRun?.status==="capturing")return;
+    captureStarting=true;
     $("capture-start").disabled=true;$("capture-report").hidden=true;lastCompleted="";brief=null;messages=[];showError("");
     showProgress(`准备读取「${tab.title||"未命名"}」的历史…`);
     try{const result=await reply({type:"CAPTURE_START",tabId:tab.id});currentId=result.id;await poll(true);}
-    catch(e){showError(e.message);showProgress("采集启动失败",true);$("capture-start").disabled=false;}
+    catch(e){showError(e.message);showProgress("采集启动失败",true);$("capture-start").disabled=false;}finally{captureStarting=false;}
   }
   async function poll(force=false){
     if(watchBusy||!currentId)return;watchBusy=true;
@@ -69,7 +70,7 @@
     try { await ThreadLineEvidenceAdoption.open({text:item.text||item.content||"",sources:sourcesForCandidate(item),submit:form=>reply({
       type:"EV_ADOPT_CAPTURE",projectId:form.projectId,text:form.text,conditions:form.conditions,
       selections:form.selections.map(x=>({captureRunId:x.source.captureRunId,messageIndex:x.source.messageIndex,selection:x.selection,selectionStart:x.selectionStart,selectionEnd:x.selectionEnd,relation:x.relation})),
-      operationId:"op_capture_adopt_"+crypto.randomUUID().replace(/-/g,"").slice(0,12)
+      operationId:form.operationId
     })}); }
     catch(e){$("report-promote-hint").textContent="无法采纳此条："+e.message;}
   }
@@ -136,7 +137,7 @@
     if(!currentRun?.aiReport || !brief || !linkedProjectId){aiStatus('请先完成 AI 分析并关联进行中的课题',true);return;}
     const candidate=(brief.conclusions||[])[0];
     if(!candidate){$('report-promote-hint').textContent='没有可采纳的结论候选';return;}
-    await adoptCandidate(candidate);
+    const button=$("report-groups").querySelector("button");if(button){button.scrollIntoView({block:"center",behavior:"smooth"});button.focus();$("report-promote-hint").textContent="请逐条核对候选及其来源，选择需要采纳的条目。";}
   }
   function cancelPromote(){promoteDraft=null;$('promote-review').hidden=true;$('promote-review-check').checked=false;}
   async function savePromoted(){

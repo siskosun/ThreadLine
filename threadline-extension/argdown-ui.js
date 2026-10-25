@@ -33,10 +33,10 @@
     const preview = button(doc, "解析并预览关系");
     const proposals = doc.createElement("div"); proposals.id = "argdown-proposals";
     const status = doc.createElement("p"); status.id = "argdown-status"; status.className = "subtle"; status.setAttribute("role", "status");
-    body.append(notice, label(doc, "课题", project), refresh, exportButton, download, exported, imported, preview, proposals, status);
+    body.append(notice, label(doc, "课题", project), refresh, exportButton, download, label(doc,"已导出的 Argdown（只读）",exported), label(doc,"粘贴要导入的 Argdown",imported), preview, proposals, status);
     box.append(summary, body); host.append(box);
 
-    let projects = [], data = null, exportedText = "";
+    let projects = [], data = null, exportedText = "", exportedProject="", request=0;
     const say = (message, bad = false) => { status.textContent = message; status.classList.toggle("warn", bad); };
     const selectedId = () => project.value;
     const send = payload => new Promise((resolve, reject) => extensionChrome.runtime.sendMessage(payload, reply => {
@@ -51,25 +51,24 @@
       }
       if ([...project.options].some(item => item.value === prior)) project.value = prior;
     }
-    async function load() {
-      proposals.replaceChildren();
-      data=null;
+    async function load({announce=true}={}) {
+      const ticket=++request,oldData=data;proposals.replaceChildren();data=null;
       try {
-        const directory = await send({ type: "EV_PROJECTS" });
-        projects = Array.isArray(directory.projects) ? directory.projects : [];
-        fillProjects();
-        if (!selectedId()) { data = null; say(directory.error || "没有可用的证据课题。", !!directory.error); return; }
-        data = await send({ type: "EV_RESEARCH_LIST", projectId: selectedId() });
-        const count = (data.rows || []).length;
-        say(`已加载 ${count} 条已采纳结论。${count ? "可导出或预览关系。" : "先采纳结论后才能映射关系。"}`);
-      } catch (error) { data = null; say("无法加载 Argdown 工作区：" + error.message, true); }
+        const directory=await send({type:"EV_PROJECTS"});if(ticket!==request)return;
+        projects=directory.projects||[];fillProjects();const id=selectedId();
+        if(!id){exportedText="";exported.value="";download.disabled=true;say(directory.error||"暂无可用的证据课题。请先采纳结论。",!!directory.error);return;}
+        const next=await send({type:"EV_RESEARCH_LIST",projectId:id});if(ticket!==request||id!==selectedId())return;
+        data=next;
+        if(exportedProject!==id||oldData?.project?.evidenceRevision!==data.project.evidenceRevision){exportedText="";exported.value="";download.disabled=true;}
+        if(announce)say(`已加载 ${data.rows.length} 条结论。导入只生成候选，确认后才登记关系。`);
+      }catch(error){if(ticket!==request)return;data=null;exportedText="";exported.value="";download.disabled=true;say("无法加载 Argdown 工作区："+error.message,true);}
     }
     function exportArgdown() {
       if (!adapter?.exportEvidence) return say("Argdown 适配器未加载。", true);
       if (!data?.rows?.length) return say("没有可导出的已采纳结论。", true);
       try {
         exportedText = adapter.exportEvidence({ rows: data.rows, edges: data.edges || [] });
-        exported.value = exportedText; download.disabled = false; say("已生成 Argdown 文本；下载仅保存到你选择的位置。");
+        exportedProject=selectedId();exported.value = exportedText; download.disabled = false; say("已生成 Argdown 文本；下载仅保存到你选择的位置。");
       } catch (error) { say("Argdown 导出失败：" + error.message, true); }
     }
     function selectFor(labelText, labelValue) {
@@ -95,7 +94,7 @@
       const downstream = selectFor("选择已有下游结论", relation.toLabel);
       const necessary = doc.createElement("input"); necessary.type = "checkbox";
       const necessaryLabel = doc.createElement("label"); necessaryLabel.textContent = " 我确认这是下游结论的必要前提，而非自动判断或事实真值。"; necessaryLabel.prepend(necessary);
-      const reason = doc.createElement("input"); reason.maxLength = 2000; reason.placeholder = "确认理由（必填）";
+      const reason = doc.createElement("input"); reason.setAttribute("aria-label","确认必要前提的理由"); reason.maxLength = 2000; reason.placeholder = "确认理由（必填）";
       const confirm = button(doc, "登记此必要前提", "primary"); confirm.disabled = true;
       const canConfirm = () => !!necessary.checked && !!upstream.value && !!downstream.value && upstream.value !== downstream.value && !!reason.value.trim();
       const update = () => { confirm.disabled = !canConfirm(); };
@@ -110,9 +109,9 @@
               downstreamConclusionId: downstream.value,
               upstreamVersionId: currentVersion(upstream.value), downstreamVersionId: currentVersion(downstream.value),
               reason: reason.value.trim() } });
-          say("已登记为必要前提；这不证明任何结论为真。"); win.dispatchEvent(new Event("threadline-evidence-changed")); await load();
+          win.dispatchEvent(new Event("threadline-evidence-changed")); await load({announce:false});say("已登记为必要前提；这不证明任何结论为真。");
         } catch (error) {
-          say("未登记：" + error.message + "。已刷新当前版本，请重新确认。", true); await load();
+          await load({announce:false});say("未登记：" + error.message + "。已刷新当前版本，请重新确认。", true);
         } finally { confirm.disabled = !canConfirm(); }
       });
       card.append(label(doc, "上游结论", upstream), label(doc, "下游结论", downstream), necessaryLabel, reason, confirm); proposals.append(card);
@@ -120,6 +119,7 @@
     function currentVersion(id) { return data?.rows?.find(row => row.conclusion.id === id)?.current?.id; }
     function previewImport() {
       proposals.replaceChildren();
+      if(!data)return say("请先加载当前课题的已采纳结论。",true);
       if (!adapter?.parse) return say("Argdown 适配器未加载。", true);
       if (bytes(imported.value) > MAX_INPUT_BYTES) return say("Argdown 文本超过 200 KiB，未解析。", true);
       try {
@@ -133,10 +133,10 @@
     function downloadText() {
       if (!exportedText) return;
       const url = URL.createObjectURL(new Blob([exportedText], { type: "text/plain;charset=utf-8" }));
-      const link = doc.createElement("a"); link.href = url; link.download = `threadline-${selectedId() || "evidence"}.argdown`; link.click(); setTimeout(() => URL.revokeObjectURL(url), 0);
+      const link = doc.createElement("a"); link.href = url; link.download = `threadline-${exportedProject || "evidence"}.argdown`; link.click(); setTimeout(() => URL.revokeObjectURL(url), 0);
     }
     refresh.addEventListener("click", load); project.addEventListener("change", load); exportButton.addEventListener("click", exportArgdown); download.addEventListener("click", downloadText); preview.addEventListener("click", previewImport);
-    win.addEventListener("threadline-evidence-changed", () => load().catch(() => {})); load().catch(() => {});
+    win.addEventListener("threadline-evidence-changed", () => load({announce:false}).catch(() => {})); load().catch(() => {});
     return { load, previewImport, exportArgdown };
   }
   function button(doc, text, className = "secondary") { const item = doc.createElement("button"); item.type = "button"; item.className = className; item.textContent = text; return item; }

@@ -58,6 +58,8 @@ def run():
           ctx = p.chromium.launch_persistent_context(profile_path, channel="chromium", headless=True,
             args=["--no-sandbox", "--disable-dev-shm-usage", f"--disable-extensions-except={EXT}", f"--load-extension={EXT}"])
           worker = ctx.service_workers[0] if ctx.service_workers else ctx.wait_for_event("serviceworker", timeout=15000)
+          if os.environ.get("THREADLINE_TRACE_DB"):
+            worker.evaluate("""()=>{globalThis.__evidenceWrites=[];for(const method of ['put','add','delete']){const original=IDBObjectStore.prototype[method];IDBObjectStore.prototype[method]=function(value,...args){if(this.transaction.db.name==='threadline_evidence_v1')globalThis.__evidenceWrites.push({store:this.name,method,id:value?.projectId||value?.operationId||value?.id||value,revision:value?.evidenceRevision,projectionRevision:value?.projectionRevision,projectionTodo:value?.projectionTodo,stack:new Error().stack});return original.call(this,value,...args);};}}""")
           eid = worker.url.split("/")[2]
           panel = ctx.new_page()
           panel.goto(f"chrome-extension://{eid}/panel.html", wait_until="domcontentloaded")
@@ -158,13 +160,24 @@ def run():
         proto2 = ctx2.new_page(); proto2.goto(f"chrome-extension://{eid2}/evidence-prototype.html", wait_until="domcontentloaded")
         bad(proto2,{"type":"EV_ENSURE","projectId":p1},"删除")
         forged = copy.deepcopy(backup); forged["evidence"]["counts"] = {"conclusions":999999}
+        # Finish startup authority reconciliation before freezing the snapshot.
+        # The preview must be isolated from legitimate UI bootstrap recovery.
+        good(proto2,{"type":"EV_LIST","projectId":p2})
+        trace_worker=ctx2.service_workers[0]
+        trace_start=trace_worker.evaluate('()=>globalThis.__evidenceWrites?.length||0') if os.environ.get("THREADLINE_TRACE_DB") else 0
         before = raw(panel2)
         forged_preview = send(panel2,{"type":"EV_RESTORE_PREVIEW","backup":forged,"replace":True})
         if forged_preview.get("ok"):
             assert forged_preview["data"]["counts"]["conclusions"] == len(backup["evidence"]["conclusions"])
         else:
             assert forged_preview.get("error")
-        assert raw(panel2) == before
+        after=raw(panel2)
+        if after!=before:
+            for (name,old),(_,new) in zip(before,after):
+                if old!=new: print("UNEXPECTED_STORE_CHANGE",name,repr(old)[:2000],repr(new)[:2000],flush=True)
+        if os.environ.get("THREADLINE_TRACE_DB"):
+            print("TRACE_WRITES_DURING_PREVIEW",trace_worker.evaluate('(start)=>(globalThis.__evidenceWrites||[]).slice(start)',trace_start),flush=True)
+        assert after == before
         ctx2.close()
     print("PASS: native S1 lifecycle, S2 dependency, S4 review, handoff, restore and delete workflow") 
 

@@ -59,7 +59,7 @@ def run():
             # Open the real dialog from the panel, then use the second occurrence.
             opened = page.evaluate("""async projectId => {
                 window.__ordinaryAdoption = null;
-                await ThreadLineEvidenceAdoption.open({
+                void ThreadLineEvidenceAdoption.open({
                   text:'', sources:[{label:'合成来源',captureRunId:'capture-e2e-repeat',
                     messageIndex:0,content:'重复片段；中间内容；重复片段。',coverage:'原始采集：分页完成'}],
                   submit: async form => {

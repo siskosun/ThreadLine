@@ -9,7 +9,7 @@ import copy
 import hashlib
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import expect, sync_playwright
 
 EXT = Path(__file__).resolve().parents[1]
 
@@ -156,7 +156,7 @@ def run():
             panel_errors = []
             panel.on("pageerror", lambda error: panel_errors.append(str(error)))
             panel.reload(wait_until="domcontentloaded")
-            panel.locator("#evidence-accordion > summary").click()
+            panel.locator("#nav-evidence").click()
             panel.wait_for_function(
                 "id => [...document.querySelector('#evidence-project').options]"
                 ".some(option => option.value === id)", arg=project_id)
@@ -177,12 +177,12 @@ def run():
             assert panel_errors == [], panel_errors
             # Exercise the actual text-only edit control and retain original evidence identity.
             original = send(panel, {"type": "EV_LIST", "projectId": project_id})["data"]["rows"][0]
-            def amend_dialog(dialog):
-                dialog.accept("实质" if "变更类型" in dialog.message else "面板修订后的结论")
-            panel.on("dialog", amend_dialog)
             panel.locator("#evidence-list button", has_text="修订").click()
+            edit = panel.locator("dialog.tl-dialog")
+            edit.locator("#tl-field-text").fill("面板修订后的结论")
+            edit.get_by_role("button", name="保存新版本").click()
+            expect(edit).to_be_hidden()
             panel.wait_for_function("() => document.querySelector('#evidence-list').textContent.includes('面板修订后的结论')")
-            panel.remove_listener("dialog", amend_dialog)
             changed = send(panel, {"type": "EV_LIST", "projectId": project_id})["data"]["rows"][0]
             assert changed["current"]["conditions"] == original["current"]["conditions"]
             assert changed["fragments"] == original["fragments"], "text edits preserve source IDs, times and provenance"

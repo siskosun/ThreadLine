@@ -11,7 +11,7 @@ async function page(options={}){
  const model=options.model||{records:new Map(),storage:new Map(),creates:[]};
  const nodes=new Map();
  const element=()=>({value:'',textContent:'',dataset:{},disabled:false,hidden:false,checked:false,
-   handlers:{},children:[],addEventListener(type,fn){this.handlers[type]=fn;},
+   handlers:{},children:[],attributes:{},setAttribute(k,v){this.attributes[k]=v;},addEventListener(type,fn){this.handlers[type]=fn;},
    replaceChildren(){this.children=[];},appendChild(child){this.children.push(child);}});
  const $=id=>{if(!nodes.has(id))nodes.set(id,element());return nodes.get(id);};
  let armed=false;
@@ -39,9 +39,9 @@ async function page(options={}){
      throw new Error('unexpected message');
    })().then(data=>cb({ok:true,data}),error=>cb({ok:false,error:error.message}));
  }}};
- vm.runInNewContext(source,{document:{getElementById:$,createElement:element},
+ vm.runInNewContext(source,{document:{getElementById:$,createElement:element,querySelectorAll:()=>[]},
    sessionStorage:{getItem:k=>model.storage.get(k)??null,setItem:(k,v)=>model.storage.set(k,v),
-     removeItem:k=>model.storage.delete(k)},chrome,ThreadLineFFCore:F,crypto:webcrypto});
+     removeItem:k=>model.storage.delete(k)},chrome,ThreadLineFFCore:F,crypto:webcrypto,setTimeout:()=>0,clearTimeout(){}});
  await new Promise(resolve=>setImmediate(resolve));
  return {model,$,fill(){for(const [id,value] of [['ff-w0','fictional W'],['ff-p','fictional P']]){
    $(id).value=value;$(id).handlers.input();}},
