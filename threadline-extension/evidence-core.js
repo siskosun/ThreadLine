@@ -606,6 +606,8 @@
       if(pkg.format!=="threadline-evidence/3")throw Error("研究历史需要 /3 备份格式，旧格式不能静默忽略");
       if(pkg.project.research) {
         const research=typeof module!=="undefined"&&module.exports?require("./research-core.js"):globalThis.ThreadLineResearchCore;
+        const state={conclusions:Object.fromEntries(cs),versions:Object.fromEntries(vs),sources:Object.fromEntries(ss),
+          links:Object.fromEntries(pkg.links.map(l=>[l.id,l])),projects:{[pkg.projectId]:pkg.project}};
         research.validateResearch(pkg.project.research,state,pkg.projectId);
         if((pkg.project.research.reviews||[]).length||
           (pkg.project.research.events||[]).some(e=>["change","reviewCompleted"].includes(e.kind)))
