@@ -89,9 +89,11 @@
     try{
       const result=await send(payload);
       if(id!==pid())return;
-      say(result.stale?"原资料已变化：复核仅保留历史，没有改写现行结论。":"复核结果已保存，已记录适用的必要关系版本。",!!result.stale);
       await refresh();window.dispatchEvent(new Event("threadline-evidence-changed"));
       const updated=scope?.research?.reviews?.find(x=>x.id===reviewId);if(updated)show(updated);
+      // Reloading the completed record also resets explanatory text. Keep the
+      // explicit success/stale verdict as the last accessible status update.
+      say(result.stale?"原资料已变化：复核仅保留历史，没有改写现行结论。":"复核结果已保存，已记录适用的必要关系版本。",!!result.stale);
     }catch(e){say("复核提交未确认："+e.message,true);}
     finally{writing=false;$("review-complete").disabled=!!active?.completions?.length;}
   }
