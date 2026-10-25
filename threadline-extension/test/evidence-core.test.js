@@ -1029,3 +1029,19 @@ test("stale editor cannot amend a newer version, but its committed retry still r
   const retry = await Core.planAmendment(before, original.conclusionId, intent, "op_editor00002");
   assert.deepEqual(retry.replay, first);
 });
+
+test("adoption, backup and project constructor reject inherited-key IDs", async () => {
+  for (const projectId of ["__proto__", "constructor", "prototype", "bad/id", "", "x".repeat(129)]) {
+    assert.equal(Core.validProjectId(projectId), false, projectId);
+    assert.throws(() => Core.newProjectRecord(projectId), /课题 ID/);
+    assert.throws(() => Core.validateAdoption({...adoption(), projectId}), /课题 ID/);
+    const pkg = {format: "threadline-evidence/2", projectId,
+      project: {takeover: true}, conclusions: [], versions: [], sources: [], links: []};
+    await assert.rejects(Core.validateExportPackage(pkg), /课题 ID/);
+    assert.throws(() => Core.exportPackage(
+      {projects: {}, conclusions: {}, versions: {}, sources: {}, links: {}}, projectId),
+    /课题 ID/);
+  }
+  for (const projectId of ["p1", "p_target", "p_1-abcd", "P9"])
+    assert.equal(Core.validProjectId(projectId), true, projectId);
+});
