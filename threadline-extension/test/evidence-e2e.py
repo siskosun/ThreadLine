@@ -194,6 +194,11 @@ def run():
             topic = next(p for p in current_topic["projects"] if p["id"] == project_id)
             assert "可重试修订" in topic["decision"] and topic["knowledgeVersion"] == 3
             panel.click("#evidence-handoff")
+            # The click starts an asynchronous EV_LIST request. Wait for the
+            # actual generated material rather than reading before its response;
+            # keep the same content assertion and do not mask request failures.
+            panel.wait_for_function(
+                "() => document.querySelector('#evidence-handoff-view')?.value.includes('仅适用合成样本 A')")
             assert "仅适用合成样本 A" in panel.locator("#evidence-handoff-view").input_value()
             panel.locator("#evidence-handoff-view").fill("人工修改的交接材料")
             assert panel.locator("#evidence-handoff-view").input_value() == "人工修改的交接材料"
