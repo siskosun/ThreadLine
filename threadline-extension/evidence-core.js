@@ -574,7 +574,9 @@
         ...pkg,
         versions: pkg.versions.map(({ adoptionFingerprint, ...v }) => v),
       },
-      input = { pkg: cleanPkg },
+      // The operation identity seals the complete user-supplied package.
+      // Only the persisted records discard this untrusted derived cache.
+      input = { pkg },
       replay = await prior(s, "import", input, id);
     if (replay) return { replay };
     const project = s.projects[cleanPkg.projectId];
