@@ -5,3 +5,8 @@
 - 这只是桥接**活性检查**，不是对不可信页面脚本的身份或内容真实性证明。旧版 MAIN bridge 没有握手会被拒绝，须由用户主动刷新源会话标签页后再次操作。
 - `test/f3-bridge-e2e.py` 在无账户合成 Chromium 中通过 MAIN-world 故障注入屏蔽主桥发出的确认（扩展 Manifest 本来会自动装载两端脚本，因此不能假设 MAIN 未注入），先复现旧版会误报已启动的场景，验证新版本五秒后明确失败，再安装 MAIN 并由测试者手动第二次触发，检查成功回包且页面 `submitCount=0`。
 - 缺口不变：真实已登录 ChatGPT K=4 采集链路、三自然日十二次、selector 失效与 MV3 中断恢复、真实来源一致性以及用户人工签署。不要将该合成试验称为已修复线上根因。
+## 2026-10-25 合成选择器失效与原始运行归属（续审）
+
+- 运行 ID / 同标签页归属：完成时仅允许与当前 Fork attempt 的 `captureRunId`、tabId、会话 ID 全部一致的源记录推进分支。独立侧栏采集或旧运行不能替代该结果；同分支尚在 `capturing` 时重复请求明确拒绝，不覆盖原运行 ID。新增 Node 负向回归。
+- 新增 `test/f3-selector-fallback-e2e.py` 并纳入 `npm run test:e2e`：在一次性 Chromium 扩展与 IndexedDB 中模拟历史 API 全部 404，先仅保存两条角色明确的 DOM 文字并标记 `complete:false`，再移除角色选择器并验证零消息仍 `complete:false`；欢迎语不被归为助手回复，页面表单发送 0 次。
+- 本项为**合成故障注入**，不等于真实已登录 ChatGPT 选择器已经匹配，也不等于三自然日 12 次或 MV3 崩溃恢复人工验收。准确 HEAD 的 Linux/Windows CI 待核对，不得提前标通过。
