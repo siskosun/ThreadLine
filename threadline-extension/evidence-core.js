@@ -18,6 +18,15 @@
     now = () => Date.now();
   const isId = (x, p) =>
     typeof x === "string" && new RegExp("^" + p + "[a-z0-9_-]{8,64}$").test(x);
+  // Project IDs also become own property names in authority snapshots.
+  // A backup must never resolve an inherited Object.prototype key.
+  const validProjectId = x => typeof x === "string" &&
+    /^[a-zA-Z0-9_-]{1,128}$/.test(x) &&
+    !["__proto__", "constructor", "prototype"].includes(x);
+  function requireProjectId(x) {
+    if (!validProjectId(x)) throw Error("课题 ID 无效或保留名称");
+    return x;
+  }
   const uuid = () =>
     (crypto.randomUUID ? crypto.randomUUID() : "0000000000000000")
       .replace(/-/g, "")
@@ -81,8 +90,8 @@
       throw Error("单条结论片段总量超过 64 KiB");
   }
   function validateAdoption(i) {
-    if (!i || typeof i.projectId !== "string" || !i.projectId)
-      throw Error("缺少课题 ID");
+    if (!i || !validProjectId(i.projectId))
+      throw Error("课题 ID 无效或缺失");
     if (typeof i.text !== "string" || !i.text.trim())
       throw Error("结论正文不能为空");
     if (codePoints(i.text) > 4000) throw Error("结论正文超过 4000 code points");
@@ -439,6 +448,7 @@
     return prefix + body;
   }
   function exportPackage(s, p) {
+    requireProjectId(p);
     const conclusions = rows(s, p).map((x) => ({ ...x })),
       ids = new Set(conclusions.map((x) => x.id)),
       versions = Object.values(s.versions)
@@ -499,7 +509,7 @@
       if (!Array.isArray(pkg[n])) throw Error("导入包缺少 " + n);
       unique(pkg[n], n);
     }
-    if (typeof pkg.projectId !== "string" || !pkg.projectId.trim()) throw Error("课题 ID 无效");
+    requireProjectId(pkg.projectId);
     if (
       pkg.format.endsWith("/2") &&
       (!pkg.project ||
@@ -651,6 +661,8 @@
   }
   const Core = {
     LIMITS,
+    validProjectId,
+    requireProjectId,
     codePoints,
     bytes,
     validateFragment,
@@ -667,7 +679,7 @@
     hashRequest,
     uuid,
     newProjectRecord: (projectId) => ({
-      projectId,
+      projectId: requireProjectId(projectId),
       evidenceRevision: 0,
       projectionRevision: 0,
       projectionTodo: false,
