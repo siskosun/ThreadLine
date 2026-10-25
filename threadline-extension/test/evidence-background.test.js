@@ -202,6 +202,22 @@ test('withdrawal still projects; replay of a failed projection never double-bump
   assert.equal(project.legacyNote.text, '旧的自由文本结论', 'takeover note survives withdrawal (no un-seal)');
 });
 
+test('panel withdrawal uses a version guard, rejecting a stale confirmation after amendment', async () => {
+  const s = system();
+  const first = await s.message(adoption('p-taken', '初版结论'));
+  const amended = await s.message({type:'EV_AMEND',conclusionId:first.conclusionId,
+    text:'修订结论',expectedVersionId:first.versionId,operationId:'op_wdguard_amend01'});
+  const snapshot = structuredClone(s.evidence.conclusions.get(first.conclusionId));
+  await assert.rejects(s.message({type:'EV_WITHDRAW',conclusionId:first.conclusionId,
+    reason:'旧窗口',expectedVersionId:first.versionId,operationId:'op_wdguard_old001'}), /其他窗口修订/);
+  assert.deepEqual(s.evidence.conclusions.get(first.conclusionId), snapshot);
+  const payload = {type:'EV_WITHDRAW',conclusionId:first.conclusionId,
+    reason:'核对新版本后撤回',expectedVersionId:amended.versionId,operationId:'op_wdguard_new001'};
+  const result = await s.message(payload);
+  assert.equal(result.status, 'withdrawn');
+  assert.deepEqual(await s.message(payload), result);
+});
+
 test('S1b: duplicate adoption replays instead of creating a twin; amendment works end to end', async () => {
   const s = system();
   await s.message({ type: 'EV_ENSURE', projectId: 'p-taken' });

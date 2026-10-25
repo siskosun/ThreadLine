@@ -392,15 +392,18 @@
       },
     };
   }
-  async function planWithdrawal(s, id, reason, operationId) {
+  async function planWithdrawal(s, id, reason, operationId, expectedVersionId) {
     if (!isId(id, "con_") || typeof reason !== "string")
       throw Error("撤回输入无效");
-    const input = { conclusionId: id, reason },
+    const input = { conclusionId: id, reason,
+        ...(expectedVersionId === undefined ? {} : { expectedVersionId }) },
       replay = await prior(s, "withdraw", input, operationId);
     if (replay) return { replay };
     const c = s.conclusions[id],
       project = c && s.projects[c.projectId];
     if (!c || !project) throw Error("结论不存在");
+    if (expectedVersionId !== undefined && expectedVersionId !== c.currentVersionId)
+      throw Error("结论已在其他窗口修订，请刷新后核对；未撤回当前版本");
     if (c.status === "withdrawn") throw Error("结论已撤回");
     const next = {
         ...repairedProject(s, c.projectId, project),
