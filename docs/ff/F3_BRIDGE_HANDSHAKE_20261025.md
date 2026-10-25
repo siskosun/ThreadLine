@@ -10,3 +10,9 @@
 - 运行 ID / 同标签页归属：完成时仅允许与当前 Fork attempt 的 `captureRunId`、tabId、会话 ID 全部一致的源记录推进分支。独立侧栏采集或旧运行不能替代该结果；同分支尚在 `capturing` 时重复请求明确拒绝，不覆盖原运行 ID。新增 Node 负向回归。
 - 新增 `test/f3-selector-fallback-e2e.py` 并纳入 `npm run test:e2e`：在一次性 Chromium 扩展与 IndexedDB 中模拟历史 API 全部 404，先仅保存两条角色明确的 DOM 文字并标记 `complete:false`，再移除角色选择器并验证零消息仍 `complete:false`；欢迎语不被归为助手回复，页面表单发送 0 次。
 - 本项为**合成故障注入**，不等于真实已登录 ChatGPT 选择器已经匹配，也不等于三自然日 12 次或 MV3 崩溃恢复人工验收。准确 HEAD 的 Linux/Windows CI 待核对，不得提前标通过。
+
+## 2026-10-25 终态采集的人工恢复入口
+
+- Fork 分支此前可能停留在 `phase=capturing`，尽管底层来源已经 `error` 或 `done` 但不满足完成条件；旧 UI 只显示「查看采集状态」，无法手动发起新的来源采集。
+- 现在在有既有运行 ID 的待完成分支显示「核对后手动重新采集」；点击先读取绑定该分支与运行 ID 的 `FF_CAPTURE_STATUS`，只有 `error` 或 `needs_review` 才显示用户确认框，再**显式**调用 `FF_CAPTURE`。仍在运行、`stalled`、身份未知或 `integration_error` 一律拒绝重复启动。
+- 后台单分支运行 ID 防覆盖与无自动重放规则继续生效。Node UI 测试覆盖仍在运行、来源关联错误、用户取消和用户同意四种情况。**本补丁未提供浏览器重启后失去 session marker 的自动恢复；此类来源仍需人工诊断，不得误记已修复。**

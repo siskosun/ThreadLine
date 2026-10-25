@@ -115,13 +115,23 @@
           runOperation({type:"FF_REPREFILL", experimentId:data.id, branch,
             operationId:crypto.randomUUID()}, re));
         row.appendChild(re);
-      } else if (info.phase !== "capturing") {
+      } else if (info.phase !== "capturing" || ev.captureRunId) {
         const cap = document.createElement("button");
+        const recovery = info.phase === "capturing";
         cap.type = "button"; cap.className = "secondary";
-        cap.textContent = "采集回复（完成后自动核对完成条件）";
+        cap.textContent = recovery ? "核对后手动重新采集" : "采集回复（完成后自动核对完成条件）";
         cap.addEventListener("click", async () => {
           cap.disabled=true;
           try {
+            if(recovery) {
+              const previous = await send({type:"FF_CAPTURE_STATUS",experimentId:data.id,
+                branch,runId:ev.captureRunId});
+              if(!["error","needs_review"].includes(previous.state)) {
+                notice("此前采集仍在执行或状态未确认；先查看采集状态，不可重复启动。",true);
+                return;
+              }
+              if(!confirm("先前采集已结束但分支尚未完成。确定手动重新采集当前对话？原始记录会保留；不会自动发送消息。"))return;
+            }
             const result=await send({type:"FF_CAPTURE",experimentId:data.id,branch});
             if(!result.started){
               notice("采集未启动（分支 "+branch+"）："+(result.error||"注入失败")+"。没有自动重试。",true);
