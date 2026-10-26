@@ -595,8 +595,10 @@ test('F3 untracked run requires missing lease, idle window and manual abandonmen
   assert.equal(s.runs.get(first.runId).status,'capturing');
   const ended=await s.message(req,s.ffSender);
   assert.equal(ended.manualAbandoned,true);
-  assert.deepEqual(await s.message(req,s.ffSender),
-    {runId:first.runId,state:'error',alreadyAbandoned:true});
+  const replay=await s.message(req,s.ffSender);
+  assert.equal(replay.runId,first.runId);
+  assert.equal(replay.state,'error');
+  assert.equal(replay.alreadyAbandoned,true,'a repeated acknowledgement cannot mutate the old run');
   assert.equal(s.runs.get(first.runId).status,'error');
   assert.equal(s.runs.get(first.runId).complete,false);
   assert.deepEqual(s.pageStore.get(pageKey),snapshot,'stored partial pages survive');
