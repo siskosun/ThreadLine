@@ -8,7 +8,7 @@
     "check": "node scripts/check-version.mjs",
     "lint:syntax": "node scripts/check-syntax.mjs",
     "verify": "npm run lint:syntax && npm run check && npm run check:plan && npm run check:argdown-build && npm test",
-    "test:e2e": "python test/extension-e2e.py && python test/handoff-e2e.py && python test/ff-core-e2e.py && python test/evidence-e2e.py && python test/adoption-e2e.py && python test/s1-handoff-e2e.py && python test/s2-dependencies-e2e.py && python test/s3-impacts-e2e.py && python test/s4-review-e2e.py && python test/s5-interop-e2e.py && python test/s2s4-sidebar-e2e.py && python test/evidence-ux-e2e.py && python test/review-badge-e2e.py",
+    "test:e2e": "python test/extension-e2e.py && python test/handoff-e2e.py && python test/ff-core-e2e.py && python test/evidence-e2e.py && python test/adoption-e2e.py && python test/s1-handoff-e2e.py && python test/s2-dependencies-e2e.py && python test/s3-impacts-e2e.py && python test/s4-review-e2e.py && python test/s5-interop-e2e.py && python test/s2s4-sidebar-e2e.py && python test/evidence-ux-e2e.py && python test/review-badge-e2e.py && python test/f3-bridge-e2e.py && python test/f3-selector-fallback-e2e.py && python test/f3-orphan-recovery-e2e.py && python test/f3-manual-cancel-e2e.py",
     "check:plan": "node ../scripts/check-plan.mjs",
     "build:argdown": "node scripts/build-argdown.mjs",
     "argdown:preview": "node scripts/argdown-preview.mjs",

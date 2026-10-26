@@ -28,9 +28,16 @@
     const tab=tabs.find(t=>String(t.id)===$("capture-source").value);if(!tab)return;
     if(captureStarting||currentRun?.status==="capturing")return;
     captureStarting=true;
-    $("capture-start").disabled=true;$("capture-report").hidden=true;lastCompleted="";brief=null;messages=[];showError("");
+    $("capture-start").disabled=true;$("capture-cancel").hidden=true;
+    $("capture-report").hidden=true;lastCompleted="";brief=null;messages=[];showError("");
     showProgress(`准备读取「${tab.title||"未命名"}」的历史…`);
-    try{const result=await reply({type:"CAPTURE_START",tabId:tab.id});currentId=result.id;await poll(true);}
+    try{
+      const result=await reply({type:"CAPTURE_START",tabId:tab.id});
+      currentId=result.id;
+      await poll(true);
+      if(result.started===false)
+        showError("采集未启动："+(result.error||"源页面没有确认请求")+"。不会自动重试。");
+    }
     catch(e){showError(e.message);showProgress("采集启动失败",true);$("capture-start").disabled=false;}finally{captureStarting=false;}
   }
   async function poll(force=false){
@@ -39,11 +46,15 @@
       const run=await ThreadLineCaptureDB.getRun(currentId);if(!run)return;
       currentRun=run;
       if(run.status==="capturing"){
-        showProgress(`正在逐页读取：已抓取 ${run.pageCount} 页，发现约 ${run.messageCount} 条消息。请保持源标签页打开。`);
-        $("capture-start").disabled=true;
+        const idleSeconds=Math.max(0,Math.floor((Date.now()-(run.updatedAt||run.createdAt||Date.now()))/1000));
+        const stalled=idleSeconds>=15;
+        showProgress(`正在逐页读取：已抓取 ${run.pageCount} 页，发现约 ${run.messageCount} 条消息。${stalled?` 已 ${idleSeconds} 秒无进度，可手动取消；`:" "}请保持源标签页打开。`,stalled);
+        $("capture-start").disabled=true;$("capture-cancel").hidden=false;
       }else if(run.status==="error"){
+        $("capture-cancel").hidden=true;
         showProgress("采集未完成",true);showError(run.error||"采集失败，请检查标签页和网络连接");$("capture-start").disabled=false;
       }else if(run.status==="done"){
+        $("capture-cancel").hidden=true;
         const coverage=run.complete?"历史文本已按网页接口返回完毕":"仅部分历史";
         showProgress(`采集结束：${run.pageCount} 页 / 约 ${run.messageCount} 条消息 · ${coverage}`,!run.complete);
         $("capture-start").disabled=false;
@@ -73,6 +84,23 @@
       operationId:form.operationId
     })}); }
     catch(e){$("report-promote-hint").textContent="无法采纳此条："+e.message;}
+  }
+  async function cancelCapture(){
+    const run=currentRun;
+    if(!run || run.status!=="capturing")return;
+    if(!confirm("停止当前对话的采集？已抓取的本地片段会保留并标记为未完成；不会自动重新采集或发送消息。"))return;
+    const button=$("capture-cancel");
+    button.disabled=true;
+    try{
+      const result=await reply({type:"CAPTURE_CANCEL",id:run.id});
+      await poll(true);
+      if(result.cancelled){
+        showProgress("已停止写入本次采集；原始片段保留，不代表完整对话。",true);
+        if(!result.stopSignalDelivered)
+          showError("未能确认源页面收到停止信号；如页面仍在读取，请刷新来源标签页。旧运行已标记未完成。");
+      }
+    }catch(error){showError("取消未确认："+error.message+"；请检查采集状态，勿重复操作。");}
+    finally{button.disabled=false;}
   }
   function row(title,items,adoptable=false){
     const host=document.createElement("section");host.className="digest-group";
@@ -224,7 +252,7 @@
   }
   async function clearCurrent(){
     if(!currentId||!confirm("清除这份对话采集的本地正文和提要？不会删除 ChatGPT 原始对话。"))return;
-    try{await ThreadLineCaptureDB.remove(currentId);await chrome.storage.local.set({tl_last_capture_id:""});currentId="";currentRun=null;lastCompleted="";brief=null;rulesBrief=null;linkedProjectId=null;messages=[];$("capture-report").hidden=true;$("capture-progress").hidden=true;showError("");}
+    try{await ThreadLineCaptureDB.remove(currentId);await chrome.storage.local.set({tl_last_capture_id:""});currentId="";currentRun=null;lastCompleted="";brief=null;rulesBrief=null;linkedProjectId=null;messages=[];$("capture-cancel").hidden=true;$("capture-report").hidden=true;$("capture-progress").hidden=true;showError("");}
     catch(e){showError("无法清除："+e.message);}
   }
   async function copyDigest(){if(!brief)return;try{await navigator.clipboard.writeText(ThreadLineCaptureCore.handoff(brief));showProgress("提要已复制到剪贴板");}catch(e){showError("复制失败："+e.message);}}
@@ -357,6 +385,7 @@
     $('promote-review-save').addEventListener('click',savePromoted);
     $('promote-review-cancel').addEventListener('click',cancelPromote);
     $("capture-start").addEventListener("click",begin);
+    $("capture-cancel").addEventListener("click",cancelCapture);
     $("ai-provider").addEventListener("change",updateProvider);
     $("ai-run").addEventListener("click",analyzeWithProvider);
     $("ai-stop").addEventListener("click",()=>{aiAbort?.abort();if(webHelperTabId)chrome.tabs.sendMessage(webHelperTabId,{type:"TL_WEB_STOP"}).catch(()=>{});aiStatus("正在停止分析…");});

@@ -14,7 +14,7 @@ function system(){
   };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname,'..','background.js'),'utf8'),{importScripts:()=>{},...require('./helpers/empty-evidence.js')(),ThreadLineCore:Core,ThreadLineCaptureCore:CaptureCore,ThreadLineCaptureDB:db,chrome,crypto:globalThis.crypto,console,Date,Promise,URL});
   function message(payload,sender={id:'capture-test',url:'chrome-extension://capture-test/panel.html'}){return new Promise((resolve,reject)=>{events.message(payload,sender,reply=>{if(reply.ok)resolve(reply.data);else reject(new Error(reply.error));});});}
-  return{message,runs,pages,calls,session,local};
+  return{message,runs,pages,calls,session,local,events};
 }
 test('selected-tab capture starts, only original tab can provide chunks, then completes',async()=>{
   const s=system(),{id}=await s.message({type:'CAPTURE_START',tabId:7});
@@ -85,4 +85,75 @@ test('missing reservation cannot be acknowledged',async()=>{
  const sender={url:'https://chatgpt.com/',tab:{id:84,url:'https://chatgpt.com/'}};
  await assert.rejects(s.message({type:'HANDOFF_ACK'},sender),/no reserved/);
  assert.equal(s.session.get('tl_handoff_84').text,'TEST INTENT');
+});
+
+test('manual capture cancellation is panel-only, preserves partial pages and rejects late writes',async()=>{
+  const s=system(),{id}=await s.message({type:'CAPTURE_START',tabId:7});
+  const sender={tab:{id:7,url:'https://chatgpt.com/c/source-123'}};
+  await s.message({type:'CAPTURE_PAGE',id,pageIndex:0,chunkIndex:0,
+    messages:[{id:'1',role:'user',content:'partial synthetic history'}]},sender);
+  const saved=s.pages.get(id+'_0_0');
+  await assert.rejects(s.message({type:'CAPTURE_CANCEL',id},
+    {url:'https://chatgpt.com/c/source-123',tab:{id:7,url:sender.tab.url}}),
+    /只有研线面板可取消采集/);
+  assert.equal(s.runs.get(id).status,'capturing');
+  const cancel=await s.message({type:'CAPTURE_CANCEL',id});
+  assert.equal(cancel.cancelled,true);
+  assert.equal(cancel.stopSignalDelivered,true);
+  assert.equal(s.runs.get(id).status,'error');
+  assert.equal(s.runs.get(id).phase,'user-cancelled');
+  assert.equal(s.runs.get(id).complete,false);
+  assert.ok(!s.session.has('tl_capture_owner_'+id));
+  assert.equal(s.pages.get(id+'_0_0'),saved,'partial pages must remain');
+  assert.equal(s.calls.filter(c=>c[0]==='send' && c[2].type==='TL_CAPTURE_CANCEL').length,1);
+  for(const payload of [
+    {type:'CAPTURE_PAGE',id,pageIndex:0,chunkIndex:1,messages:[]},
+    {type:'CAPTURE_PROGRESS',id,pageCount:2,messageCount:2},
+    {type:'CAPTURE_RESET',id},
+    {type:'CAPTURE_END',id,complete:true,mode:'paginated',pageCount:1,count:1},
+    {type:'CAPTURE_FAIL',id,message:'late failure'}
+  ]){
+    await assert.rejects(s.message(payload,sender),/已结束/);
+  }
+  assert.equal(s.pages.size,1,'late chunks cannot extend or reset stored evidence');
+  assert.equal(s.runs.get(id).status,'error');
+  assert.equal(s.runs.get(id).phase,'user-cancelled');
+  const replay=await s.message({type:'CAPTURE_CANCEL',id});
+  assert.equal(replay.alreadyCancelled,true);
+  assert.equal(s.calls.filter(c=>c[0]==='send' && c[2].type==='TL_CAPTURE_CANCEL').length,1,
+    'replay does not send another cancel signal');
+});
+test('a completed capture cannot be retroactively cancelled',async()=>{
+  const s=system(),{id}=await s.message({type:'CAPTURE_START',tabId:7});
+  const sender={tab:{id:7,url:'https://chatgpt.com/c/source-123'}};
+  await s.message({type:'CAPTURE_END',id,complete:true,mode:'paginated',pageCount:0,count:0},sender);
+  await assert.rejects(s.message({type:'CAPTURE_CANCEL',id}),/采集已结束/);
+  assert.equal(s.runs.get(id).status,'done');
+  assert.equal(s.runs.get(id).complete,true);
+});
+
+test('stalled source with live tab is not automatically marked failed during SNAPSHOT',async()=>{
+  const s=system(),{id}=await s.message({type:'CAPTURE_START',tabId:7});
+  const old=Date.now()-16*60*1000;
+  s.runs.set(id,{...s.runs.get(id),createdAt:old,updatedAt:old});
+  await s.message({type:'SNAPSHOT'});
+  assert.equal(s.runs.get(id).status,'capturing');
+  assert.equal(s.session.has('tl_capture_owner_'+id),true);
+  const sender={tab:{id:7,url:'https://chatgpt.com/c/source-123'}};
+  await s.message({type:'CAPTURE_END',id,complete:true,mode:'paginated',pageCount:0,count:0},sender);
+  await s.message({type:'SNAPSHOT'});
+  assert.equal(s.runs.get(id).status,'done','recovery cannot overwrite completion');
+});
+test('closed source is marked incomplete and late completion cannot overwrite it',async()=>{
+  const s=system(),{id}=await s.message({type:'CAPTURE_START',tabId:7});
+  s.events.tabRemoved(7);
+  // The tab-removal callback schedules asynchronous serialized recovery.
+  await s.message({type:'SNAPSHOT'});
+  assert.equal(s.runs.get(id).status,'error');
+  assert.equal(s.runs.get(id).complete,false);
+  assert.equal(s.runs.get(id).phase,'source-closed');
+  assert.equal(s.session.has('tl_capture_owner_'+id),false);
+  await assert.rejects(s.message({type:'CAPTURE_END',id,complete:true},
+    {tab:{id:7,url:'https://chatgpt.com/c/source-123'}}),/已结束/);
+  assert.equal(s.runs.get(id).phase,'source-closed');
 });
