@@ -175,12 +175,16 @@ test("review segment attribution, corrections and deferrals require auditable id
  assert.throws(()=>evaluateData(b.protocol,b.observations,b.hash),/交接纠正目标必须属于/);
  const c=fixture();c.observations.records[0].arms.B.deferrals=[{
   triggerEventId:"event_0",targetConclusionId:c.protocol.cases[0].events[0].goldAffectedIds[0],
+  targetVersionId:c.protocol.cases[0].events[0].frozenState.conclusions[c.protocol.cases[0].events[0].goldAffectedIds[0]].currentVersionId,
   reason:"下次决策前再核对",receiptId:"synthetic-deferral-001"}];
  const result=evaluateData(c.protocol,c.observations,c.hash);
  assert.equal(result.events[0].tiered.deferredIds.length,1);
  assert.equal(result.events[0].tiered.mustReviewCount,1,"explicit defer must not erase the safety priority");
  assert.equal(result.tiered.leakedDeferred,1);
  c.observations.records[0].arms.B.deferrals[0].reason="";
+ assert.throws(()=>evaluateData(c.protocol,c.observations,c.hash),/暂不处理必须有事件身份/);
+ c.observations.records[0].arms.B.deferrals[0].reason="理由已恢复";
+ c.observations.records[0].arms.B.deferrals[0].targetVersionId="ver_wrong";
  assert.throws(()=>evaluateData(c.protocol,c.observations,c.hash),/暂不处理必须有事件身份/);
 });
 test("noise time excludes unknown learning allocation and is compared to A case by case",()=>{
