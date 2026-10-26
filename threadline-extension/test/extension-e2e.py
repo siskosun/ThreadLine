@@ -116,6 +116,7 @@ def run():
       panel.locator('[data-action="select-project"][data-id="' + pid + '"]').click()
       panel.evaluate("""() => {
         const original=chrome.runtime.sendMessage.bind(chrome.runtime);
+        window.__originalCreateSendMessage=original;
         window.__releaseCreate=null;
         window.__createdCreateResponse=null;
         chrome.runtime.sendMessage=(payload,callback)=>{
@@ -142,8 +143,8 @@ def run():
       assert panel.locator('#topic-list [data-id="' + pid + '"]').get_attribute('aria-pressed')=='true'
       assert panel.locator('#topic-list [data-id="' + delayed_id + '"]').get_attribute('aria-pressed')=='false'
       panel.evaluate("""() => {
-        if(window.__createdCreateResponse) delete window.__createdCreateResponse;
-        if(window.__releaseCreate) delete window.__releaseCreate;
+        if(window.__originalCreateSendMessage) chrome.runtime.sendMessage=window.__originalCreateSendMessage;
+        for(const key of ['__originalCreateSendMessage','__createdCreateResponse','__releaseCreate']) delete window[key];
       }""")
       panel.get_by_role('tab',name='证据与交接').click()
       panel.get_by_role('button',name='打开研究整理',exact=True).click()
