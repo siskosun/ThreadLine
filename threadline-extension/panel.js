@@ -437,6 +437,7 @@
   let evidenceHandoffStamp = null;
   let evidenceRequest = 0,evidenceDirectory=0,handoffGeneration=0,handoffEdits=0,handoffProject=null,handoffPending=null,evidenceHasRows=false;
   const handoffDrafts=new Map();
+  let evidenceListCache=null,evidenceVisibleLimit=ThreadLineEvidenceList.PAGE_SIZE;
 
   async function renderEvidence() {
     const ticket=++evidenceDirectory,snapshot = await evSend({ type: "EV_PROJECTS" });
@@ -457,13 +458,13 @@
 
   async function renderEvidenceProject() {
     const request=++evidenceRequest,projectId = ev$("evidence-project").value;
-    if (!projectId) { evidenceHasRows=false; ev$("evidence-handoff").disabled=true; ev$("evidence-summary").textContent = "暂无课题。先在“对话切换 → 全部课题与管理”创建课题，再从整理结果逐条采纳。"; ev$("evidence-list").replaceChildren(); return; }
+    if (!projectId) { evidenceListCache=null;evidenceHasRows=false;ev$("evidence-handoff").disabled=true;ev$("evidence-summary").textContent="暂无课题。先在“对话切换 → 全部课题与管理”创建课题，再从整理结果逐条采纳。";renderEvidenceRows();return; }
     let data;
     try { data = await evSend({ type: "EV_LIST", projectId }); }
     catch (e) {
       if(request!==evidenceRequest)return;
       ev$("evidence-summary").textContent = "证据库不可用：" + e.message;
-      ev$("evidence-list").replaceChildren();
+      evidenceListCache=null;renderEvidenceRows();
       // Preserve any manually edited draft, but stop presenting it as current.
       ev$("evidence-handoff-copy").disabled = true;
       ev$("evidence-handoff-read").disabled = true;evidenceHasRows=false;
@@ -475,22 +476,52 @@
     evidenceHasRows=!!data.rows.length;ev$("evidence-handoff").disabled=!evidenceHasRows||!!handoffPending;
     const adopted=data.rows.filter(r=>r.conclusion.status!=="withdrawn").length,withdrawn=data.rows.length-adopted;
     ev$("evidence-summary").textContent=data.rows.length?`已采纳 ${adopted} 条 · 已撤回 ${withdrawn} 条 · 共 ${data.rows.reduce((n,r)=>n+r.versions.length,0)} 个版本`+(data.projectionPending?"\n证据已保存，共享摘要待更新。":"\n点击依据查看原文；修订和撤回均保留历史。") : "尚无采纳结论。先在“研究整理”或 Fork 对照结果中逐条采纳。";
-    const holder = ev$("evidence-list");
+
+    evidenceListCache={projectId,rows:data.rows,legacyNote:data.project?.legacyNote?.text||""};
+    renderEvidenceRows();
+  }
+
+
+  function renderEvidenceRows() {
+    const holder=ev$("evidence-list"),more=ev$("evidence-more"),count=ev$("evidence-list-count");
+    const cache=evidenceListCache;
+    if(!cache||cache.projectId!==ev$("evidence-project").value){
+      holder.replaceChildren();count.textContent="";more.hidden=true;return;
+    }
+    const opened=new Set([...holder.querySelectorAll(".evidence-item[open]")].map(el=>el.dataset.conclusionId));
+    const view=ThreadLineEvidenceList.select(cache.rows,{
+      query:ev$("evidence-query").value,status:ev$("evidence-filter-status").value,limit:evidenceVisibleLimit
+    });
     holder.replaceChildren();
-    if(data.project?.legacyNote?.text){const legacy=document.createElement("details"),title=document.createElement("summary"),body=document.createElement("pre");title.textContent="接管前的课题备注（未核验）";body.textContent=data.project.legacyNote.text;legacy.append(title,body);holder.append(legacy);}
-    for (const row of data.rows) {
-      const item = document.createElement("div");
-      item.className = "evidence-item";
-      const head = document.createElement("p");
-      const c = row.conclusion;
-      head.textContent = (c.status === "withdrawn" ? "[已撤回] " : "") +
-        (row.current ? row.current.text : c.id) +
-        (row.versions && row.versions.length > 1 ? "（修订 " + (row.versions.length - 1) + " 次）" : "");
-      item.appendChild(head);
+    if(cache.legacyNote){
+      const legacy=document.createElement("details"),title=document.createElement("summary"),body=document.createElement("pre");
+      title.textContent="接管前的课题备注（未核验）";body.textContent=cache.legacyNote;
+      legacy.append(title,body);holder.appendChild(legacy);
+    }
+    count.textContent=`匹配 ${view.matched} / ${view.total} 条结论，当前显示 ${view.rows.length} 条`;
+    more.hidden=!view.hasMore;
+    more.textContent=`再显示 ${Math.min(ThreadLineEvidenceList.PAGE_SIZE,view.matched-view.rows.length)} 条结论`;
+    if(!view.rows.length){
+      const empty=document.createElement("p");empty.className="subtle";
+      empty.textContent=view.total?"没有符合搜索或状态筛选的结论，可清除条件重新查找。":"尚未采纳结论。请从研究整理逐条确认。";
+      holder.appendChild(empty);
+    }
+    for(const row of view.rows){
+      const c=row.conclusion,item=document.createElement("details"),summary=document.createElement("summary"),content=document.createElement("div");
+      item.className="evidence-item";item.dataset.conclusionId=c.id;
+      item.open=opened.has(c.id)||view.rows.length===1;
+      summary.className="evidence-item-header";
+      summary.textContent=(c.status==="withdrawn"?"已撤回 · ":"已采纳 · ")+ThreadLineEvidenceList.preview(row)
+        +(row.versions?.length>1?" · 修订 "+(row.versions.length-1)+" 次":"")
+        +" · "+(row.fragments?.length||0)+" 条依据";
+      content.className="evidence-item-body";
+      const head=document.createElement("p");
+      head.textContent=(c.status==="withdrawn"?"[已撤回] ":"")+(row.current?.text||c.id);
+      content.appendChild(head);item.append(summary,content);
       if (row.current?.conditions) {
         const conditions = document.createElement("p");
         conditions.textContent = "适用条件：" + row.current.conditions;
-        item.appendChild(conditions);
+        content.appendChild(conditions);
       }
       for (const fragment of row.fragments || []) {
         const box = document.createElement("details");
@@ -525,7 +556,7 @@
           locateRow.appendChild(btn); locateRow.appendChild(note);
           box.appendChild(locateRow);
         }
-        item.appendChild(box);
+        content.appendChild(box);
       }
       if (c.status !== "withdrawn") {
         const row2 = document.createElement("div");
@@ -556,15 +587,26 @@
           } catch (e) { alert("撤回失败：" + e.message); }
         });
         row2.appendChild(amend); row2.appendChild(withdraw);
-        item.appendChild(row2);
+        content.appendChild(row2);
       }
       holder.appendChild(item);
     }
   }
 
+
   ev$("evidence-refresh").addEventListener("click", () => renderEvidenceProject());
+  ev$("evidence-query").addEventListener("input",()=>{evidenceVisibleLimit=ThreadLineEvidenceList.PAGE_SIZE;renderEvidenceRows();});
+  ev$("evidence-filter-status").addEventListener("change",()=>{evidenceVisibleLimit=ThreadLineEvidenceList.PAGE_SIZE;renderEvidenceRows();});
+  ev$("evidence-more").addEventListener("click",()=>{
+    evidenceVisibleLimit+=ThreadLineEvidenceList.PAGE_SIZE;renderEvidenceRows();
+    const more=ev$("evidence-more");
+    if(!more.hidden)more.focus();
+    else ev$("evidence-list").querySelector(".evidence-item:last-of-type > summary")?.focus();
+  });
   ev$("evidence-handoff-view").addEventListener("input",()=>{++handoffEdits;});
   ev$("evidence-project").addEventListener("change",()=>{
+    evidenceListCache=null;evidenceVisibleLimit=ThreadLineEvidenceList.PAGE_SIZE;
+    ev$("evidence-query").value="";ev$("evidence-filter-status").value="all";renderEvidenceRows();
     const view=ev$("evidence-handoff-view");
     if(handoffProject&&!view.hidden)handoffDrafts.set(handoffProject,{text:view.value,stamp:evidenceHandoffStamp});
     ++handoffGeneration;++handoffEdits;handoffPending=null;evidenceHasRows=false;ev$("evidence-handoff").disabled=true;handoffProject=ev$("evidence-project").value;
