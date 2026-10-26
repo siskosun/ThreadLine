@@ -552,6 +552,94 @@ test('F3 same-tab foreign capture cannot complete a Fork attempt; only its linke
   assert.equal(row.branches.A.attempts.at(-1).evidence.reply,'正确关联的原始回复');
 });
 
+test('F3 untracked run requires missing lease, idle window and manual abandonment before retry',async()=>{
+  const s=system(),created=await s.setupExperiment('create_f3orphan_001');
+  const opened=await s.message({type:'FF_LAUNCH',experimentId:created.id,
+    operationId:'launch_f3orphan_001'},s.ffSender);
+  const tabId=opened.tabIds.A,conv='https://chatgpt.com/c/f3-orphan-source';
+  await s.message({type:'HANDOFF_BEGIN'},s.tabSender(tabId,'https://chatgpt.com/'));
+  await s.message({type:'HANDOFF_ACK'},s.tabSender(tabId,'https://chatgpt.com/'));
+  s.tabsById.get(tabId).url=conv;
+  await s.message({type:'OBSERVE',href:conv,title:'重启孤儿采集',streaming:false,
+    assistantBytes:40},s.tabSender(tabId,conv));
+  const first=await s.message({type:'FF_CAPTURE',experimentId:created.id,branch:'A'},s.ffSender);
+  assert.equal(first.started,true);
+  const req={type:'FF_CAPTURE_ABANDON',experimentId:created.id,
+    branch:'A',runId:first.runId,ack:'manual-reviewed-no-replay'};
+  const pageKey=first.runId+'_0_0';
+  s.pageStore.set(pageKey,{id:first.runId,pageIndex:0,chunkIndex:0,
+    messages:[{id:'m1',role:'user',content:'保留的部分片段'}]});
+  const snapshot=structuredClone(s.pageStore.get(pageKey));
+  const status=()=>s.message({type:'FF_CAPTURE_STATUS',experimentId:created.id,
+    branch:'A',runId:first.runId},s.ffSender);
+  assert.equal((await status()).state,'capturing');
+  s.runs.get(first.runId).updatedAt=Date.now()-61000;
+  await assert.rejects(s.message(req,s.ffSender),/活动标记/);
+  assert.equal((await status()).state,'stalled','a live session lease blocks recovery');
+  s.session.delete('tl_capture_owner_'+first.runId);
+  assert.equal((await status()).state,'untracked');
+  s.runs.get(first.runId).updatedAt=Date.now();
+  assert.equal((await status()).manualRecoveryAvailable,false);
+  await assert.rejects(s.message(req,s.ffSender),/最近仍有更新/);
+  s.runs.get(first.runId).updatedAt=Date.now()-61000;
+  const stale=await status();
+  assert.equal(stale.state,'untracked');
+  assert.equal(stale.manualRecoveryAvailable,true);
+  assert.equal(stale.branchStatus,'pending');
+  const before=await s.message({type:'FF_READ',id:created.id},s.ffSender);
+  await assert.rejects(s.message({type:'FF_CAPTURE',experimentId:created.id,branch:'A'},s.ffSender),
+    /已有进行中的采集/);
+  await assert.rejects(s.message({...req,ack:'silently-retry'},s.ffSender),/需要用户确认/);
+  await assert.rejects(s.message({...req,branch:'B'},s.ffSender),/不匹配/);
+  await assert.rejects(s.message({...req,runId:'cap_other'},s.ffSender),/不匹配/);
+  assert.equal(s.runs.get(first.runId).status,'capturing');
+  const ended=await s.message(req,s.ffSender);
+  assert.equal(ended.manualAbandoned,true);
+  assert.deepEqual(await s.message(req,s.ffSender),
+    {runId:first.runId,state:'error',alreadyAbandoned:true});
+  assert.equal(s.runs.get(first.runId).status,'error');
+  assert.equal(s.runs.get(first.runId).complete,false);
+  assert.deepEqual(s.pageStore.get(pageKey),snapshot,'stored partial pages survive');
+  assert.equal((await s.message({type:'FF_READ',id:created.id},s.ffSender)).revision,before.revision);
+  assert.equal((await status()).state,'error');
+  await assert.rejects(s.message({type:'CAPTURE_END',id:first.runId,complete:true,
+    mode:'paginated',pageCount:1,count:1},s.tabSender(tabId,conv)),/已结束/);
+  assert.equal((await s.message({type:'FF_READ',id:created.id},s.ffSender)).branches.A.status,'pending');
+  assert.equal(s.sent.filter(([,kind])=>kind==='TL_CAPTURE_START').length,1,
+    'abandonment does not initiate a new capture');
+  const next=await s.message({type:'FF_CAPTURE',experimentId:created.id,branch:'A'},s.ffSender);
+  assert.notEqual(next.runId,first.runId);
+  assert.equal(s.runs.get(first.runId).status,'error');
+  assert.equal(s.runs.size,2,'new capture requires a separate manual request');
+  assert.equal(s.sent.filter(([,kind])=>kind==='TL_CAPTURE_START').length,2);
+});
+
+test('F3 an already completed run cannot be manually reclassified as abandoned',async()=>{
+  const s=system(),created=await s.setupExperiment('create_f3done_00001');
+  const opened=await s.message({type:'FF_LAUNCH',experimentId:created.id,
+    operationId:'launch_f3done_00001'},s.ffSender);
+  const tabId=opened.tabIds.B,conv='https://chatgpt.com/c/f3-done-source';
+  await s.message({type:'HANDOFF_BEGIN'},s.tabSender(tabId,'https://chatgpt.com/'));
+  await s.message({type:'HANDOFF_ACK'},s.tabSender(tabId,'https://chatgpt.com/'));
+  s.tabsById.get(tabId).url=conv;
+  await s.message({type:'OBSERVE',href:conv,title:'采集完成优先',streaming:false,
+    assistantBytes:30},s.tabSender(tabId,conv));
+  const run=await s.message({type:'FF_CAPTURE',experimentId:created.id,branch:'B'},s.ffSender);
+  const text=(await s.message({type:'FF_READ',id:created.id},s.ffSender)).frozen.text;
+  s.pageStore.set(run.runId+'_0_0',{id:run.runId,pageIndex:0,chunkIndex:0,messages:[
+    {id:'m1',role:'user',content:text,finished:true},
+    {id:'m2',role:'assistant',content:'先完成的合成采集',finished:true}
+  ]});
+  await s.message({type:'CAPTURE_END',id:run.runId,complete:true,mode:'paginated',
+    pageCount:1,count:2},s.tabSender(tabId,conv));
+  assert.equal((await s.message({type:'FF_READ',id:created.id},s.ffSender)).branches.B.status,'done');
+  s.runs.get(run.runId).updatedAt=Date.now()-61000;
+  await assert.rejects(s.message({type:'FF_CAPTURE_ABANDON',experimentId:created.id,
+    branch:'B',runId:run.runId,ack:'manual-reviewed-no-replay'},s.ffSender),
+    /不匹配|已变化/);
+  assert.equal(s.runs.get(run.runId).status,'done');
+});
+
 test('K=4 startup recovery rebinds C/D as well as A/B without auto-prefill',async()=>{
   const s=system();
   await s.message({type:'FF_SET_ENABLED',enabled:true,ack:'local-only-no-send'},s.ffSender);
