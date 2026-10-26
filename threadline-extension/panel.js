@@ -280,10 +280,10 @@
       const text=JSON.stringify(data,null,2);
       const url=URL.createObjectURL(new Blob([text],{type:'application/json;charset=utf-8'}));
       const anchor=document.createElement('a');
-      anchor.href=url;anchor.download=`ThreadLine-课题备份-${new Date().toISOString().slice(0,10)}.json`;
+      anchor.href=url;anchor.download=`ThreadLine-课题与对话关联-${new Date().toISOString().slice(0,10)}.json`;
       document.body.append(anchor);anchor.click();anchor.remove();
       setTimeout(()=>URL.revokeObjectURL(url),2500);
-      $('#backup-status').textContent=`已下载 ${data.state.projects.length} 个课题、${Object.keys(data.state.chats).length} 条关联。临时采集原文未包含。`;
+      $('#backup-status').textContent=`已下载 ${data.state.projects.length} 个课题、${Object.keys(data.state.chats).length} 条关联。不包含证据库、Fork 实验或临时采集全文。`;
     } catch(e){$('#backup-status').textContent='导出失败：'+e.message;}
   }
   async function importBackup(){
@@ -291,7 +291,7 @@
     try {
       if(file.size>ThreadLineBackup.MAX_BYTES)throw new Error('备份文件超过 2MB');
       const json=await file.text();const state=ThreadLineBackup.parse(json);
-      if(!confirm(`确认用备份中的 ${state.projects.length} 个课题、${Object.keys(state.chats).length} 条关联覆盖当前数据吗？当前状态会先保留为本地快照。`))return;
+      if(!confirm(`确认用备份中的 ${state.projects.length} 个课题、${Object.keys(state.chats).length} 条关联替换当前所有本地课题与对话关联吗？此操作不包含证据库或 Fork 实验；当前课题状态会先保留为本地快照。`))return;
       const info=await message({type:'BACKUP_IMPORT',json});
       selectedId=null;await refresh(true);
       $('#backup-status').textContent=`恢复成功：${info.projects} 个课题、${info.chats} 条关联。`;
@@ -351,6 +351,7 @@
     const action=btn.dataset.action,key=btn.dataset.key,id=btn.dataset.id;
     if (action==="open-research") {setWorkspace("research",true);return;}
     if (action==="start-new-topic") {
+      setWorkspace("switch");
       $("#manage-accordion").open = true;
       $("#topic-name").focus();
       $("#topic-name").scrollIntoView({block:"center",behavior:"smooth"});
@@ -455,9 +456,15 @@
     else await renderEvidenceProject();
   }
 
+  function createEvidenceNext(action,label) {
+    const next=document.createElement("button");
+    next.type="button";next.className="secondary evidence-next";next.dataset.action=action;next.textContent=label;
+    return next;
+  }
+
   async function renderEvidenceProject() {
     const request=++evidenceRequest,projectId = ev$("evidence-project").value;
-    if (!projectId) { evidenceHasRows=false; ev$("evidence-handoff").disabled=true; ev$("evidence-summary").textContent = "暂无课题。先在“对话切换 → 全部课题与管理”创建课题，再从整理结果逐条采纳。"; ev$("evidence-list").replaceChildren(); return; }
+    if (!projectId) { evidenceHasRows=false; ev$("evidence-handoff").disabled=true; ev$("evidence-summary").textContent = "暂无课题。先创建课题，再从整理结果逐条采纳。"; ev$("evidence-list").replaceChildren(createEvidenceNext("start-new-topic","创建课题")); return; }
     let data;
     try { data = await evSend({ type: "EV_LIST", projectId }); }
     catch (e) {
@@ -478,6 +485,7 @@
     const holder = ev$("evidence-list");
     holder.replaceChildren();
     if(data.project?.legacyNote?.text){const legacy=document.createElement("details"),title=document.createElement("summary"),body=document.createElement("pre");title.textContent="接管前的课题备注（未核验）";body.textContent=data.project.legacyNote.text;legacy.append(title,body);holder.append(legacy);}
+    if(!data.rows.length)holder.append(createEvidenceNext("open-research","打开研究整理"));
     for (const row of data.rows) {
       const item = document.createElement("div");
       item.className = "evidence-item";

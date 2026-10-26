@@ -155,6 +155,7 @@ def run():
             # No ChatGPT tab is opened: location must show the fragment fallback.
             panel_errors = []
             panel.on("pageerror", lambda error: panel_errors.append(str(error)))
+            panel.set_viewport_size({"width": 360, "height": 900})
             panel.reload(wait_until="domcontentloaded")
             panel.get_by_role("tab", name="证据与交接").click()
             # Research navigation may already expand the accordion. Do not
@@ -175,7 +176,9 @@ def run():
             assert panel.locator("#evidence-list .evidence-item").count() == 1
             assert panel.locator("#evidence-list button", has_text="修订").count() == 1
             assert panel.locator("#evidence-list button", has_text="撤回").count() == 1
-            panel.locator("#evidence-list details > summary").click()
+            summary = panel.locator("#evidence-list details > summary")
+            assert summary.evaluate("node => node.getBoundingClientRect().height") >= 36
+            summary.click()
             panel.locator("#evidence-list button", has_text="在对话中定位").click()
             panel.wait_for_function(
                 "() => document.querySelector('#evidence-list').textContent"
@@ -187,6 +190,16 @@ def run():
             # Exercise the actual text field and submit path without weakening
             # the evidence/source preservation assertions below.
             panel.locator("#evidence-list button", has_text="修订").click()
+            action_bounds = panel.locator("dialog.tl-dialog").evaluate("""dialog => {
+                const outer = dialog.getBoundingClientRect();
+                return [...dialog.querySelectorAll('.tl-actions button')].map(button => {
+                  const rect = button.getBoundingClientRect();
+                  return {text:button.textContent,visible:rect.top >= Math.max(0, outer.top) &&
+                    rect.bottom <= Math.min(innerHeight, outer.bottom) &&
+                    rect.left >= Math.max(0, outer.left) && rect.right <= Math.min(innerWidth, outer.right)};
+                });
+            }""")
+            assert all(button["visible"] for button in action_bounds), action_bounds
             panel.locator("dialog.tl-dialog #tl-field-text").fill("面板修订后的结论")
             panel.locator("dialog.tl-dialog button[type=submit]").click()
             panel.wait_for_function("() => document.querySelector('#evidence-list').textContent.includes('面板修订后的结论')")

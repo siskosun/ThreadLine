@@ -372,3 +372,43 @@
 - [Draft PR9](https://github.com/siskosun/ThreadLine/pull/9) 将 PR1/3/5/6/7/8 当前代码收敛到 main 目标分支，生产源码与已验收 `102185b` 一致。旧 PR 保留，main 未变。
 - PLAN 的 P1-CORE 由 planned 改为 in_review/PR9；这是状态纠偏，未更改完成条件、依赖或校验器。合并、合并后准确提交的 CI 与完成 JSON 尚待正式执行，因此未写 done。
 - 本集成的回归和准确提交 CI 以 PR9 检查及 [集成证据](evidence/ACCEPTED_INTEGRATION_20261023.md) 为准。后续先完成该集成，再依正式 Z0-LIVE/P1 放行进入 P2；本次无新增网页发送、无 P2/P3 实现。
+
+## 2026-10-26 UI 标准独立复核与验收工具修复（本 PR 增量）
+
+- 逐张以原始分辨率检查 17 张生产合成截图，并实际打开 1280/360px 独立样张；17 个索引 SHA-256 全部匹配，设计 token 的 8 组对比度独立复算均正确。原探针复跑为 17 状态、零页面错误，核心 DOM 测量与冻结记录一致。
+- 新增 UX-09：采纳弹窗三个动作在 360×900 初始视口外。设计和清单补充长弹窗动作可见、键盘滚动、逐张原图人工检查及证据分级；不把修订弹窗或全部弹窗泛判为失败。
+- `probe.cjs` 增加弹窗动作测量、半透明颜色保守跳过、样张可复跑检查、`sourceDirty` 及非空输出目录拒绝保护；样张结果不再只有无来源的布尔 JSON。未改生产 JS/CSS、数据协议或 PLAN 机器状态。
+- 本地实测：`npm run verify` exit 0，285/285；增强探针 exit 0，17 状态、扩展及样张零页面错误、19 个输出文件；49 条本地 Markdown 链接零失效；非空输出目录负例 exit 1 且旧测量哈希不变。文档增量未重跑完整 Python E2E，真实登录、读屏器、真人任务及完整 WCAG 验收仍 NOT_EXECUTED。
+- 最终证据在干净提交 `80f4524668b42ac36cdd65dd13ff5c44726cb71e` 采集，`sourceDirty=false`，生产指纹不变。12 张图像字节不变，另 5 张因焦点/渲染状态或随机实验 ID 变化，已重新打开检查，未据此宣称视觉通过或回归。生产修复位于独立 Draft [PR #60](https://github.com/siskosun/ThreadLine/pull/60)，不混入本文档 PR，也不代表已合入 main。
+- 基线提交 `9e099909b89b99d2fb198d1d329447c7cdc0818c` 的 [Linux verify](https://github.com/siskosun/ThreadLine/actions/runs/40304481247) 与 [Windows baseline](https://github.com/siskosun/ThreadLine/actions/runs/40304481143) 均 success；本条只追加证据链接，最终 PR HEAD 以 GitHub 为准。
+
+## 2026-10-26 UI 评估、体验基线与美学标准（文档候选）
+
+- 本轮基于 main `3ce5d930`（v0.8.2）建立独立文档候选，未沿用 PR #37 作为现状。源码审计与合成原生扩展页面测量确认可读性、备份范围、列表查找、历史阅读及反馈一致性等改进点；支持有限前端重构，暂不支持整体重写。
+- 新增 `DESIGN.md`、`docs/ui/BASELINE_20261026.md`、`docs/ui/CHECKLIST.md` 与独立视觉参考 HTML；明确区分实测事实、设计目标、未来 S2–S5 范围和未执行的真人指标。只读复审未发现实质问题；不是外部 ChatGPT Gate。
+- 实际验证：`npm.cmd run verify` exit 0、285/285；合成原生页面探针 exit 0、17 状态及零页面 JS 错误，生产文件指纹前后一致。样张在 320/360/768/1280px 无整页横向溢出，搜索、筛选、弹窗 Escape/焦点返回、反馈及相对链接检查通过。环境、截图、源指纹见 UI 基线资产与验证记录；未重跑完整 Python E2E。生产 JS/CSS、schema、权限、发送逻辑未修改；PLAN 只添加评估进度和下一步，不调整任务机器表。
+- 合并与发布仍待独立授权。后续从 UX-01/02 的可读性与范围说明开始，按标准逐批验证。
+
+## 2026-10-26 UI 可读性、任务入口与弹窗修复（独立生产候选）
+
+- 基于 main `3ce5d930` / v0.8.2，对应 UI 基线 UX-01/02/03/09。提高必要文字、导航、研究正文与模型外发说明的字号和对比度；扩大证据折叠目标；空证据页可直接创建课题或进入研究整理，且追加动作时保留任何既有未核验备注；备份明确不包含证据库、Fork 实验及临时采集全文，替换确认列出真实范围。
+- 采纳与通用表单弹窗改为正文独立滚动、动作和状态区保留可见；滚动区可键盘进入。未改后台、数据格式、来源匹配、草稿/历史保护、权限或发送逻辑，未改 PLAN 机器状态。
+- 新增回归先证实旧实现失败：备份范围文案不成立、采纳三个动作在 360×900 全部出屏、必要说明 11px、证据折叠高度不足 36px。修复后 `npm run verify` exit 0，287/287；`npm run test:e2e` exit 0，7/7 套合成 Chromium MV3 全 PASS。首次全套在 PageDown 后立即读取 `scrollTop=0` 失败；独立诊断显示 20ms 后为 44、100ms 后为 228，改为等待真实滚动后单项及全套均通过，未放宽动作可见或键盘滚动断言。
+- 已逐张原图检查修改后的 17 状态，覆盖 320/360/768/1280px；动作可见、范围可读，未见整页横向溢出。最终公开证据在干净生产提交 `1e8b82dea0be02c352eb33ccac73be67256b9deb` 采集，见 `docs/ui/candidate-pr60/`；12 张与已看图相同，另 5 张焦点/原生控件渲染或随机 ID 变化已重看。长列表查找/摘要、完整历史阅读、维护课题同步、统一反馈和 Fork 标识仍为后续项；真实登录网页、读屏器、真人任务、200% 文字放大及完整无障碍验收 NOT_EXECUTED。保持独立 Draft，未合并、未发布。
+- 生产代码提交 `14cc6d4aa5101e61ef71b86b600082adcc630fed`，独立 Draft [PR #60](https://github.com/siskosun/ThreadLine/pull/60)。准确代码提交的 [Linux verify](https://github.com/siskosun/ThreadLine/actions/runs/40303520895) 与 [Windows baseline](https://github.com/siskosun/ThreadLine/actions/runs/40303520847) 均 success；本条证据文档增量不改生产文件，最终 PR HEAD 以 GitHub 为准。
+
+## 2026-10-26 UI 标准独立复核与验收工具修复（本 PR 增量）
+
+- 逐张以原始分辨率检查 17 张生产合成截图，并实际打开 1280/360px 独立样张；17 个索引 SHA-256 全部匹配，设计 token 的 8 组对比度独立复算均正确。原探针复跑为 17 状态、零页面错误，核心 DOM 测量与冻结记录一致。
+- 新增 UX-09：采纳弹窗三个动作在 360×900 初始视口外。设计和清单补充长弹窗动作可见、键盘滚动、逐张原图人工检查及证据分级；不把修订弹窗或全部弹窗泛判为失败。
+- `probe.cjs` 增加弹窗动作测量、半透明颜色保守跳过、样张可复跑检查、`sourceDirty` 及非空输出目录拒绝保护；样张结果不再只有无来源的布尔 JSON。未改生产 JS/CSS、数据协议或 PLAN 机器状态。
+- 本地实测：`npm run verify` exit 0，285/285；增强探针 exit 0，17 状态、扩展及样张零页面错误、19 个输出文件；49 条本地 Markdown 链接零失效；非空输出目录负例 exit 1 且旧测量哈希不变。文档增量未重跑完整 Python E2E，真实登录、读屏器、真人任务及完整 WCAG 验收仍 NOT_EXECUTED。
+- 最终证据在干净提交 `80f4524668b42ac36cdd65dd13ff5c44726cb71e` 采集，`sourceDirty=false`，生产指纹不变。12 张图像字节不变，另 5 张因焦点/渲染状态或随机实验 ID 变化，已重新打开检查，未据此宣称视觉通过或回归。生产修复位于独立 Draft [PR #60](https://github.com/siskosun/ThreadLine/pull/60)，不混入本文档 PR，也不代表已合入 main。
+- 基线提交 `9e099909b89b99d2fb198d1d329447c7cdc0818c` 的 [Linux verify](https://github.com/siskosun/ThreadLine/actions/runs/40304481247) 与 [Windows baseline](https://github.com/siskosun/ThreadLine/actions/runs/40304481143) 均 success；本条只追加证据链接，最终 PR HEAD 以 GitHub 为准。
+
+## 2026-10-26 UI 评估、体验基线与美学标准（文档候选）
+
+- 本轮基于 main `3ce5d930`（v0.8.2）建立独立文档候选，未沿用 PR #37 作为现状。源码审计与合成原生扩展页面测量确认可读性、备份范围、列表查找、历史阅读及反馈一致性等改进点；支持有限前端重构，暂不支持整体重写。
+- 新增 `DESIGN.md`、`docs/ui/BASELINE_20261026.md`、`docs/ui/CHECKLIST.md` 与独立视觉参考 HTML；明确区分实测事实、设计目标、未来 S2–S5 范围和未执行的真人指标。只读复审未发现实质问题；不是外部 ChatGPT Gate。
+- 实际验证：`npm.cmd run verify` exit 0、285/285；合成原生页面探针 exit 0、17 状态及零页面 JS 错误，生产文件指纹前后一致。样张在 320/360/768/1280px 无整页横向溢出，搜索、筛选、弹窗 Escape/焦点返回、反馈及相对链接检查通过。环境、截图、源指纹见 UI 基线资产与验证记录；未重跑完整 Python E2E。生产 JS/CSS、schema、权限、发送逻辑未修改；PLAN 只添加评估进度和下一步，不调整任务机器表。
+- 合并与发布仍待独立授权。后续从 UX-01/02 的可读性与范围说明开始，按标准逐批验证。
