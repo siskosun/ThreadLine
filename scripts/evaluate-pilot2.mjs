@@ -264,7 +264,12 @@ export function evaluateData(protocol,observations,protocolSha256){
    arms:outcome,gainBvsA:gainA,gainBvsC:gainC,
    gainBvsAExcludingLearning:gainAWithoutLearning,gainBvsCExcludingLearning:gainCWithoutLearning,
    accuracyDeltaBvsA:outcome.B.correctRate-outcome.A.correctRate,
-   accuracyDeltaBvsC:outcome.B.correctRate-outcome.C.correctRate});
+   accuracyDeltaBvsC:outcome.B.correctRate-outcome.C.correctRate,
+   correctedSubstantiveRateB:outcome.B.substantiveHandoffCorrectRate,
+   noiseShareDiffBvsA:outcome.B.noiseShareWithLearning!==null&&
+     outcome.A.noiseShareWithLearning!==null&&
+     outcome.B.unallocatedLearningMs===0&&outcome.A.unallocatedLearningMs===0?
+     outcome.B.noiseShareWithLearning-outcome.A.noiseShareWithLearning:null});
  }
  const total=TP+FP,totalGold=TP+FN,edgeGold=edgesTP+edgesFN;
  const recall=ratio(TP,totalGold),precision=ratio(TP,total),dependencyCoverage=ratio(edgesTP,edgeGold);
@@ -293,10 +298,9 @@ export function evaluateData(protocol,observations,protocolSha256){
  }));
  // A/B noise comparison is not fully attributable if learning overhead was
  // not tied to inspected targets. Missing attribution is unknown, never zero.
- const noiseShareReference=reviewNoise.A.noiseShareWithLearning!==null&&
-  reviewNoise.B.noiseShareWithLearning!==null&&
-  reviewNoise.A.unallocatedLearningMs===0&&reviewNoise.B.unallocatedLearningMs===0?
-  reviewNoise.B.noiseShareWithLearning<=reviewNoise.A.noiseShareWithLearning:null;
+ const pairedNoise=cases.map(c=>c.noiseShareDiffBvsA);
+ const noiseShareReference=pairedNoise.every(v=>v!==null)?
+   median(pairedNoise)<=0:null;
  const thresholds={
   dependencyCoverage:dependencyCoverage!==null&&dependencyCoverage>=0.9,
   impactRecall:recall!==null&&recall>=0.9,
@@ -323,7 +327,10 @@ export function evaluateData(protocol,observations,protocolSha256){
    meanAccuracyDeltaBvsA:mean(cases.map(c=>c.accuracyDeltaBvsA)),
    meanAccuracyDeltaBvsC:mean(cases.map(c=>c.accuracyDeltaBvsC)),
    clusterIntervals:{deltaBvsA:bootCaseInterval(cases,"accuracyDeltaBvsA"),
-    deltaBvsC:bootCaseInterval(cases,"accuracyDeltaBvsC")}},
+    deltaBvsC:bootCaseInterval(cases,"accuracyDeltaBvsC"),
+    noiseShareDiffBvsA:bootCaseInterval(cases.filter(c=>c.noiseShareDiffBvsA!==null),"noiseShareDiffBvsA"),
+    correctedSubstantiveRateB:bootCaseInterval(cases.filter(c=>c.correctedSubstantiveRateB!==null),"correctedSubstantiveRateB")},
+   noiseReferencePairedCases:pairedNoise.filter(x=>x!==null).length},
   thresholds,screeningPassed:Object.values(thresholds).every(Boolean),cases,events};
 }
 async function main(){
