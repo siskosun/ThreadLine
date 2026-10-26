@@ -47,16 +47,24 @@ export function checkRepository(cwd,latestTag,{forPublish=false}={}) {
   return evaluateReleaseDrift({latestTag,previousVersion:previous,currentVersion:current,changedFiles:paths,forPublish});
 }
 if(process.argv[1] && path.resolve(process.argv[1])===fileURLToPath(import.meta.url)) {
+  const flags=process.argv.slice(3);
+  const advisory=flags.length===1 && flags[0]==="--advisory";
   try{
-    const flags=process.argv.slice(3);
-    if(flags.some(arg=>arg!=="--publish") || flags.length>1)
-      throw new Error("Only --publish is a supported optional flag");
+    if(flags.length>1 || flags.some(arg=>!["--publish","--advisory"].includes(arg)))
+      throw new Error("Only --advisory or --publish is a supported optional flag");
     const out=checkRepository(process.cwd(),process.argv[2],{forPublish:flags.includes("--publish")});
     console.log((out.clean?"Release audit clean: ":"Release version guard OK: ")+
       out.latestTag+" -> v"+out.currentVersion+
       " ("+out.changedFiles+" changed extension files)");
   }catch(error){
-    console.error("::error::Release guard: "+error.message);
-    process.exitCode=1;
+    if(advisory) {
+      // Developer branches may be ahead of the last published installer.
+      // Keep that debt visible without making normal code CI look broken;
+      // only an explicit publish request uses the mandatory hard gate.
+      console.warn("::warning::Release drift: "+error.message);
+    } else {
+      console.error("::error::Release guard: "+error.message);
+      process.exitCode=1;
+    }
   }
 }
