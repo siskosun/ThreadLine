@@ -75,6 +75,9 @@
     if(!region||!text){notify(value,true);return;}
     text.textContent=value;
     region.hidden=false;
+    const active=document.activeElement;
+    if(!active||active===document.body||!active.isConnected)
+      $("#critical-notice-dismiss")?.focus();
   }
   $("#critical-notice-dismiss")?.addEventListener("click",()=>{
     $("#critical-notice").hidden=true;
