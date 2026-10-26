@@ -192,6 +192,40 @@ def run():
             assert "匹配 1 / 1 条结论" in panel.locator("#evidence-list-count").inner_text()
             assert panel.locator("#evidence-list button", has_text="修订").count() == 1
             assert panel.locator("#evidence-list button", has_text="撤回").count() == 1
+            # Accessible withdrawal confirmation and durable error feedback.
+            withdraw_button = panel.locator("#evidence-list button", has_text="撤回")
+            withdraw_button.click()
+            panel.locator("dialog.tl-confirm-dialog").wait_for()
+            panel.locator("dialog.tl-confirm-dialog button", has_text="取消").click()
+            assert panel.locator("dialog.tl-confirm-dialog").count() == 0
+            still_adopted = send(panel, {"type":"EV_LIST","projectId":project_id})["data"]["rows"][0]
+            assert still_adopted["conclusion"]["status"] == "adopted"
+            panel.evaluate("""() => {
+                const original=chrome.runtime.sendMessage.bind(chrome.runtime);
+                window.__restoreWithdrawMessage=()=>{chrome.runtime.sendMessage=original;};
+                window.__withdrawCalls=0;
+                chrome.runtime.sendMessage=(payload,callback)=>{
+                    if(payload?.type==="EV_WITHDRAW"){
+                        window.__withdrawCalls++;
+                        callback({ok:false,error:"SIMULATED_WITHDRAW_FAILURE"});
+                        return;
+                    }
+                    return original(payload,callback);
+                };
+            }""")
+            panel.locator("#evidence-list button", has_text="撤回").click()
+            panel.locator("dialog.tl-confirm-dialog button", has_text="撤回结论").click()
+            panel.wait_for_function("() => document.querySelector('#critical-notice')?.hidden===false")
+            assert "SIMULATED_WITHDRAW_FAILURE" in panel.locator("#critical-notice-text").inner_text()
+            panel.wait_for_timeout(3300)
+            assert panel.locator("#critical-notice").is_visible(), "withdraw error must outlive transient toast"
+            assert panel.evaluate("window.__withdrawCalls") == 1, "withdraw must not auto-replay"
+            after_failed_withdraw = send(panel, {"type":"EV_LIST","projectId":project_id})["data"]["rows"][0]
+            assert after_failed_withdraw["conclusion"]["status"] == "adopted"
+            panel.evaluate("window.__restoreWithdrawMessage()")
+            panel.locator("#critical-notice-dismiss").click()
+            assert panel.locator("#critical-notice").is_hidden()
+
             first = panel.locator("#evidence-list .evidence-item").first
             assert first.get_attribute("open") is not None
             summary = first.locator(":scope > summary")
