@@ -9,6 +9,14 @@
 - 新增 Node 单元、后台来源权限/不消耗意图回归，以及合成 Chromium MV3 既有对话与 Project 无误报和受控错误跳转用例。准确 HEAD 的 Linux/Windows CI 另行登记；真实已登录 ChatGPT 仍 NOT_EXECUTED。此修复不改变 S1 风险状态、唯一 PLAN 任务表、不合并不发布。
 
 
+## 2026-10-26 UX：默认选择手动 AI 分析（独立候选）
+
+- **代码候选准确 HEAD** `6eef0103c099fd3af4749a764716e614c0d2b719`：[Linux verify](https://github.com/siskosun/ThreadLine/actions/runs/40256481886) **success**；[Windows baseline](https://github.com/siskosun/ThreadLine/actions/runs/40256481867) **success**。均为自动化与合成 Chromium 场景；真实登录 ChatGPT、既有数据、真人交互/无障碍验收 **NOT_EXECUTED**。本条文档更新后的准确 HEAD 仍需单独检查，保持 Draft / Open、未合并/发布。
+
+- 用户合成浏览器体验审计指出 `panel.html` 把未经真实账号验收的 ChatGPT 网页自动分析标成默认，和 README 的实验性质不一致。改为仅 `manual` 选项带 `selected`，默认复制结构化提示并手动导入，网页自动、Ollama、API 均保留为明确的用户选择；调整引导文案与原 UI 断言，防止将来恢复为默认网页自动操作。
+- 不删除自动分析功能，也不改变当前独立模型权限、发送前确认与停止功能。仅界面默认及说明；与 S1、F3、发布治理互不依赖，真实登录 ChatGPT 仍 NOT_EXECUTED。独立 Draft PR 的准确 HEAD 自动测试后续登记，不动唯一 PLAN 状态、不合并发布。
+
+
 任务定义和正式状态唯一来源：[docs/PLAN.md](../PLAN.md)。本文件只记录发生过的事件与证据，不自行认定任务完成。
 
 ## 2026-10-25 第十二章分拆交付：独立 PR、准确提交 CI 与真人门禁

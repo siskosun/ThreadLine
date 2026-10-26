@@ -253,7 +253,7 @@
   async function analyzeWithProvider(){
     if(!currentRun||!rulesBrief||!messages.length){aiStatus("请先完成对话采集",true);return;}
     if(aiAbort){aiStatus("已有一项分析正在运行",true);return;}
-    const kind=selectedProvider();if(kind==="manual"){aiStatus("请先选择 ChatGPT 网页自动分析，或复制结构化提示并手动导入结果。",true);return;}
+    const kind=selectedProvider();if(kind==="manual"){aiStatus("当前为手动分析：请复制结构化提示，在 ChatGPT 自行发送后导入 JSON；若确需自动分析，请主动切换方式。",true);return;}
     const model=$("ai-model").value,token=$("ai-api-key").value;
     if(kind!=="webui"){try{ThreadLineProviders.config(kind,model,token);}catch(e){aiStatus(e.message,true);return;}}
     const maxChars=kind==="ollama"?4900:kind==="webui"?5600:10500;
