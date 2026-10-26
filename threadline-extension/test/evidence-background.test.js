@@ -100,6 +100,8 @@ function system() {
     ThreadLineCaptureCore: CaptureCore, ThreadLineCaptureDB: captureDB,
     ThreadLineFFCore: FFCore, ThreadLineFFDB: ffdb,
     ThreadLineEvidenceCore: EvidenceCore, ThreadLineEvidenceDB: EvidenceDB,
+    ThreadLineEvidenceSource: require('../evidence-source.js'),
+    ThreadLineEvidenceLifecycle: require('../evidence-lifecycle.js'), ThreadLineEvidenceWorkflows: require('../evidence-workflows.js'),
     chrome, crypto: webcrypto, console, Date, Promise, URL, TextEncoder, structuredClone
   });
   const panelSender = { id: 'ev-bg-test', url: 'chrome-extension://ev-bg-test/panel.html' };
@@ -194,13 +196,38 @@ test('withdrawal still projects; replay of a failed projection never double-bump
   const adopted = await s.message(adoption('p-taken', '将被撤回'));
   await new Promise(r => setImmediate(r));
   await s.message({ type: 'EV_WITHDRAW', conclusionId: adopted.conclusionId,
-    reason: '测试撤回', operationId: 'op_s1a_wd_' + Math.random().toString(16).slice(2, 8) });
+    reason: '测试撤回', expectedVersionId: adopted.versionId, operationId: 'op_s1a_wd_' + Math.random().toString(16).slice(2, 8) });
   await new Promise(r => setImmediate(r));
   const projection = s.local.get('tl_evidence_summary_p-taken');
   assert.ok(projection.summary.includes('[已撤回]'), 'withdrawal visible in projection');
   assert.equal(projection.evidenceRevision, 2);
   const project = s.evidence.projects.get('p-taken');
   assert.equal(project.legacyNote.text, '旧的自由文本结论', 'takeover note survives withdrawal (no un-seal)');
+});
+
+test('panel withdrawal uses a version guard, rejecting a stale confirmation after amendment', async () => {
+  const s = system();
+  const first = await s.message(adoption('p-taken', '初版结论'));
+  const amended = await s.message({type:'EV_AMEND',conclusionId:first.conclusionId,
+    text:'修订结论',expectedVersionId:first.versionId,operationId:'op_wdguard_amend01'});
+  const snapshot = structuredClone(s.evidence.conclusions.get(first.conclusionId));
+  await assert.rejects(s.message({type:'EV_WITHDRAW',conclusionId:first.conclusionId,
+    reason:'无版本',operationId:'op_wdguard_nover01'}), /撤回需要当前版本 ID/);
+  await assert.rejects(s.message({type:'EV_WITHDRAW',conclusionId:first.conclusionId,
+    reason:'旧窗口',expectedVersionId:first.versionId,operationId:'op_wdguard_old001'}), /其他窗口修订/);
+  assert.deepEqual(s.evidence.conclusions.get(first.conclusionId), snapshot);
+  const payload = {type:'EV_WITHDRAW',conclusionId:first.conclusionId,
+    reason:'核对新版本后撤回',expectedVersionId:amended.versionId,operationId:'op_wdguard_new001'};
+  const result = await s.message(payload);
+  assert.equal(result.status, 'withdrawn');
+  assert.deepEqual(await s.message(payload), result);
+});
+
+test('both shipped withdrawal entry points send the displayed evidence version', () => {
+  const panel = fs.readFileSync(path.join(__dirname, '../panel.js'), 'utf8');
+  const prototype = fs.readFileSync(path.join(__dirname, '../evidence-prototype.js'), 'utf8');
+  assert.match(panel, /type:\s*"EV_WITHDRAW"[\s\S]{0,160}expectedVersionId:\s*row\.current\.id/);
+  assert.match(prototype, /type:\s*"EV_WITHDRAW"[\s\S]{0,160}expectedVersionId:\s*row\.current\.id/);
 });
 
 test('S1b: duplicate adoption replays instead of creating a twin; amendment works end to end', async () => {

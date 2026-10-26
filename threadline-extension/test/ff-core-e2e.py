@@ -7,7 +7,9 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from playwright.sync_api import sync_playwright, expect
 
-EXT = Path(__file__).resolve().parents[1]
+# Run the same synthetic browser contract against an integration worktree when
+# requested.  This keeps the test independent of this worker's checkout.
+EXT = Path(os.environ.get("THREADLINE_EXTENSION_PATH", Path(__file__).resolve().parents[1])).resolve()
 SITE = """<!doctype html><title>Offline synthetic tab</title>
 <form id="composer"><textarea></textarea><button type="submit">Send</button></form>
 <script>window.submitCount=0;document.getElementById('composer').onsubmit=e=>{
@@ -535,8 +537,8 @@ def run():
             expect(reopened.locator("#ff-reveal")).to_contain_text("裁决：X", timeout=15000)
             assert "分支" in reopened.locator("#ff-reveal").text_content(), (
                 "post-verdict reveal shows the mapping")
-            # S1b: adopt the revealed branch conclusion into the evidence
-            # store. A topic project must exist for the prompt-based picker.
+            # S1b: adopt the revealed branch conclusion through the real
+            # evidence dialog. A topic project must exist for its selector.
             seeded = reopened.evaluate("""() => {
               return new Promise(resolve => chrome.storage.local.get('threadline_state_v1', record => {
                 const state = record['threadline_state_v1'];
@@ -547,12 +549,20 @@ def run():
               }));
             }""")
             assert seeded is True
-            reopened.once("dialog", lambda dialog: dialog.accept("e2e-topic")
-                if dialog.type == "prompt" else dialog.accept())
             adopt_buttons = reopened.locator("button", has_text="采纳该分支结论到证据库")
             adopt_buttons.first.click()
-            expect(reopened.locator("#ff-columns")).to_contain_text("已采纳：con_",
-                timeout=10000)
+            adoption = reopened.locator("dialog.evidence-adoption-dialog")
+            expect(adoption).to_be_visible(timeout=10000)
+            adoption.locator("#evidence-adopt-project").select_option("e2e-topic")
+            original = adoption.locator('textarea[aria-label="原始消息全文"]')
+            expect(original).to_have_value("好的，OK。")
+            original.evaluate("el => { el.focus(); el.setSelectionRange(0, el.value.length); }")
+            adoption.get_by_role("button", name="使用上方选中文本").click()
+            expect(adoption.locator(".evidence-adoption-source textarea").nth(1)).to_have_value("好的，OK。")
+            adoption.locator("#evidence-adopt-text").fill("E2E 人工确认的分支结论")
+            adoption.get_by_role("button", name="确认采纳").click()
+            expect(adoption).to_contain_text("已采纳。", timeout=10000)
+            expect(adoption).to_be_hidden(timeout=5000)
             adopted = reopened.evaluate(
                 "(p) => chrome.runtime.sendMessage(p)",
                 {"type": "EV_LIST", "projectId": "e2e-topic"})
@@ -560,13 +570,21 @@ def run():
             adopted_row = adopted["data"]["rows"][0]
             assert adopted_row["conclusion"]["projectId"] == "e2e-topic"
             assert adopted_row["fragments"] and adopted_row["fragments"][0]["selection"]
+            assert adopted_row["fragments"][0]["selection"] == "好的，OK。"
+            assert adopted_row["fragments"][0]["captureRunId"], "adoption keeps capture provenance"
+            assert adopted_row["fragments"][0]["messageId"], "adoption keeps exact source message"
             assert adopted_row["conclusion"]["takeover"] if "takeover" in adopted_row["conclusion"] else True
             # Duplicate adoption replays instead of creating a twin.
-            reopened.once("dialog", lambda dialog: dialog.accept("e2e-topic")
-                if dialog.type == "prompt" else dialog.accept())
             adopt_buttons.first.click()
-            expect(reopened.locator("#ff-columns")).to_contain_text("未重复创建",
-                timeout=10000)
+            expect(adoption).to_be_visible(timeout=10000)
+            adoption.locator("#evidence-adopt-project").select_option("e2e-topic")
+            original = adoption.locator('textarea[aria-label="原始消息全文"]')
+            original.evaluate("el => { el.focus(); el.setSelectionRange(0, el.value.length); }")
+            adoption.get_by_role("button", name="使用上方选中文本").click()
+            adoption.locator("#evidence-adopt-text").fill("E2E 人工确认的分支结论")
+            adoption.get_by_role("button", name="确认采纳").click()
+            expect(adoption).to_contain_text("未重复创建", timeout=10000)
+            expect(adoption).to_be_hidden(timeout=5000)
             adopted_again = reopened.evaluate(
                 "(p) => chrome.runtime.sendMessage(p)",
                 {"type": "EV_LIST", "projectId": "e2e-topic"})

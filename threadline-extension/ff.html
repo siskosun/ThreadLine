@@ -38,11 +38,11 @@
       <h2>冻结共同材料与指令</h2>
       <form id="ff-create">
         <div class="grid">
-          <div><label for="ff-w0">共同材料 W₀</label><textarea id="ff-w0" spellcheck="false" placeholder="两条未来分支共同使用的背景资料"></textarea></div>
-          <div><label for="ff-p">任务指令 P</label><textarea id="ff-p" required spellcheck="false" placeholder="写下两条分支要执行的同一任务"></textarea></div>
+          <div><label for="ff-w0">共同材料 W₀（可选）</label><textarea id="ff-w0" spellcheck="false" placeholder="各条未来分支共同使用的背景资料"></textarea></div>
+          <div><label for="ff-p">任务指令 P</label><textarea id="ff-p" required spellcheck="false" placeholder="写下各条分支要执行的同一任务"></textarea></div>
         </div>
         <p id="ff-bytes" class="subtle" aria-live="polite">最终发送文本：0 / 24,000 UTF-8 字节</p>
-        <label class="line" for="ff-branch-count">并行分支数（P4，2–4）
+        <label class="line" for="ff-branch-count">并行分支数（2–4）
           <select id="ff-branch-count"><option value="2">2</option><option value="3">3</option><option value="4">4</option></select>
         </label>
         <button id="ff-save" type="submit">冻结并保存在本地</button>
@@ -71,7 +71,7 @@
     <section class="surface" id="ff-compare" hidden aria-label="去标签对照与裁决">
       <h2>去标签对照</h2>
       <p class="subtle" id="ff-compare-note"></p>
-      <button class="secondary" id="ff-compare-btn" type="button">生成 X/Y 对照（两分支均完成后）</button>
+      <button class="secondary" id="ff-compare-btn" type="button">生成去标签对照（所有分支完成后）</button>
       <div id="ff-columns"></div>
       <div id="ff-calibration" hidden>
         <h3>裁判校准（隐藏校准题，全部答对后开放裁决）</h3>
@@ -95,6 +95,7 @@
     </section>
   </div>
   <p class="subtle" id="ff-version-note" style="margin-top:26px"></p>
-  <script src="ff-core.js"></script><script src="ff-page.js"></script>
+  <link rel="stylesheet" href="ui-polish.css"/>
+  <script src="ui-dialogs.js"></script><script src="ff-core.js"></script><script src="evidence-adoption-ui.js"></script><script src="ff-page.js"></script>
 </body>
 </html>

@@ -156,7 +156,13 @@ def run():
             panel_errors = []
             panel.on("pageerror", lambda error: panel_errors.append(str(error)))
             panel.reload(wait_until="domcontentloaded")
-            panel.locator("#evidence-accordion > summary").click()
+            panel.get_by_role("tab", name="证据与交接").click()
+            # Research navigation may already expand the accordion. Do not
+            # accidentally close it by blindly toggling the summary.
+            accordion = panel.locator("#evidence-accordion")
+            if accordion.get_attribute("open") is None:
+                accordion.locator("summary").click()
+            assert accordion.get_attribute("open") is not None
             panel.wait_for_function(
                 "id => [...document.querySelector('#evidence-project').options]"
                 ".some(option => option.value === id)", arg=project_id)
@@ -177,8 +183,12 @@ def run():
             assert panel_errors == [], panel_errors
             # Exercise the actual text-only edit control and retain original evidence identity.
             original = send(panel, {"type": "EV_LIST", "projectId": project_id})["data"]["rows"][0]
-            panel.once("dialog", lambda dialog: dialog.accept("面板修订后的结论"))
+            # S1 now uses the inline accessible form, not window.prompt.
+            # Exercise the actual text field and submit path without weakening
+            # the evidence/source preservation assertions below.
             panel.locator("#evidence-list button", has_text="修订").click()
+            panel.locator("dialog.tl-dialog #tl-field-text").fill("面板修订后的结论")
+            panel.locator("dialog.tl-dialog button[type=submit]").click()
             panel.wait_for_function("() => document.querySelector('#evidence-list').textContent.includes('面板修订后的结论')")
             changed = send(panel, {"type": "EV_LIST", "projectId": project_id})["data"]["rows"][0]
             assert changed["current"]["conditions"] == original["current"]["conditions"]
