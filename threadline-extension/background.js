@@ -191,12 +191,21 @@ async function receiveCapture(payload,sender){
         await ThreadLineCaptureDB.modifyRun(run.id,{pageCount:0,messageCount:0});
         return {ok:true};
       });
-    case "CAPTURE_PAGE":{
-      if(!Number.isInteger(payload.pageIndex)||payload.pageIndex<0||payload.pageIndex>2500||!Number.isInteger(payload.chunkIndex)||payload.chunkIndex<0||payload.chunkIndex>10000)throw new Error("分页序号错误");
-      if(!Array.isArray(payload.messages)||payload.messages.length>20)throw new Error("消息批次不合法");
-      const sanitized=ThreadLineCaptureCore.normalizePage(payload.messages,payload.pageIndex);
-      await ThreadLineCaptureDB.putPage({id:run.id,pageIndex:payload.pageIndex,chunkIndex:payload.chunkIndex,messages:sanitized});return {ok:true};
-    }
+    case "CAPTURE_PAGE":
+      return serialize(async()=>{
+        // Cancellation, reset, progress, completion and page writes share a
+        // serial terminal guard. No chunks may append after manual cancel.
+        const live=await ThreadLineCaptureDB.getRun(run.id);
+        if(!live || live.status!=="capturing")
+          throw new Error("采集任务已结束或人工停止");
+        if(!Number.isInteger(payload.pageIndex)||payload.pageIndex<0||payload.pageIndex>2500||!Number.isInteger(payload.chunkIndex)||payload.chunkIndex<0||payload.chunkIndex>10000)
+          throw new Error("分页序号错误");
+        if(!Array.isArray(payload.messages)||payload.messages.length>20)
+          throw new Error("消息批次不合法");
+        const sanitized=ThreadLineCaptureCore.normalizePage(payload.messages,payload.pageIndex);
+        await ThreadLineCaptureDB.putPage({id:run.id,pageIndex:payload.pageIndex,chunkIndex:payload.chunkIndex,messages:sanitized});
+        return {ok:true};
+      });
     case "CAPTURE_PROGRESS":
       return serialize(async()=>{
         const live=await ThreadLineCaptureDB.getRun(run.id);
@@ -1181,6 +1190,34 @@ chrome.runtime.onMessage.addListener((payload,sender,reply) => {
     if (payload.type === "CAPTURE_START") {
       await requirePanelSender(sender,"只有研线面板可启动采集");
       return beginCapture(payload.tabId);
+    }
+    if (payload.type === "CAPTURE_CANCEL") {
+      await requirePanelSender(sender,"只有研线面板可取消采集");
+      const result=await serialize(async()=>{
+        const run=await ThreadLineCaptureDB.getRun(payload.id);
+        if(!run)throw new Error("采集记录不存在");
+        if(run.status==="error" && run.phase==="user-cancelled")
+          return {id:run.id,cancelled:true,alreadyCancelled:true,tabId:null};
+        if(run.status!=="capturing")
+          throw new Error("采集已结束，请刷新状态；不会倒写已完成的结果");
+        await ThreadLineCaptureDB.modifyRun(run.id,{
+          status:"error",complete:false,phase:"user-cancelled",
+          error:"用户主动取消本次采集；已读取的片段仍在本地，未标记为完整历史"});
+        captureOwners.delete(run.id);
+        await chrome.storage.session.remove(CAPTURE_PREFIX+run.id);
+        return {id:run.id,cancelled:true,alreadyCancelled:false,tabId:run.tabId};
+      });
+      // The durable terminal state is written first; delivery to the page
+      // is best-effort, and no delayed page result can overwrite cancel.
+      let delivered=false;
+      if(Number.isInteger(result.tabId)){
+        try{
+          const response=await chrome.tabs.sendMessage(result.tabId,{type:"TL_CAPTURE_CANCEL",id:result.id});
+          delivered=response?.ok===true;
+        }catch{}
+      }
+      return {id:result.id,cancelled:true,alreadyCancelled:result.alreadyCancelled,
+        stopSignalDelivered:delivered};
     }
     if (["CAPTURE_RESET","CAPTURE_PAGE","CAPTURE_PROGRESS","CAPTURE_END","CAPTURE_FAIL"].includes(payload.type))return receiveCapture(payload,sender);
     if(payload.type === "WEB_ORGANIZE"){

@@ -1,5 +1,15 @@
 # ThreadLine 开发进度记录
 
+## 2026-10-26 UX P0：显式取消正在采集的对话（基于 F3 PR #40 的独立候选）
+
+- **准确代码 HEAD** `8fa6344a0c62226a851788b3b9e6b20dc962e8fd`：[Linux verify](https://github.com/siskosun/ThreadLine/actions/runs/40256770411) **success**；[Windows baseline](https://github.com/siskosun/ThreadLine/actions/runs/40256770330) **success**。Linux 共 244/244 Node 成功，合成 Chromium MV3 验证侧栏 21 秒无进度提示、320px 不横向溢出、用户确认取消、部分片段保留、迟到回执拒绝及 0 自动发送。另有挂起请求 AbortController 中止的 Node 测试。程序只确认写入终止；停止信号未送达会在 UI 明示，请用户刷新源标签页。
+- 合成测试不代替真实已登录 ChatGPT 的取消或停滞复现；本次文档收据更新后的 SHA 需单独验证。PR #49 依赖 #40，保持 Draft/Open、不合并、不发布、不修改用户数据或 PLAN done。
+
+- 用户浏览器评审发现：源隔离脚本已有 `TL_CAPTURE_CANCEL` 接收端，但正式后台与面板缺少取消动作，采集停滞时无法停止。本候选从 PR #40 准确 HEAD 另建后续分支，`CAPTURE_CANCEL` 仅接受扩展面板来源，先在后台串行区将旧运行标记 `error/user-cancelled` 和 `complete:false`，保留已采片段及来源；随后尽力向原源标签发送取消信号，不自动重放/重试或发送用户消息。
+- 原 `CAPTURE_PAGE` 和 RESET/PROGRESS/END/FAIL 改用同一串行终态判断，防止人工取消后迟到批次重写历史或结束状态；已完成运行不能倒写为取消，同一取消命令重放只回读结果。
+- 侧栏在进行中显示“取消采集”，进度超过 15 秒未更新时显示闲置时长（仅提示，不自动超时或宣告成功）；取消需二次确认，原片段保留且标记不完整。加入后台权限、幂等、迟到完成/分页拒绝测试。准确 HEAD CI 与真实站点验收分别登记；本轮不合并、不发布，不能作为 F3 实站验收通过。
+
+
 ## 2026-10-26 F3 完整浏览器重启的失联采集恢复（PR #40）
 
 - 提交 `12d11a55221bfd24f17bcceaf14aeaaf32b44ea2` 的 [Linux](https://github.com/siskosun/ThreadLine/actions/runs/40252510913) / [Windows](https://github.com/siskosun/ThreadLine/actions/runs/40252510938) CI 均 success；241/241 Node 与合成 Chromium MV3（含 profile 关闭后重新启动）全部通过。保留原有 F3 注入诊断、桥握手与选择器降级回归。
