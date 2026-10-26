@@ -1102,12 +1102,28 @@ async function handleEvidence(payload, sender) {
       if (!project || project.deleted || !conclusion)
         throw new Error("该课题下不存在该结论");
       const versions = Object.values(state.versions)
-        .filter(version => version.conclusionId === conclusion.id)
-        .sort((a,b) => (a.createdAt || 0) - (b.createdAt || 0) ||
-          String(a.id).localeCompare(String(b.id)));
+        .filter(version => version.conclusionId === conclusion.id);
       if (!versions.length || versions.length > Core.LIMITS.versionsPerConclusion)
         throw new Error("该课题下不存在有效版本历史");
-      const history = versions.map(version => {
+      // Timestamps can share a millisecond. Prefer the immutable predecessor
+      // chain for ordering; use time/ID only as a deterministic corruption fallback.
+      const timeOrder = (a,b) => (a.createdAt || 0) - (b.createdAt || 0) ||
+        String(a.id).localeCompare(String(b.id));
+      const byId = new Map(versions.map(version => [version.id,version]));
+      const childByPredecessor = new Map();
+      for (const version of versions)
+        if (byId.has(version.predecessorId)) childByPredecessor.set(version.predecessorId,version);
+      const ordered = [], used = new Set();
+      for (const root of versions.filter(version => !byId.has(version.predecessorId)).sort(timeOrder)) {
+        let cursor = root;
+        while (cursor && !used.has(cursor.id)) {
+          ordered.push(cursor);used.add(cursor.id);
+          cursor = childByPredecessor.get(cursor.id);
+        }
+      }
+      for (const version of versions.slice().sort(timeOrder))
+        if (!used.has(version.id)) ordered.push(version);
+      const history = ordered.map(version => {
         const links = Object.values(state.links)
           .filter(link => link.versionId === version.id)
           .sort((a,b) => String(a.id).localeCompare(String(b.id)));
