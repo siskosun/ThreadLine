@@ -1,0 +1,5608 @@
+{
+  "source": "1e8b82dea0be02c352eb33ccac73be67256b9deb",
+  "extensionFingerprint": "c5bee3f828e8a0549de7c3c068ae5dc96a646a98e6c3fd63380593e3daf21d9a",
+  "capturedAt": "2026-10-26T10:17:07.595Z",
+  "playwright": "1.62.1",
+  "scope": "Synthetic extension profile. Solid-background leaf text and target candidates only, not full WCAG conformance or a render benchmark.",
+  "browser": "156.0.8078.4",
+  "complete": true,
+  "extensionFingerprintAfter": "c5bee3f828e8a0549de7c3c068ae5dc96a646a98e6c3fd63380593e3daf21d9a",
+  "results": [
+    {
+      "name": "switch-empty-360",
+      "viewport": {
+        "width": 360,
+        "height": 900,
+        "dpr": 1
+      },
+      "bodyHeight": 900,
+      "documentWidth": 360,
+      "visibleControls": 4,
+      "smallTargets": [],
+      "fontHistogram": {
+        "12": 10,
+        "13": 1,
+        "18": 1
+      },
+      "textContrastCandidates": [],
+      "samples": [
+        {
+          "selector": "h1",
+          "text": "研线 ThreadLine",
+          "font": 18,
+          "weight": "750",
+          "color": "rgb(32, 45, 61)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 13.15,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "切换对话之前，先看最新状态",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 5.5,
+          "disabled": false
+        },
+        {
+          "selector": "#nav-switch",
+          "text": "⇄ 对话切换",
+          "font": 12,
+          "weight": "650",
+          "color": "rgb(32, 77, 122)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 8.74,
+          "disabled": false
+        },
+        {
+          "selector": "#nav-research",
+          "text": "◎ 研究整理",
+          "font": 12,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(237, 241, 246)",
+          "contrast": 5.15,
+          "disabled": false
+        },
+        {
+          "selector": "#nav-evidence",
+          "text": "◇ 证据与交接",
+          "font": 12,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(237, 241, 246)",
+          "contrast": 5.15,
+          "disabled": false
+        },
+        {
+          "selector": "p.current-sub",
+          "text": "当前窗口没有激活的 ChatGPT 标签页。切回目标窗口后，这里会显示对应的研究状态。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "h2",
+          "text": "同课题对话",
+          "font": 13,
+          "weight": "740",
+          "color": "rgb(32, 45, 61)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 13.96,
+          "disabled": false
+        },
+        {
+          "selector": "#quick-subtitle",
+          "text": "关联课题后，可一键切换同题分支",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "#quick-counter",
+          "text": "0 条",
+          "font": 12,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(241, 243, 246)",
+          "contrast": 5.25,
+          "disabled": false
+        },
+        {
+          "selector": "div.quick-empty",
+          "text": "暂无同课题分支。关联当前对话，或从下方打开「全部课题与管理」。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "span",
+          "text": "全部课题与管理",
+          "font": 12,
+          "weight": "700",
+          "color": "rgb(70, 96, 120)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 6.55,
+          "disabled": false
+        },
+        {
+          "selector": "span.manage-desc",
+          "text": "创建 · 关联 · 清理",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        }
+      ]
+    },
+    {
+      "name": "manage-empty-360",
+      "viewport": {
+        "width": 360,
+        "height": 900,
+        "dpr": 1
+      },
+      "bodyHeight": 1575,
+      "documentWidth": 360,
+      "visibleControls": 16,
+      "smallTargets": [
+        {
+          "selector": "#ff-preview-link",
+          "text": "打开 Fork 实验页面",
+          "w": 121.6,
+          "h": 18,
+          "disabled": false
+        }
+      ],
+      "fontHistogram": {
+        "12": 25,
+        "13": 6,
+        "14": 6,
+        "18": 4,
+        "16.38": 1
+      },
+      "textContrastCandidates": [],
+      "samples": [
+        {
+          "selector": "h1",
+          "text": "研线 ThreadLine",
+          "font": 18,
+          "weight": "750",
+          "color": "rgb(32, 45, 61)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 13.15,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "切换对话之前，先看最新状态",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 5.5,
+          "disabled": false
+        },
+        {
+          "selector": "#nav-switch",
+          "text": "⇄ 对话切换",
+          "font": 12,
+          "weight": "650",
+          "color": "rgb(32, 77, 122)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 8.74,
+          "disabled": false
+        },
+        {
+          "selector": "#nav-research",
+          "text": "◎ 研究整理",
+          "font": 12,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(237, 241, 246)",
+          "contrast": 5.15,
+          "disabled": false
+        },
+        {
+          "selector": "#nav-evidence",
+          "text": "◇ 证据与交接",
+          "font": 12,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(237, 241, 246)",
+          "contrast": 5.15,
+          "disabled": false
+        },
+        {
+          "selector": "p.current-sub",
+          "text": "当前窗口没有激活的 ChatGPT 标签页。切回目标窗口后，这里会显示对应的研究状态。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "h2",
+          "text": "同课题对话",
+          "font": 13,
+          "weight": "740",
+          "color": "rgb(32, 45, 61)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 13.96,
+          "disabled": false
+        },
+        {
+          "selector": "#quick-subtitle",
+          "text": "关联课题后，可一键切换同题分支",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "#quick-counter",
+          "text": "0 条",
+          "font": 12,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(241, 243, 246)",
+          "contrast": 5.25,
+          "disabled": false
+        },
+        {
+          "selector": "div.quick-empty",
+          "text": "暂无同课题分支。关联当前对话，或从下方打开「全部课题与管理」。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "span",
+          "text": "全部课题与管理",
+          "font": 12,
+          "weight": "700",
+          "color": "rgb(70, 96, 120)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 6.55,
+          "disabled": false
+        },
+        {
+          "selector": "span.manage-desc",
+          "text": "创建 · 关联 · 清理",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "#stat-active",
+          "text": "0",
+          "font": 18,
+          "weight": "720",
+          "color": "rgb(32, 45, 61)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 13.96,
+          "disabled": false
+        },
+        {
+          "selector": "span",
+          "text": "进行中课题",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "#stat-closed",
+          "text": "0",
+          "font": 18,
+          "weight": "720",
+          "color": "rgb(32, 45, 61)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 13.96,
+          "disabled": false
+        },
+        {
+          "selector": "span",
+          "text": "已收口课题",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "#stat-chats",
+          "text": "0",
+          "font": 18,
+          "weight": "720",
+          "color": "rgb(32, 45, 61)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 13.96,
+          "disabled": false
+        },
+        {
+          "selector": "span",
+          "text": "关联对话",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "h2",
+          "text": "创建临时课题",
+          "font": 14,
+          "weight": "730",
+          "color": "rgb(32, 45, 61)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 13.96,
+          "disabled": false
+        },
+        {
+          "selector": "span",
+          "text": "输入名称即可开始",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "label.sr-only",
+          "text": "课题名称",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(32, 45, 61)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 13.96,
+          "disabled": false
+        },
+        {
+          "selector": "button.primary",
+          "text": "＋ 创建",
+          "font": 13,
+          "weight": "680",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(41, 77, 117)",
+          "contrast": 8.7,
+          "disabled": false
+        },
+        {
+          "selector": "p.subhelp",
+          "text": "如果当前是 ChatGPT 对话，创建时会自动关联。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "h2",
+          "text": "课题看板",
+          "font": 14,
+          "weight": "730",
+          "color": "rgb(32, 45, 61)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 13.96,
+          "disabled": false
+        },
+        {
+          "selector": "#clear-closed",
+          "text": "清理已收口",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": true
+        },
+        {
+          "selector": "button.selected",
+          "text": "全部",
+          "font": 12,
+          "weight": "680",
+          "color": "rgb(49, 87, 127)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.5,
+          "disabled": false
+        },
+        {
+          "selector": "button",
+          "text": "进行中",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(237, 240, 245)",
+          "contrast": 5.11,
+          "disabled": false
+        },
+        {
+          "selector": "button",
+          "text": "已收口",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(237, 240, 245)",
+          "contrast": 5.11,
+          "disabled": false
+        },
+        {
+          "selector": "div.empty",
+          "text": "这里还没有课题。输入名称即可创建临时研究看板。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(250, 251, 253)",
+          "contrast": 5.64,
+          "disabled": false
+        },
+        {
+          "selector": "h3",
+          "text": "Fork 对照实验",
+          "font": 16.38,
+          "weight": "700",
+          "color": "rgb(32, 45, 61)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 13.96,
+          "disabled": false
+        },
+        {
+          "selector": "p.caption",
+          "text": "冻结材料，对照多个分支的回复；发送始终由你手动完成，研线永不自动发送。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "#ff-preview-link",
+          "text": "打开 Fork 实验页面",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(0, 0, 238)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 9.4,
+          "disabled": false
+        },
+        {
+          "selector": "h3",
+          "text": "课题与对话关联备份",
+          "font": 14,
+          "weight": "700",
+          "color": "rgb(32, 45, 61)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 13.96,
+          "disabled": false
+        },
+        {
+          "selector": "p.caption",
+          "text": "导出课题、对话关联及旧版课题状态历史；不包含已采纳结论与证据、Fork 实验或临时采集全文。导出文件可能含研究资料，请妥善保管。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "#backup-export",
+          "text": "导出课题与对话关联",
+          "font": 13,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "#backup-rollback",
+          "text": "恢复最近快照",
+          "font": 13,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "label",
+          "text": "从 JSON 替换课题与对话关联",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(89, 101, 121)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.9,
+          "disabled": false
+        },
+        {
+          "selector": "#backup-import",
+          "text": "检查并替换本地课题与关联",
+          "font": 13,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(238, 243, 249)",
+          "contrast": 6.69,
+          "disabled": false
+        },
+        {
+          "selector": "h3",
+          "text": "网页适配自检",
+          "font": 14,
+          "weight": "700",
+          "color": "rgb(32, 45, 61)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 13.96,
+          "disabled": false
+        },
+        {
+          "selector": "p.caption",
+          "text": "只读检查当前 ChatGPT 标签页的控件，不会自动发消息、创建项目或归档。显示上次真实完成操作的时间，尚未验证的功能仍标记未知。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "#health-check",
+          "text": "检查当前 ChatGPT 网页",
+          "font": 13,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "#health-result",
+          "text": "尚未检查",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(51, 68, 86)",
+          "background": "rgb(245, 248, 251)",
+          "contrast": 9.37,
+          "disabled": false
+        }
+      ]
+    },
+    {
+      "name": "evidence-empty-360",
+      "viewport": {
+        "width": 360,
+        "height": 900,
+        "dpr": 1
+      },
+      "bodyHeight": 900,
+      "documentWidth": 360,
+      "visibleControls": 9,
+      "smallTargets": [],
+      "fontHistogram": {
+        "12": 11,
+        "13": 1,
+        "18": 2
+      },
+      "textContrastCandidates": [],
+      "samples": [
+        {
+          "selector": "h1",
+          "text": "研线 ThreadLine",
+          "font": 18,
+          "weight": "750",
+          "color": "rgb(32, 45, 61)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 13.15,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "切换对话之前，先看最新状态",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 5.5,
+          "disabled": false
+        },
+        {
+          "selector": "#nav-switch",
+          "text": "⇄ 对话切换",
+          "font": 12,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(237, 241, 246)",
+          "contrast": 5.15,
+          "disabled": false
+        },
+        {
+          "selector": "#nav-research",
+          "text": "◎ 研究整理",
+          "font": 12,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(237, 241, 246)",
+          "contrast": 5.15,
+          "disabled": false
+        },
+        {
+          "selector": "#nav-evidence",
+          "text": "◇ 证据与交接",
+          "font": 12,
+          "weight": "650",
+          "color": "rgb(32, 77, 122)",
+          "background": "rgb(237, 241, 246)",
+          "contrast": 7.7,
+          "disabled": false
+        },
+        {
+          "selector": "h2",
+          "text": "证据与交接",
+          "font": 18,
+          "weight": "700",
+          "color": "rgb(32, 45, 61)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 13.15,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "采纳重要结论，保存原始依据与版本历史，并制作研究交接。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 5.5,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "已采纳结论与依据",
+          "font": 12,
+          "weight": "700",
+          "color": "rgb(70, 96, 120)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 6.55,
+          "disabled": false
+        },
+        {
+          "selector": "p.subtle",
+          "text": "管理已经采纳的重要结论，随时回看依据。后续修订在此生成新版本，旧正文与撤回记录都会保留。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "#evidence-refresh",
+          "text": "刷新",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "#evidence-summary",
+          "text": "暂无课题。先创建课题，再从整理结果逐条采纳。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary.evidence-next",
+          "text": "创建课题",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "#evidence-handoff",
+          "text": "生成交接预览",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": true
+        },
+        {
+          "selector": "summary",
+          "text": "证据备份、恢复与删除",
+          "font": 13,
+          "weight": "700",
+          "color": "rgb(41, 75, 112)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 8.99,
+          "disabled": false
+        }
+      ]
+    },
+    {
+      "name": "research-empty-360",
+      "viewport": {
+        "width": 360,
+        "height": 900,
+        "dpr": 1
+      },
+      "bodyHeight": 900,
+      "documentWidth": 360,
+      "visibleControls": 5,
+      "smallTargets": [],
+      "fontHistogram": {
+        "12": 6,
+        "13": 1,
+        "14": 3,
+        "18": 1
+      },
+      "textContrastCandidates": [],
+      "samples": [
+        {
+          "selector": "h1",
+          "text": "研线 ThreadLine",
+          "font": 18,
+          "weight": "750",
+          "color": "rgb(32, 45, 61)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 13.15,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "切换对话之前，先看最新状态",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 5.5,
+          "disabled": false
+        },
+        {
+          "selector": "#nav-switch",
+          "text": "⇄ 对话切换",
+          "font": 12,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(237, 241, 246)",
+          "contrast": 5.15,
+          "disabled": false
+        },
+        {
+          "selector": "#nav-research",
+          "text": "◎ 研究整理",
+          "font": 12,
+          "weight": "650",
+          "color": "rgb(32, 77, 122)",
+          "background": "rgb(237, 241, 246)",
+          "contrast": 7.7,
+          "disabled": false
+        },
+        {
+          "selector": "#nav-evidence",
+          "text": "◇ 证据与交接",
+          "font": 12,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(237, 241, 246)",
+          "contrast": 5.15,
+          "disabled": false
+        },
+        {
+          "selector": "h2",
+          "text": "跨对话采集与接续",
+          "font": 14,
+          "weight": "730",
+          "color": "rgb(32, 45, 61)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 13.96,
+          "disabled": false
+        },
+        {
+          "selector": "span.badge.muted",
+          "text": "按需采集",
+          "font": 12,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(241, 243, 246)",
+          "contrast": 5.25,
+          "disabled": false
+        },
+        {
+          "selector": "p.capture-subtitle",
+          "text": "选择当前浏览器中一个已经保存的 ChatGPT 对话，逐页采集历史，在右侧面板查看提要与思维导图。无需上传下载。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "label.sr-only",
+          "text": "要采集的对话",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(32, 45, 61)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 13.96,
+          "disabled": false
+        },
+        {
+          "selector": "#capture-source",
+          "text": "没有打开的已保存 ChatGPT 对话",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(51, 79, 112)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 8.42,
+          "disabled": false
+        },
+        {
+          "selector": "#capture-start",
+          "text": "采集并整理",
+          "font": 13,
+          "weight": "680",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(41, 77, 117)",
+          "contrast": 8.7,
+          "disabled": true
+        }
+      ]
+    },
+    {
+      "name": "research-report-360",
+      "viewport": {
+        "width": 360,
+        "height": 900,
+        "dpr": 1
+      },
+      "bodyHeight": 2434,
+      "documentWidth": 360,
+      "visibleControls": 24,
+      "smallTargets": [
+        {
+          "selector": "summary",
+          "text": "或手动粘贴 ChatGPT 返回的 JSON",
+          "w": 278,
+          "h": 15,
+          "disabled": false
+        }
+      ],
+      "fontHistogram": {
+        "12": 42,
+        "13": 3,
+        "14": 14,
+        "18": 1
+      },
+      "textContrastCandidates": [],
+      "samples": [
+        {
+          "selector": "h1",
+          "text": "研线 ThreadLine",
+          "font": 18,
+          "weight": "750",
+          "color": "rgb(32, 45, 61)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 13.15,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "切换对话之前，先看最新状态",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 5.5,
+          "disabled": false
+        },
+        {
+          "selector": "#nav-switch",
+          "text": "⇄ 对话切换",
+          "font": 12,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(237, 241, 246)",
+          "contrast": 5.15,
+          "disabled": false
+        },
+        {
+          "selector": "#nav-research",
+          "text": "◎ 研究整理",
+          "font": 12,
+          "weight": "650",
+          "color": "rgb(32, 77, 122)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 8.74,
+          "disabled": false
+        },
+        {
+          "selector": "#nav-evidence",
+          "text": "◇ 证据与交接",
+          "font": 12,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(237, 241, 246)",
+          "contrast": 5.15,
+          "disabled": false
+        },
+        {
+          "selector": "h2",
+          "text": "跨对话采集与接续",
+          "font": 14,
+          "weight": "730",
+          "color": "rgb(32, 45, 61)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 13.96,
+          "disabled": false
+        },
+        {
+          "selector": "span.badge.muted",
+          "text": "按需采集",
+          "font": 12,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(241, 243, 246)",
+          "contrast": 5.25,
+          "disabled": false
+        },
+        {
+          "selector": "p.capture-subtitle",
+          "text": "选择当前浏览器中一个已经保存的 ChatGPT 对话，逐页采集历史，在右侧面板查看提要与思维导图。无需上传下载。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "label.sr-only",
+          "text": "要采集的对话",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(32, 45, 61)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 13.96,
+          "disabled": false
+        },
+        {
+          "selector": "#capture-source",
+          "text": "没有打开的已保存 ChatGPT 对话",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(51, 79, 112)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 8.42,
+          "disabled": false
+        },
+        {
+          "selector": "#capture-start",
+          "text": "采集并整理",
+          "font": 13,
+          "weight": "680",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(41, 77, 117)",
+          "contrast": 8.7,
+          "disabled": false
+        },
+        {
+          "selector": "#capture-progress",
+          "text": "采集结束：1 页 / 约 2 条消息 · 仅部分历史",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(157, 52, 44)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.09,
+          "disabled": false
+        },
+        {
+          "selector": "#report-title",
+          "text": "合成研究材料",
+          "font": 14,
+          "weight": "730",
+          "color": "rgb(32, 45, 61)",
+          "background": "rgb(242, 246, 251)",
+          "contrast": 12.86,
+          "disabled": false
+        },
+        {
+          "selector": "#report-meta",
+          "text": "2 条文本消息 · 1 页 · dom · 部分采集",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(242, 246, 251)",
+          "contrast": 5.38,
+          "disabled": false
+        },
+        {
+          "selector": "#report-aim",
+          "text": "研究目标候选：尚未从对话中识别出明确研究目标",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(63, 89, 111)",
+          "background": "rgb(242, 246, 251)",
+          "contrast": 6.74,
+          "disabled": false
+        },
+        {
+          "selector": "#report-warning",
+          "text": "仅合成文本片段 采集未覆盖全部历史；以下提要可能遗漏早期信息。 这是基于可读取文本的规则提取，条目可能来自被推翻的旧回答。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(128, 85, 22)",
+          "background": "rgb(255, 249, 235)",
+          "contrast": 6.19,
+          "disabled": false
+        },
+        {
+          "selector": "h3",
+          "text": "结论线索（需核查）",
+          "font": 14,
+          "weight": "700",
+          "color": "rgb(42, 66, 94)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 10.3,
+          "disabled": false
+        },
+        {
+          "selector": "span",
+          "text": "候选结论：同期活动和复访行为可能同时影响收入，需要补充独立证据。",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(77, 96, 117)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 6.47,
+          "disabled": false
+        },
+        {
+          "selector": "span.source",
+          "text": "[消息 2]",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "采纳此条为证据结论",
+          "font": 13,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "h3",
+          "text": "未解决与证据缺口",
+          "font": 14,
+          "weight": "700",
+          "color": "rgb(42, 66, 94)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 10.3,
+          "disabled": false
+        },
+        {
+          "selector": "li",
+          "text": "本次提取没有发现明确条目",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(77, 96, 117)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 6.47,
+          "disabled": false
+        },
+        {
+          "selector": "h3",
+          "text": "下一步工作候选",
+          "font": 14,
+          "weight": "700",
+          "color": "rgb(42, 66, 94)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 10.3,
+          "disabled": false
+        },
+        {
+          "selector": "span",
+          "text": "下一步：核实对照窗口和样本口径。",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(77, 96, 117)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 6.47,
+          "disabled": false
+        },
+        {
+          "selector": "span.source",
+          "text": "[消息 2]",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "h3",
+          "text": "AI 深度整理",
+          "font": 13,
+          "weight": "700",
+          "color": "rgb(36, 71, 108)",
+          "background": "rgb(248, 251, 255)",
+          "contrast": 9.23,
+          "disabled": false
+        },
+        {
+          "selector": "span.badge.muted",
+          "text": "可选",
+          "font": 12,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(241, 243, 246)",
+          "contrast": 5.25,
+          "disabled": false
+        },
+        {
+          "selector": "p.ai-help",
+          "text": "默认手动分析：复制结构化提示，在 ChatGPT 自行发送，再导入核对后的 JSON。网页自动分析仍是实验功能，只有主动切换并确认后才会操作网页；任何方式均不会",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(248, 251, 255)",
+          "contrast": 5.63,
+          "disabled": false
+        },
+        {
+          "selector": "label",
+          "text": "分析方式",
+          "font": 12,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(248, 251, 255)",
+          "contrast": 5.63,
+          "disabled": false
+        },
+        {
+          "selector": "#ai-provider",
+          "text": "ChatGPT 手动分析并导入（默认，不自动操作网页）\n            ChatGPT 网页自动分析（实验性，需确认）\n            \n   ",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(48, 72, 95)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 9.47,
+          "disabled": false
+        },
+        {
+          "selector": "#ai-copy-prompt",
+          "text": "复制 ChatGPT 结构化提示",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "#ai-import-clipboard",
+          "text": "从剪贴板导入结果",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "或手动粘贴 ChatGPT 返回的 JSON",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(248, 251, 255)",
+          "contrast": 5.63,
+          "disabled": false
+        },
+        {
+          "selector": "p.ai-help",
+          "text": "自动模式会将采集到的对话文本发往所选模型服务。官方 ChatGPT 计划 OAuth 授权暂未接入；网页实验模式通过已登录的页面发送提示词，并非官方 Respo",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(248, 251, 255)",
+          "contrast": 5.63,
+          "disabled": false
+        },
+        {
+          "selector": "h3",
+          "text": "研究思维导图",
+          "font": 14,
+          "weight": "700",
+          "color": "rgb(32, 45, 61)",
+          "background": "rgb(251, 252, 255)",
+          "contrast": 13.61,
+          "disabled": false
+        },
+        {
+          "selector": "#map-minus",
+          "text": "−",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "#map-plus",
+          "text": "＋",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "#map-reset",
+          "text": "适配",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "div.map-node.root",
+          "text": "合成研究材料",
+          "font": 12,
+          "weight": "740",
+          "color": "rgb(34, 72, 117)",
+          "background": "rgb(234, 242, 251)",
+          "contrast": 8.26,
+          "disabled": false
+        },
+        {
+          "selector": "button.map-node.group",
+          "text": "− 研究目标",
+          "font": 12,
+          "weight": "720",
+          "color": "rgb(39, 59, 86)",
+          "background": "rgb(243, 247, 252)",
+          "contrast": 10.57,
+          "disabled": false
+        },
+        {
+          "selector": "div.map-node.leaf",
+          "text": "尚未从对话中识别出明确研究目标",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(69, 88, 111)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.3,
+          "disabled": false
+        },
+        {
+          "selector": "button.map-node.group",
+          "text": "− 已记录结论",
+          "font": 12,
+          "weight": "720",
+          "color": "rgb(39, 59, 86)",
+          "background": "rgb(243, 247, 252)",
+          "contrast": 10.57,
+          "disabled": false
+        },
+        {
+          "selector": "div.map-node.leaf",
+          "text": "候选结论：同期活动和复访行为可能同时影响收入，需要补充独立证据。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(69, 88, 111)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.3,
+          "disabled": false
+        },
+        {
+          "selector": "button.map-node.group",
+          "text": "− 未解决问题",
+          "font": 12,
+          "weight": "720",
+          "color": "rgb(39, 59, 86)",
+          "background": "rgb(243, 247, 252)",
+          "contrast": 10.57,
+          "disabled": false
+        },
+        {
+          "selector": "div.map-node.leaf",
+          "text": "对话中未识别到明确条目",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(69, 88, 111)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.3,
+          "disabled": false
+        },
+        {
+          "selector": "button.map-node.group",
+          "text": "− 可继续的工作",
+          "font": 12,
+          "weight": "720",
+          "color": "rgb(39, 59, 86)",
+          "background": "rgb(243, 247, 252)",
+          "contrast": 10.57,
+          "disabled": false
+        },
+        {
+          "selector": "div.map-node.leaf",
+          "text": "下一步：核实对照窗口和样本口径。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(69, 88, 111)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.3,
+          "disabled": false
+        },
+        {
+          "selector": "div.map-caption",
+          "text": "点击分类节点可展开/收起；左右滚动查看完整导图。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(251, 252, 255)",
+          "contrast": 5.69,
+          "disabled": false
+        },
+        {
+          "selector": "h3",
+          "text": "整理到 ChatGPT 网页",
+          "font": 14,
+          "weight": "700",
+          "color": "rgb(39, 69, 99)",
+          "background": "rgb(248, 250, 252)",
+          "contrast": 9.48,
+          "disabled": false
+        },
+        {
+          "selector": "span.badge.muted",
+          "text": "单次操作",
+          "font": 12,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(241, 243, 246)",
+          "contrast": 5.25,
+          "disabled": false
+        }
+      ]
+    },
+    {
+      "name": "adoption-dialog-360",
+      "viewport": {
+        "width": 360,
+        "height": 900,
+        "dpr": 1
+      },
+      "bodyHeight": 2434,
+      "documentWidth": 360,
+      "visibleControls": 12,
+      "smallTargets": [],
+      "fontHistogram": {
+        "12": 2,
+        "13": 8,
+        "14": 1,
+        "21": 1,
+        "16.38": 1
+      },
+      "textContrastCandidates": [],
+      "samples": [
+        {
+          "selector": "#evidence-adopt-heading",
+          "text": "采纳一条证据结论",
+          "font": 21,
+          "weight": "700",
+          "color": "rgb(35, 56, 79)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 12,
+          "disabled": false
+        },
+        {
+          "selector": "p.subtle",
+          "text": "核对正文与原始依据后保存。采纳不等于事实已经证实。",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(35, 56, 79)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 12,
+          "disabled": false
+        },
+        {
+          "selector": "#evidence-adopt-project",
+          "text": "合成研究：收入变化归因",
+          "font": 13,
+          "weight": "400",
+          "color": "rgb(35, 56, 79)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 12,
+          "disabled": false
+        },
+        {
+          "selector": "small",
+          "text": "32 / 4,000 字符",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "h3",
+          "text": "核对依据",
+          "font": 16.38,
+          "weight": "700",
+          "color": "rgb(35, 56, 79)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 12,
+          "disabled": false
+        },
+        {
+          "selector": "select",
+          "text": "M2 · assistant · 候选结论：同期活动和复访行为可能同时影响收入，需要补充独立证据。下一步：核实对照窗口和样本口径。",
+          "font": 13,
+          "weight": "400",
+          "color": "rgb(35, 56, 79)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 12,
+          "disabled": false
+        },
+        {
+          "selector": "small",
+          "text": "原始采集：部分历史；AI 输入范围：未确认或部分",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "使用上方选中文本",
+          "font": 13,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "select",
+          "text": "引用支持反对背景",
+          "font": 13,
+          "weight": "400",
+          "color": "rgb(35, 56, 79)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 12,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "移除此依据",
+          "font": 13,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "添加另一条依据",
+          "font": 13,
+          "weight": "400",
+          "color": "rgb(41, 67, 94)",
+          "background": "rgb(238, 243, 248)",
+          "contrast": 9.14,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "取消",
+          "font": 13,
+          "weight": "400",
+          "color": "rgb(41, 67, 94)",
+          "background": "rgb(238, 243, 248)",
+          "contrast": 9.14,
+          "disabled": false
+        },
+        {
+          "selector": "button.primary",
+          "text": "确认采纳",
+          "font": 13,
+          "weight": "680",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(36, 94, 152)",
+          "contrast": 6.71,
+          "disabled": false
+        }
+      ]
+    },
+    {
+      "name": "evidence-1-360",
+      "viewport": {
+        "width": 360,
+        "height": 900,
+        "dpr": 1
+      },
+      "bodyHeight": 1004,
+      "documentWidth": 360,
+      "visibleControls": 11,
+      "smallTargets": [],
+      "fontHistogram": {
+        "12": 13,
+        "13": 1,
+        "14": 3,
+        "18": 2
+      },
+      "textContrastCandidates": [],
+      "samples": [
+        {
+          "selector": "h1",
+          "text": "研线 ThreadLine",
+          "font": 18,
+          "weight": "750",
+          "color": "rgb(32, 45, 61)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 13.15,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "切换对话之前，先看最新状态",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 5.5,
+          "disabled": false
+        },
+        {
+          "selector": "#nav-switch",
+          "text": "⇄ 对话切换",
+          "font": 12,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(237, 241, 246)",
+          "contrast": 5.15,
+          "disabled": false
+        },
+        {
+          "selector": "#nav-research",
+          "text": "◎ 研究整理",
+          "font": 12,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(237, 241, 246)",
+          "contrast": 5.15,
+          "disabled": false
+        },
+        {
+          "selector": "#nav-evidence",
+          "text": "◇ 证据与交接",
+          "font": 12,
+          "weight": "650",
+          "color": "rgb(32, 77, 122)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 8.74,
+          "disabled": false
+        },
+        {
+          "selector": "h2",
+          "text": "证据与交接",
+          "font": 18,
+          "weight": "700",
+          "color": "rgb(32, 45, 61)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 13.15,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "采纳重要结论，保存原始依据与版本历史，并制作研究交接。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 5.5,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "已采纳结论与依据",
+          "font": 12,
+          "weight": "700",
+          "color": "rgb(70, 96, 120)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 6.55,
+          "disabled": false
+        },
+        {
+          "selector": "p.subtle",
+          "text": "管理已经采纳的重要结论，随时回看依据。后续修订在此生成新版本，旧正文与撤回记录都会保留。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "#evidence-project",
+          "text": "合成研究：收入变化归因proto-p1proto-p2",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(35, 56, 79)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 12,
+          "disabled": false
+        },
+        {
+          "selector": "#evidence-refresh",
+          "text": "刷新",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(243, 246, 250)",
+          "contrast": 6.88,
+          "disabled": false
+        },
+        {
+          "selector": "#evidence-summary",
+          "text": "已采纳 1 条 · 已撤回 0 条 · 共 1 个版本\n点击依据查看原文；修订和撤回均保留历史。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 001：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "#evidence-handoff",
+          "text": "生成交接预览",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "证据备份、恢复与删除",
+          "font": 13,
+          "weight": "700",
+          "color": "rgb(41, 75, 112)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 8.99,
+          "disabled": false
+        }
+      ]
+    },
+    {
+      "name": "evidence-10-360",
+      "viewport": {
+        "width": 360,
+        "height": 900,
+        "dpr": 1
+      },
+      "bodyHeight": 3684,
+      "documentWidth": 360,
+      "visibleControls": 38,
+      "smallTargets": [],
+      "fontHistogram": {
+        "12": 40,
+        "13": 1,
+        "14": 21,
+        "18": 2
+      },
+      "textContrastCandidates": [],
+      "samples": [
+        {
+          "selector": "h1",
+          "text": "研线 ThreadLine",
+          "font": 18,
+          "weight": "750",
+          "color": "rgb(32, 45, 61)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 13.15,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "切换对话之前，先看最新状态",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 5.5,
+          "disabled": false
+        },
+        {
+          "selector": "#nav-switch",
+          "text": "⇄ 对话切换",
+          "font": 12,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(237, 241, 246)",
+          "contrast": 5.15,
+          "disabled": false
+        },
+        {
+          "selector": "#nav-research",
+          "text": "◎ 研究整理",
+          "font": 12,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(237, 241, 246)",
+          "contrast": 5.15,
+          "disabled": false
+        },
+        {
+          "selector": "#nav-evidence",
+          "text": "◇ 证据与交接",
+          "font": 12,
+          "weight": "650",
+          "color": "rgb(32, 77, 122)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 8.74,
+          "disabled": false
+        },
+        {
+          "selector": "h2",
+          "text": "证据与交接",
+          "font": 18,
+          "weight": "700",
+          "color": "rgb(32, 45, 61)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 13.15,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "采纳重要结论，保存原始依据与版本历史，并制作研究交接。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 5.5,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "已采纳结论与依据",
+          "font": 12,
+          "weight": "700",
+          "color": "rgb(70, 96, 120)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 6.55,
+          "disabled": false
+        },
+        {
+          "selector": "p.subtle",
+          "text": "管理已经采纳的重要结论，随时回看依据。后续修订在此生成新版本，旧正文与撤回记录都会保留。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "#evidence-project",
+          "text": "合成研究：收入变化归因proto-p1proto-p2",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(35, 56, 79)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 12,
+          "disabled": false
+        },
+        {
+          "selector": "#evidence-refresh",
+          "text": "刷新",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(243, 246, 250)",
+          "contrast": 6.88,
+          "disabled": false
+        },
+        {
+          "selector": "#evidence-summary",
+          "text": "已采纳 10 条 · 已撤回 0 条 · 共 10 个版本\n点击依据查看原文；修订和撤回均保留历史。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 010：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 009：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 008：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 007：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 006：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 005：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 004：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 003：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        }
+      ]
+    },
+    {
+      "name": "evidence-50-360",
+      "viewport": {
+        "width": 360,
+        "height": 900,
+        "dpr": 1
+      },
+      "bodyHeight": 15594,
+      "documentWidth": 360,
+      "visibleControls": 158,
+      "smallTargets": [],
+      "fontHistogram": {
+        "12": 160,
+        "13": 1,
+        "14": 101,
+        "18": 2
+      },
+      "textContrastCandidates": [],
+      "samples": [
+        {
+          "selector": "h1",
+          "text": "研线 ThreadLine",
+          "font": 18,
+          "weight": "750",
+          "color": "rgb(32, 45, 61)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 13.15,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "切换对话之前，先看最新状态",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 5.5,
+          "disabled": false
+        },
+        {
+          "selector": "#nav-switch",
+          "text": "⇄ 对话切换",
+          "font": 12,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(237, 241, 246)",
+          "contrast": 5.15,
+          "disabled": false
+        },
+        {
+          "selector": "#nav-research",
+          "text": "◎ 研究整理",
+          "font": 12,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(237, 241, 246)",
+          "contrast": 5.15,
+          "disabled": false
+        },
+        {
+          "selector": "#nav-evidence",
+          "text": "◇ 证据与交接",
+          "font": 12,
+          "weight": "650",
+          "color": "rgb(32, 77, 122)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 8.74,
+          "disabled": false
+        },
+        {
+          "selector": "h2",
+          "text": "证据与交接",
+          "font": 18,
+          "weight": "700",
+          "color": "rgb(32, 45, 61)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 13.15,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "采纳重要结论，保存原始依据与版本历史，并制作研究交接。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 5.5,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "已采纳结论与依据",
+          "font": 12,
+          "weight": "700",
+          "color": "rgb(70, 96, 120)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 6.55,
+          "disabled": false
+        },
+        {
+          "selector": "p.subtle",
+          "text": "管理已经采纳的重要结论，随时回看依据。后续修订在此生成新版本，旧正文与撤回记录都会保留。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "#evidence-project",
+          "text": "合成研究：收入变化归因proto-p1proto-p2",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(35, 56, 79)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 12,
+          "disabled": false
+        },
+        {
+          "selector": "#evidence-refresh",
+          "text": "刷新",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(243, 246, 250)",
+          "contrast": 6.88,
+          "disabled": false
+        },
+        {
+          "selector": "#evidence-summary",
+          "text": "已采纳 50 条 · 已撤回 0 条 · 共 50 个版本\n点击依据查看原文；修订和撤回均保留历史。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 050：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 049：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 048：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 047：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 046：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 045：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 044：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 043：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        }
+      ]
+    },
+    {
+      "name": "evidence-200-360",
+      "viewport": {
+        "width": 360,
+        "height": 900,
+        "dpr": 1
+      },
+      "bodyHeight": 60257,
+      "documentWidth": 360,
+      "visibleControls": 608,
+      "smallTargets": [],
+      "fontHistogram": {
+        "12": 610,
+        "13": 1,
+        "14": 401,
+        "18": 2
+      },
+      "textContrastCandidates": [],
+      "samples": [
+        {
+          "selector": "h1",
+          "text": "研线 ThreadLine",
+          "font": 18,
+          "weight": "750",
+          "color": "rgb(32, 45, 61)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 13.15,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "切换对话之前，先看最新状态",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 5.5,
+          "disabled": false
+        },
+        {
+          "selector": "#nav-switch",
+          "text": "⇄ 对话切换",
+          "font": 12,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(237, 241, 246)",
+          "contrast": 5.15,
+          "disabled": false
+        },
+        {
+          "selector": "#nav-research",
+          "text": "◎ 研究整理",
+          "font": 12,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(237, 241, 246)",
+          "contrast": 5.15,
+          "disabled": false
+        },
+        {
+          "selector": "#nav-evidence",
+          "text": "◇ 证据与交接",
+          "font": 12,
+          "weight": "650",
+          "color": "rgb(32, 77, 122)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 8.74,
+          "disabled": false
+        },
+        {
+          "selector": "h2",
+          "text": "证据与交接",
+          "font": 18,
+          "weight": "700",
+          "color": "rgb(32, 45, 61)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 13.15,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "采纳重要结论，保存原始依据与版本历史，并制作研究交接。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 5.5,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "已采纳结论与依据",
+          "font": 12,
+          "weight": "700",
+          "color": "rgb(70, 96, 120)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 6.55,
+          "disabled": false
+        },
+        {
+          "selector": "p.subtle",
+          "text": "管理已经采纳的重要结论，随时回看依据。后续修订在此生成新版本，旧正文与撤回记录都会保留。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "#evidence-project",
+          "text": "合成研究：收入变化归因proto-p1proto-p2",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(35, 56, 79)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 12,
+          "disabled": false
+        },
+        {
+          "selector": "#evidence-refresh",
+          "text": "刷新",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(243, 246, 250)",
+          "contrast": 6.88,
+          "disabled": false
+        },
+        {
+          "selector": "#evidence-summary",
+          "text": "已采纳 200 条 · 已撤回 0 条 · 共 200 个版本\n点击依据查看原文；修订和撤回均保留历史。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 200：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 199：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 198：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 197：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 196：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 195：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 194：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 193：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        }
+      ]
+    },
+    {
+      "name": "evidence-200-320",
+      "viewport": {
+        "width": 320,
+        "height": 900,
+        "dpr": 1
+      },
+      "bodyHeight": 63973,
+      "documentWidth": 320,
+      "visibleControls": 608,
+      "smallTargets": [],
+      "fontHistogram": {
+        "12": 610,
+        "13": 1,
+        "14": 401,
+        "18": 2
+      },
+      "textContrastCandidates": [],
+      "samples": [
+        {
+          "selector": "h1",
+          "text": "研线 ThreadLine",
+          "font": 18,
+          "weight": "750",
+          "color": "rgb(32, 45, 61)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 13.15,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "切换对话之前，先看最新状态",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 5.5,
+          "disabled": false
+        },
+        {
+          "selector": "#nav-switch",
+          "text": "⇄ 对话切换",
+          "font": 12,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(237, 241, 246)",
+          "contrast": 5.15,
+          "disabled": false
+        },
+        {
+          "selector": "#nav-research",
+          "text": "◎ 研究整理",
+          "font": 12,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(237, 241, 246)",
+          "contrast": 5.15,
+          "disabled": false
+        },
+        {
+          "selector": "#nav-evidence",
+          "text": "◇ 证据与交接",
+          "font": 12,
+          "weight": "650",
+          "color": "rgb(32, 77, 122)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 8.74,
+          "disabled": false
+        },
+        {
+          "selector": "h2",
+          "text": "证据与交接",
+          "font": 18,
+          "weight": "700",
+          "color": "rgb(32, 45, 61)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 13.15,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "采纳重要结论，保存原始依据与版本历史，并制作研究交接。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 5.5,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "已采纳结论与依据",
+          "font": 12,
+          "weight": "700",
+          "color": "rgb(70, 96, 120)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 6.55,
+          "disabled": false
+        },
+        {
+          "selector": "p.subtle",
+          "text": "管理已经采纳的重要结论，随时回看依据。后续修订在此生成新版本，旧正文与撤回记录都会保留。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "#evidence-project",
+          "text": "合成研究：收入变化归因proto-p1proto-p2",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(35, 56, 79)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 12,
+          "disabled": false
+        },
+        {
+          "selector": "#evidence-refresh",
+          "text": "刷新",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(253, 254, 254)",
+          "contrast": 7.38,
+          "disabled": false
+        },
+        {
+          "selector": "#evidence-summary",
+          "text": "已采纳 200 条 · 已撤回 0 条 · 共 200 个版本\n点击依据查看原文；修订和撤回均保留历史。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 200：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 199：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 198：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 197：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 196：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 195：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 194：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 193：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        }
+      ]
+    },
+    {
+      "name": "evidence-200-768",
+      "viewport": {
+        "width": 768,
+        "height": 900,
+        "dpr": 1
+      },
+      "bodyHeight": 50568,
+      "documentWidth": 768,
+      "visibleControls": 608,
+      "smallTargets": [],
+      "fontHistogram": {
+        "11": 1,
+        "12": 607,
+        "13": 1,
+        "14": 404,
+        "18": 1
+      },
+      "textContrastCandidates": [
+        {
+          "selector": "span",
+          "text": "ThreadLine",
+          "font": 11,
+          "weight": "550",
+          "color": "rgb(135, 149, 166)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 2.87,
+          "disabled": false
+        }
+      ],
+      "samples": [
+        {
+          "selector": "span",
+          "text": "ThreadLine",
+          "font": 11,
+          "weight": "550",
+          "color": "rgb(135, 149, 166)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 2.87,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "切换对话之前，先看最新状态",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 5.5,
+          "disabled": false
+        },
+        {
+          "selector": "span.nav-icon",
+          "text": "⇄",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(237, 241, 246)",
+          "contrast": 5.15,
+          "disabled": false
+        },
+        {
+          "selector": "span.nav-icon",
+          "text": "◎",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(237, 241, 246)",
+          "contrast": 5.15,
+          "disabled": false
+        },
+        {
+          "selector": "span.nav-icon",
+          "text": "◇",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(32, 77, 122)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 8.74,
+          "disabled": false
+        },
+        {
+          "selector": "h2",
+          "text": "证据与交接",
+          "font": 18,
+          "weight": "700",
+          "color": "rgb(32, 45, 61)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 13.15,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "采纳重要结论，保存原始依据与版本历史，并制作研究交接。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 5.5,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "已采纳结论与依据",
+          "font": 12,
+          "weight": "700",
+          "color": "rgb(70, 96, 120)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 6.55,
+          "disabled": false
+        },
+        {
+          "selector": "p.subtle",
+          "text": "管理已经采纳的重要结论，随时回看依据。后续修订在此生成新版本，旧正文与撤回记录都会保留。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "#evidence-project",
+          "text": "合成研究：收入变化归因proto-p1proto-p2",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(35, 56, 79)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 12,
+          "disabled": false
+        },
+        {
+          "selector": "#evidence-refresh",
+          "text": "刷新",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "#evidence-summary",
+          "text": "已采纳 200 条 · 已撤回 0 条 · 共 200 个版本\n点击依据查看原文；修订和撤回均保留历史。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 200：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 199：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 198：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 197：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 196：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 195：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 194：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 193：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        }
+      ]
+    },
+    {
+      "name": "evidence-200-1280",
+      "viewport": {
+        "width": 1280,
+        "height": 900,
+        "dpr": 1
+      },
+      "bodyHeight": 50568,
+      "documentWidth": 1280,
+      "visibleControls": 608,
+      "smallTargets": [],
+      "fontHistogram": {
+        "11": 1,
+        "12": 607,
+        "13": 1,
+        "14": 404,
+        "18": 1
+      },
+      "textContrastCandidates": [
+        {
+          "selector": "span",
+          "text": "ThreadLine",
+          "font": 11,
+          "weight": "550",
+          "color": "rgb(135, 149, 166)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 2.87,
+          "disabled": false
+        }
+      ],
+      "samples": [
+        {
+          "selector": "span",
+          "text": "ThreadLine",
+          "font": 11,
+          "weight": "550",
+          "color": "rgb(135, 149, 166)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 2.87,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "切换对话之前，先看最新状态",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 5.5,
+          "disabled": false
+        },
+        {
+          "selector": "span.nav-icon",
+          "text": "⇄",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(237, 241, 246)",
+          "contrast": 5.15,
+          "disabled": false
+        },
+        {
+          "selector": "span.nav-icon",
+          "text": "◎",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(237, 241, 246)",
+          "contrast": 5.15,
+          "disabled": false
+        },
+        {
+          "selector": "span.nav-icon",
+          "text": "◇",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(32, 77, 122)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 8.74,
+          "disabled": false
+        },
+        {
+          "selector": "h2",
+          "text": "证据与交接",
+          "font": 18,
+          "weight": "700",
+          "color": "rgb(32, 45, 61)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 13.15,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "采纳重要结论，保存原始依据与版本历史，并制作研究交接。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(247, 248, 251)",
+          "contrast": 5.5,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "已采纳结论与依据",
+          "font": 12,
+          "weight": "700",
+          "color": "rgb(70, 96, 120)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 6.55,
+          "disabled": false
+        },
+        {
+          "selector": "p.subtle",
+          "text": "管理已经采纳的重要结论，随时回看依据。后续修订在此生成新版本，旧正文与撤回记录都会保留。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "#evidence-project",
+          "text": "合成研究：收入变化归因proto-p1proto-p2",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(35, 56, 79)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 12,
+          "disabled": false
+        },
+        {
+          "selector": "#evidence-refresh",
+          "text": "刷新",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "#evidence-summary",
+          "text": "已采纳 200 条 · 已撤回 0 条 · 共 200 个版本\n点击依据查看原文；修订和撤回均保留历史。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 200：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 199：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 198：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 197：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 196：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 195：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 194：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "修订",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "撤回",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(59, 87, 119)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 7.46,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "结论 193：样本中收入变化与复访行为同时出现；该观察仍需排除同期活动影响，不能直接视作因果结论。",
+          "font": 14,
+          "weight": "650",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "p",
+          "text": "适用条件：仅适用于合成样本，不构成真实经营判断",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "summary",
+          "text": "依据片段 · 引用 · 仅片段（来源不可定位）",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(54, 86, 119)",
+          "background": "rgb(244, 247, 251)",
+          "contrast": 7.1,
+          "disabled": false
+        }
+      ]
+    },
+    {
+      "name": "amend-dialog-360",
+      "viewport": {
+        "width": 360,
+        "height": 900,
+        "dpr": 1
+      },
+      "bodyHeight": 60257,
+      "documentWidth": 360,
+      "visibleControls": 5,
+      "smallTargets": [],
+      "fontHistogram": {
+        "12": 1,
+        "13": 3,
+        "19": 1
+      },
+      "textContrastCandidates": [],
+      "samples": [
+        {
+          "selector": "#tl-dialog-title",
+          "text": "修订结论",
+          "font": 19,
+          "weight": "700",
+          "color": "rgb(35, 56, 79)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 12,
+          "disabled": false
+        },
+        {
+          "selector": "p.subtle",
+          "text": "保存后生成新版本，原有正文和依据保留。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(82, 103, 125)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.84,
+          "disabled": false
+        },
+        {
+          "selector": "#tl-field-changeImpact",
+          "text": "实质修改仅调整措辞适用条件变化",
+          "font": 13,
+          "weight": "400",
+          "color": "rgb(35, 56, 79)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 12,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "取消",
+          "font": 13,
+          "weight": "400",
+          "color": "rgb(41, 67, 94)",
+          "background": "rgb(238, 243, 248)",
+          "contrast": 9.14,
+          "disabled": false
+        },
+        {
+          "selector": "button.primary",
+          "text": "保存新版本",
+          "font": 13,
+          "weight": "680",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(36, 94, 152)",
+          "contrast": 6.71,
+          "disabled": false
+        }
+      ]
+    },
+    {
+      "name": "fork-disabled-360",
+      "viewport": {
+        "width": 360,
+        "height": 900,
+        "dpr": 1
+      },
+      "bodyHeight": 900,
+      "documentWidth": 360,
+      "visibleControls": 1,
+      "smallTargets": [
+        {
+          "selector": "#ff-enable",
+          "text": "",
+          "w": 18,
+          "h": 18,
+          "disabled": false
+        }
+      ],
+      "fontHistogram": {
+        "12": 1,
+        "13": 5,
+        "25": 1
+      },
+      "textContrastCandidates": [],
+      "samples": [
+        {
+          "selector": "h1",
+          "text": "Fork 对照实验（2–4 分支）",
+          "font": 25,
+          "weight": "700",
+          "color": "rgb(36, 50, 71)",
+          "background": "rgb(245, 247, 250)",
+          "contrast": 12.06,
+          "disabled": false
+        },
+        {
+          "selector": "p.subtle",
+          "text": "独立于原有课题：冻结材料 → 发起 K 个新标签并逐字预填 → 你手动发送 → 采集 → 去标签对照与裁决。",
+          "font": 13,
+          "weight": "400",
+          "color": "rgb(94, 110, 131)",
+          "background": "rgb(245, 247, 250)",
+          "contrast": 4.85,
+          "disabled": false
+        },
+        {
+          "selector": "b",
+          "text": "永不自动发送",
+          "font": 13,
+          "weight": "700",
+          "color": "rgb(36, 50, 71)",
+          "background": "rgb(238, 246, 255)",
+          "contrast": 11.87,
+          "disabled": false
+        },
+        {
+          "selector": "p.subtle",
+          "text": "功能默认关闭。启用后可保存/导入实验；只有你点击「发起」时才会打开 ChatGPT 标签。原有课题与备份不受影响。",
+          "font": 13,
+          "weight": "400",
+          "color": "rgb(94, 110, 131)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.21,
+          "disabled": false
+        },
+        {
+          "selector": "#ff-notice",
+          "text": "功能未启用。没有自动网页操作。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(36, 50, 71)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 12.95,
+          "disabled": false
+        },
+        {
+          "selector": "#ff-version-note",
+          "text": "当前加载版本 v0.8.2。侧载扩展不会自动更新：升级新版后请在扩展管理页手动「重新加载」，并完全重启浏览器。",
+          "font": 13,
+          "weight": "400",
+          "color": "rgb(94, 110, 131)",
+          "background": "rgb(245, 247, 250)",
+          "contrast": 4.85,
+          "disabled": false
+        },
+        {
+          "selector": "#ff-action-status",
+          "text": "功能未启用。没有自动网页操作。",
+          "font": 13,
+          "weight": "400",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(35, 60, 87)",
+          "contrast": 11.32,
+          "disabled": false
+        }
+      ]
+    },
+    {
+      "name": "fork-create-360",
+      "viewport": {
+        "width": 360,
+        "height": 900,
+        "dpr": 1
+      },
+      "bodyHeight": 1538,
+      "documentWidth": 360,
+      "visibleControls": 7,
+      "smallTargets": [
+        {
+          "selector": "#ff-enable",
+          "text": "",
+          "w": 18,
+          "h": 18,
+          "disabled": false
+        },
+        {
+          "selector": "#ff-import-file",
+          "text": "",
+          "w": 227,
+          "h": 22.6,
+          "disabled": false
+        }
+      ],
+      "fontHistogram": {
+        "12": 4,
+        "13": 8,
+        "14": 2,
+        "17": 2,
+        "25": 1
+      },
+      "textContrastCandidates": [],
+      "samples": [
+        {
+          "selector": "h1",
+          "text": "Fork 对照实验（2–4 分支）",
+          "font": 25,
+          "weight": "700",
+          "color": "rgb(36, 50, 71)",
+          "background": "rgb(245, 247, 250)",
+          "contrast": 12.06,
+          "disabled": false
+        },
+        {
+          "selector": "p.subtle",
+          "text": "独立于原有课题：冻结材料 → 发起 K 个新标签并逐字预填 → 你手动发送 → 采集 → 去标签对照与裁决。",
+          "font": 13,
+          "weight": "400",
+          "color": "rgb(94, 110, 131)",
+          "background": "rgb(245, 247, 250)",
+          "contrast": 4.85,
+          "disabled": false
+        },
+        {
+          "selector": "b",
+          "text": "永不自动发送",
+          "font": 13,
+          "weight": "700",
+          "color": "rgb(36, 50, 71)",
+          "background": "rgb(238, 246, 255)",
+          "contrast": 11.87,
+          "disabled": false
+        },
+        {
+          "selector": "p.subtle",
+          "text": "功能默认关闭。启用后可保存/导入实验；只有你点击「发起」时才会打开 ChatGPT 标签。原有课题与备份不受影响。",
+          "font": 13,
+          "weight": "400",
+          "color": "rgb(94, 110, 131)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.21,
+          "disabled": false
+        },
+        {
+          "selector": "#ff-notice",
+          "text": "已启用：仅本地冻结/存储，不会发送消息。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(36, 50, 71)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 12.95,
+          "disabled": false
+        },
+        {
+          "selector": "h2",
+          "text": "冻结共同材料与指令",
+          "font": 17,
+          "weight": "700",
+          "color": "rgb(36, 50, 71)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 12.95,
+          "disabled": false
+        },
+        {
+          "selector": "label",
+          "text": "共同材料 W₀（可选）",
+          "font": 12,
+          "weight": "600",
+          "color": "rgb(36, 50, 71)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 12.95,
+          "disabled": false
+        },
+        {
+          "selector": "label",
+          "text": "任务指令 P",
+          "font": 12,
+          "weight": "600",
+          "color": "rgb(36, 50, 71)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 12.95,
+          "disabled": false
+        },
+        {
+          "selector": "#ff-bytes",
+          "text": "最终发送文本：47 / 24,000 UTF-8 字节",
+          "font": 13,
+          "weight": "400",
+          "color": "rgb(94, 110, 131)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.21,
+          "disabled": false
+        },
+        {
+          "selector": "#ff-branch-count",
+          "text": "234",
+          "font": 12,
+          "weight": "600",
+          "color": "rgb(0, 0, 0)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 21,
+          "disabled": false
+        },
+        {
+          "selector": "#ff-save",
+          "text": "冻结并保存在本地",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(33, 94, 155)",
+          "contrast": 6.69,
+          "disabled": true
+        },
+        {
+          "selector": "h2",
+          "text": "已冻结的实验",
+          "font": 17,
+          "weight": "700",
+          "color": "rgb(36, 50, 71)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 12.95,
+          "disabled": false
+        },
+        {
+          "selector": "p.subtle",
+          "text": "本地持久化。支持自包含 JSON 导出与严格验证的导入（哈希与映射重算，不覆盖既有实验）。",
+          "font": 13,
+          "weight": "400",
+          "color": "rgb(94, 110, 131)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.21,
+          "disabled": false
+        },
+        {
+          "selector": "#ff-refresh",
+          "text": "刷新列表",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(37, 56, 79)",
+          "background": "rgb(234, 240, 247)",
+          "contrast": 10.42,
+          "disabled": false
+        },
+        {
+          "selector": "p.subtle",
+          "text": "尚无实验。",
+          "font": 13,
+          "weight": "400",
+          "color": "rgb(94, 110, 131)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.21,
+          "disabled": false
+        },
+        {
+          "selector": "#ff-version-note",
+          "text": "当前加载版本 v0.8.2。侧载扩展不会自动更新：升级新版后请在扩展管理页手动「重新加载」，并完全重启浏览器。",
+          "font": 13,
+          "weight": "400",
+          "color": "rgb(94, 110, 131)",
+          "background": "rgb(245, 247, 250)",
+          "contrast": 4.85,
+          "disabled": false
+        },
+        {
+          "selector": "#ff-action-status",
+          "text": "已启用：仅本地冻结/存储，不会发送消息。",
+          "font": 13,
+          "weight": "400",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(35, 60, 87)",
+          "contrast": 11.32,
+          "disabled": false
+        }
+      ]
+    },
+    {
+      "name": "fork-frozen-360",
+      "viewport": {
+        "width": 360,
+        "height": 900,
+        "dpr": 1
+      },
+      "bodyHeight": 2301,
+      "documentWidth": 360,
+      "visibleControls": 9,
+      "smallTargets": [
+        {
+          "selector": "#ff-enable",
+          "text": "",
+          "w": 18,
+          "h": 18,
+          "disabled": false
+        },
+        {
+          "selector": "#ff-import-file",
+          "text": "",
+          "w": 227,
+          "h": 22.6,
+          "disabled": false
+        }
+      ],
+      "fontHistogram": {
+        "12": 4,
+        "13": 13,
+        "14": 4,
+        "17": 4,
+        "25": 1
+      },
+      "textContrastCandidates": [],
+      "samples": [
+        {
+          "selector": "h1",
+          "text": "Fork 对照实验（2–4 分支）",
+          "font": 25,
+          "weight": "700",
+          "color": "rgb(36, 50, 71)",
+          "background": "rgb(245, 247, 250)",
+          "contrast": 12.06,
+          "disabled": false
+        },
+        {
+          "selector": "p.subtle",
+          "text": "独立于原有课题：冻结材料 → 发起 K 个新标签并逐字预填 → 你手动发送 → 采集 → 去标签对照与裁决。",
+          "font": 13,
+          "weight": "400",
+          "color": "rgb(94, 110, 131)",
+          "background": "rgb(245, 247, 250)",
+          "contrast": 4.85,
+          "disabled": false
+        },
+        {
+          "selector": "b",
+          "text": "永不自动发送",
+          "font": 13,
+          "weight": "700",
+          "color": "rgb(36, 50, 71)",
+          "background": "rgb(238, 246, 255)",
+          "contrast": 11.87,
+          "disabled": false
+        },
+        {
+          "selector": "p.subtle",
+          "text": "功能默认关闭。启用后可保存/导入实验；只有你点击「发起」时才会打开 ChatGPT 标签。原有课题与备份不受影响。",
+          "font": 13,
+          "weight": "400",
+          "color": "rgb(94, 110, 131)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.21,
+          "disabled": false
+        },
+        {
+          "selector": "#ff-notice",
+          "text": "已冻结并保存到独立本地数据库；没有打开或发送网页消息。",
+          "font": 12,
+          "weight": "400",
+          "color": "rgb(36, 50, 71)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 12.95,
+          "disabled": false
+        },
+        {
+          "selector": "h2",
+          "text": "冻结共同材料与指令",
+          "font": 17,
+          "weight": "700",
+          "color": "rgb(36, 50, 71)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 12.95,
+          "disabled": false
+        },
+        {
+          "selector": "label",
+          "text": "共同材料 W₀（可选）",
+          "font": 12,
+          "weight": "600",
+          "color": "rgb(36, 50, 71)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 12.95,
+          "disabled": false
+        },
+        {
+          "selector": "label",
+          "text": "任务指令 P",
+          "font": 12,
+          "weight": "600",
+          "color": "rgb(36, 50, 71)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 12.95,
+          "disabled": false
+        },
+        {
+          "selector": "#ff-bytes",
+          "text": "最终发送文本：155 / 24,000 UTF-8 字节",
+          "font": 13,
+          "weight": "400",
+          "color": "rgb(94, 110, 131)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.21,
+          "disabled": false
+        },
+        {
+          "selector": "#ff-branch-count",
+          "text": "234",
+          "font": 12,
+          "weight": "600",
+          "color": "rgb(0, 0, 0)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 21,
+          "disabled": false
+        },
+        {
+          "selector": "#ff-save",
+          "text": "冻结并保存在本地",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(33, 94, 155)",
+          "contrast": 6.69,
+          "disabled": false
+        },
+        {
+          "selector": "h2",
+          "text": "已冻结的实验",
+          "font": 17,
+          "weight": "700",
+          "color": "rgb(36, 50, 71)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 12.95,
+          "disabled": false
+        },
+        {
+          "selector": "p.subtle",
+          "text": "本地持久化。支持自包含 JSON 导出与严格验证的导入（哈希与映射重算，不覆盖既有实验）。",
+          "font": 13,
+          "weight": "400",
+          "color": "rgb(94, 110, 131)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.21,
+          "disabled": false
+        },
+        {
+          "selector": "#ff-refresh",
+          "text": "刷新列表",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(37, 56, 79)",
+          "background": "rgb(234, 240, 247)",
+          "contrast": 10.42,
+          "disabled": false
+        },
+        {
+          "selector": "button.secondary",
+          "text": "ff_a629aebd-85fa-45cf-9e31-0e689e5dedd5 · K=2 · A… B…",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(37, 56, 79)",
+          "background": "rgb(229, 239, 249)",
+          "contrast": 10.27,
+          "disabled": false
+        },
+        {
+          "selector": "h2",
+          "text": "冻结内容及校验值",
+          "font": 17,
+          "weight": "700",
+          "color": "rgb(36, 50, 71)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 12.95,
+          "disabled": false
+        },
+        {
+          "selector": "#ff-meta",
+          "text": "实验 ff_a629aebd-85fa-45cf-9e31-0e689e5dedd5 · revision 0 · 155 UTF-8 字节",
+          "font": 13,
+          "weight": "400",
+          "color": "rgb(36, 50, 71)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 12.95,
+          "disabled": false
+        },
+        {
+          "selector": "#ff-sha",
+          "text": "冻结 SHA-256（canonicalization-v1）：a692b8836aa47880c9d972758139d0ff8a17bccf5d6d389e",
+          "font": 13,
+          "weight": "400",
+          "color": "rgb(36, 50, 71)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 12.95,
+          "disabled": false
+        },
+        {
+          "selector": "#ff-text",
+          "text": "【共同材料 W₀】\n这是一组完全虚构的研究材料。\n\n【任务指令 P】\n比较收入变化的竞争解释，列出需要核实的证据。",
+          "font": 13,
+          "weight": "400",
+          "color": "rgb(36, 50, 71)",
+          "background": "rgb(248, 250, 252)",
+          "contrast": 12.37,
+          "disabled": false
+        },
+        {
+          "selector": "h2",
+          "text": "分支执行",
+          "font": 17,
+          "weight": "700",
+          "color": "rgb(36, 50, 71)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 12.95,
+          "disabled": false
+        },
+        {
+          "selector": "p.subtle",
+          "text": "创建 K 个独立新聊天标签并填入同一冻结文本；发送由你手动完成。",
+          "font": 13,
+          "weight": "400",
+          "color": "rgb(94, 110, 131)",
+          "background": "rgb(255, 255, 255)",
+          "contrast": 5.21,
+          "disabled": false
+        },
+        {
+          "selector": "#ff-launch",
+          "text": "发起 2 个分支标签",
+          "font": 14,
+          "weight": "400",
+          "color": "rgb(37, 56, 79)",
+          "background": "rgb(234, 240, 247)",
+          "contrast": 10.42,
+          "disabled": false
+        },
+        {
+          "selector": "p.mono",
+          "text": "分支 A：进行中 · 等待预填核对",
+          "font": 13,
+          "weight": "400",
+          "color": "rgb(36, 50, 71)",
+          "background": "rgb(250, 252, 254)",
+          "contrast": 12.59,
+          "disabled": false
+        },
+        {
+          "selector": "p.mono",
+          "text": "分支 B：进行中 · 等待预填核对",
+          "font": 13,
+          "weight": "400",
+          "color": "rgb(36, 50, 71)",
+          "background": "rgb(250, 252, 254)",
+          "contrast": 12.59,
+          "disabled": false
+        },
+        {
+          "selector": "#ff-version-note",
+          "text": "当前加载版本 v0.8.2。侧载扩展不会自动更新：升级新版后请在扩展管理页手动「重新加载」，并完全重启浏览器。",
+          "font": 13,
+          "weight": "400",
+          "color": "rgb(94, 110, 131)",
+          "background": "rgb(245, 247, 250)",
+          "contrast": 4.85,
+          "disabled": false
+        },
+        {
+          "selector": "#ff-action-status",
+          "text": "已冻结并保存到独立本地数据库；没有打开或发送网页消息。",
+          "font": 13,
+          "weight": "400",
+          "color": "rgb(255, 255, 255)",
+          "background": "rgb(35, 60, 87)",
+          "contrast": 11.32,
+          "disabled": false
+        }
+      ]
+    }
+  ],
+  "errors": []
+}
