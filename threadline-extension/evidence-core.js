@@ -18,7 +18,6 @@
     now = () => Date.now();
   const isId = (x, p) =>
     typeof x === "string" && new RegExp("^" + p + "[a-z0-9_-]{8,64}$").test(x);
-  // Topic IDs are stored as object keys in authoritative snapshots.
   const validProjectId = x => typeof x === "string" &&
     /^[a-zA-Z0-9_-]{1,128}$/.test(x) &&
     x !== "prototype" && !Object.hasOwn(Object.prototype, x);
@@ -618,7 +617,15 @@
     }
     if (pkg.project?.research || pkg.project?.handoffs) {
       if(pkg.format!=="threadline-evidence/3")throw Error("研究历史需要 /3 备份格式，旧格式不能静默忽略");
-      if(pkg.project.research)throw Error("该备份含 S2–S4 依赖和复核历史，S1 独立版本不支持；请使用完整研究版本恢复，未写入");
+      if(pkg.project.research) {
+        const research=typeof module!=="undefined"&&module.exports?require("./research-core.js"):globalThis.ThreadLineResearchCore;
+        const state={conclusions:Object.fromEntries(cs),versions:Object.fromEntries(vs),sources:Object.fromEntries(ss),
+          links:Object.fromEntries(pkg.links.map(l=>[l.id,l])),projects:{[pkg.projectId]:pkg.project}};
+        research.validateResearch(pkg.project.research,state,pkg.projectId);
+        if((pkg.project.research.reviews||[]).length||
+          (pkg.project.research.events||[]).some(e=>["change","reviewCompleted"].includes(e.kind)))
+          throw Error("此研究备份包含 S3/S4 的变化或复核历史；S2 独立版本不会降级覆盖，请使用完整版本恢复");
+      }
       if(pkg.project.handoffs) {
         if(!Array.isArray(pkg.project.handoffs)||pkg.project.handoffs.length>100)throw Error("交接历史数量无效");
         const seen=new Set();

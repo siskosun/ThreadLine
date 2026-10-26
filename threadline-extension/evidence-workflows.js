@@ -6,19 +6,33 @@
   const recordId=()=>"dep_"+crypto.randomUUID().replace(/-/g,"");
   const copy=x=>structuredClone(x);
   function create(env) {
-    const {chrome,Core,DB,Lifecycle,Source}=env;
+    const {chrome,Core,DB,Lifecycle,Source,Research}=env;
     const raw=async()=>{const db=await env.db();return {db,state:await DB.snapshot(db),local:await chrome.storage.local.get(null)};};
     const topic=local=>env.TopicCore.normalizedState(local[STORE]);
     const counts=pkg=>Object.fromEntries(["conclusions","versions","sources","links"].map(k=>[k,pkg[k].length]));
     const token=async data=>Core.hashRequest({state:data.state,topic:data.local[STORE]||null,summary:Object.fromEntries(Object.entries(data.local).filter(([k])=>k.startsWith(PREFIX)))});
-    const checkId=id=>{if(typeof id!=="string"||!/^[a-zA-Z0-9_-]{1,128}$/.test(id)||["__proto__","constructor","prototype"].includes(id))throw Error("课题 ID 无效");};
+    // Use the same inherited-key and reserved-name guard as the authority
+    // database. Object keys such as "toString" must never impersonate records.
+    const checkId=id=>Core.requireProjectId(id);
+    const TOPIC_FIELDS=new Set(["id","name","goal","stage"]);
+    function safeTopicMetadata(meta,projectId) {
+      const fallback={id:projectId,name:"恢复的课题 "+projectId,goal:"",stage:"active"};
+      if(meta===null||meta===undefined)return fallback;
+      if(typeof meta!=="object"||Array.isArray(meta) ||
+          Object.keys(meta).some(key=>!TOPIC_FIELDS.has(key)))
+        throw Error("备份课题包含不支持的元信息字段；未写入");
+      if(meta.id!==projectId||typeof meta.name!=="string"||meta.name.length>80||
+          typeof meta.goal!=="string"||meta.goal.length>600||
+          !["active","closed"].includes(meta.stage))
+        throw Error("备份课题信息无效；未写入");
+      return {id:projectId,name:meta.name,goal:meta.goal,stage:meta.stage};
+    }
     function envelope(input) {
       if(!input||Core.bytes(JSON.stringify(input))>Core.LIMITS.packageBytes)throw Error("备份超过 20 MiB 或格式无效");
       const wrapped=input.format==="threadline-project-backup/1", pkg=wrapped?input.evidence:input;
       checkId(pkg?.projectId);
-      const meta=wrapped?input.topic:null;
-      if(meta&&(meta.id!==pkg.projectId||typeof meta.name!=="string"||meta.name.length>80||typeof meta.goal!=="string"||meta.goal.length>600||!["active","closed"].includes(meta.stage)))throw Error("备份课题信息无效");
-      return {pkg,meta:meta||{id:pkg.projectId,name:"恢复的课题 "+pkg.projectId,goal:"",stage:"active"}};
+      const meta=safeTopicMetadata(wrapped?input.topic:null,pkg.projectId);
+      return {pkg,meta};
     }
     function scrubState(value,id,bump=false) {
       const s=env.TopicCore.normalizedState(value),had=s.projects.some(p=>p.id===id);
@@ -45,7 +59,8 @@
           const local=await chrome.storage.local.get(null),s=topic(local),at=Date.now(),meta=p.restoreTopic;
           let t=s.projects.find(t=>t.id===p.projectId);
           if(!t){if(s.projects.length>=100)throw Error("课题数量达到上限，恢复已保存，等待腾出空间");t={id:p.projectId,knowledgeVersion:0,history:[],lastChange:null,createdAt:at,updatedAt:at,closedAt:null,decision:""};s.projects.push(t);}
-          Object.assign(t,meta,{evidenceTakeover:true,evidenceProjectionRevision:0});s.revision++;
+          Object.assign(t,safeTopicMetadata(meta,p.projectId),
+            {evidenceTakeover:true,evidenceProjectionRevision:0});s.revision++;
           // Preserve old raw data via explicit diagnostic export; never restore stale summaries.
           await chrome.storage.local.set({[STORE]:s});
           await DB.markRestoreDone(data.db,p.projectId,p.evidenceRevision);
@@ -79,9 +94,12 @@
       return {hash,prior};
     }
     function scope(state,id) {
+      const inspected=Research.inspect(state,id);
       return Object.values(state.conclusions).filter(c=>c.projectId===id)
         .sort((a,b)=>a.id.localeCompare(b.id))
         .map(c=>({id:c.id,status:c.status,versionId:c.currentVersionId,
+          dependencies:inspected.edges.filter(e=>e.downstreamConclusionId===c.id)
+            .map(e=>({id:e.id,revision:e.revision,active:e.active,status:e.status,confirmationId:e.confirmation?.id||null})),
           sources:Object.values(state.links).filter(l=>l.versionId===c.currentVersionId)
             .map(l=>({id:l.sourceId,hash:state.sources[l.sourceId]?.textHash,relation:l.relation}))
             .sort((a,b)=>a.id.localeCompare(b.id))}));
@@ -99,7 +117,8 @@
     }
     const commands=new Set(["EV_PROJECTS","EV_BACKUP","EV_DELETE_PREVIEW","EV_DELETE_COMMIT",
       "EV_RESTORE_PREVIEW","EV_RESTORE_COMMIT","EV_ADOPT_CAPTURE","EV_ADOPT_FORK",
-      "EV_HANDOFF_PREPARE","EV_HANDOFF_VALIDATE","EV_HANDOFF_RECORD"]);
+      "EV_HANDOFF_PREPARE","EV_HANDOFF_VALIDATE","EV_HANDOFF_RECORD",
+      "EV_RESEARCH_LIST","EV_RESEARCH_COMMAND","EV_DEPENDENCY_PROMPT","EV_SUGGESTIONS_PREVIEW"]);
     async function handle(payload) {
       if(!commands.has(payload.type))return undefined;
       return env.serialize(async()=>{
@@ -181,7 +200,32 @@
           if(replay.requestHash!==expected)throw Error("操作 ID 已用于不同请求");
           return commit(authority,{replay:replay.result});
         }
-        const currentScope=scope(state,id),scopeHash=await Core.hashRequest(currentScope);
+        const currentScope=scope(state,id),scopeHash=await Core.hashRequest(currentScope),inspected=Research.inspect(state,id);
+        if(type==="EV_RESEARCH_LIST")return {project:p,rows:env.rows(state,id),...inspected,scopeHash};
+        if(type==="EV_DEPENDENCY_PROMPT")return {scopeHash,prompt:"请仅建议必须成立的前提关系，不推断事实真伪。返回 JSON {scopeHash,proposals:[{upstreamConclusionId,downstreamConclusionId,reason}]}；没有可靠关系时 proposals 为空。每条建议仍须人工确认。\\nscopeHash="+scopeHash+"\\n"+JSON.stringify(env.rows(state,id).map(r=>({id:r.conclusion.id,version:r.current.id,text:r.current.text,conditions:r.current.conditions})))};
+        if(type==="EV_SUGGESTIONS_PREVIEW"){
+          if(typeof payload.json!=="string"||Core.bytes(payload.json)>200*1024)throw Error("建议文件超过 200 KiB");
+          const input=JSON.parse(payload.json);
+          if(input.scopeHash!==scopeHash||!Array.isArray(input.proposals)||input.proposals.length>100)throw Error("建议范围已变化或格式无效");
+          return {scopeHash,proposals:input.proposals.map(x=>{
+            if(!x||state.conclusions[x.upstreamConclusionId]?.projectId!==id||
+              state.conclusions[x.downstreamConclusionId]?.projectId!==id||
+              typeof x.reason!=="string"||!x.reason.trim()||x.reason.length>2000)throw Error("建议引用无效");
+            return {...x,upstreamVersionId:state.conclusions[x.upstreamConclusionId].currentVersionId,
+              downstreamVersionId:state.conclusions[x.downstreamConclusionId].currentVersionId};
+          })};
+        }
+        if(type==="EV_RESEARCH_COMMAND"){
+          if(!["addDependency","removeDependency","confirmDependency"].includes(payload.command?.kind))
+            throw Error("S2 仅允许人工必要依赖操作");
+          const command={...payload.command,scopeManifestHash:scopeHash};
+          // S2 never silently acknowledges S3 change events; explicit
+          // per-event coverage only arrives with S3's dedicated review UI.
+          if(command.kind==="confirmDependency")command.coveredChanges=[];
+          else delete command.coveredChanges;
+          const changed=Research.update(state,id,command,{id:recordId,at:Date.now()});
+          return commit(authority,await planMetadata(state,id,payload,changed.research,undefined,changed.result));
+        }
         if(type==="EV_HANDOFF_PREPARE"){
           const text=handoffText(state,id),handoffs=copy(p.handoffs||[]);if(handoffs.length>=100)throw Error("交接历史已达 100 条，请导出后整理课题");
           const handoff={id:recordId(),scope:currentScope,scopeHash,text,materialHash:await Core.hashText(text),createdAt:Date.now(),events:[]};handoffs.push(handoff);
