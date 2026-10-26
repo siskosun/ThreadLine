@@ -33,8 +33,10 @@ const ARM=["A","B","C"];
 function validateProtocol(p) {
  if(p?.format!=="threadline-pilot2-protocol/1"||p.status!=="FROZEN"||!Array.isArray(p.cases)||p.cases.length<6)
   fail("协议必须在执行前冻结，包含至少 6 个研究案例");
- if(instant(p.freeze?.at)===null||!p.freeze?.commitSha||!p.freeze?.reviewedBy)
-  fail("冻结缺少时间、Git commit 和预审人员；不能以结果反向更改真值");
+ if(instant(p.freeze?.at)===null||typeof p.freeze?.commitSha!=="string"||
+    !/^[a-f0-9]{40}$/.test(p.freeze.commitSha)||
+    typeof p.freeze?.reviewedBy!=="string"||!p.freeze.reviewedBy.trim())
+  fail("冻结缺少有效的前置输入 Git commit、时间或预审人员；冻结文件不能自我引用提交 SHA");
  const frozenAt=instant(p.freeze.at);
  if(p.freeze.ruleFrozenBeforeScoring!==true || p.tierRuleId!==TIER_RULE_ID ||
     p.tierRuleSha256!==TIER_RULE_SHA)
