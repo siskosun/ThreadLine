@@ -11,14 +11,28 @@
     const topic=local=>env.TopicCore.normalizedState(local[STORE]);
     const counts=pkg=>Object.fromEntries(["conclusions","versions","sources","links"].map(k=>[k,pkg[k].length]));
     const token=async data=>Core.hashRequest({state:data.state,topic:data.local[STORE]||null,summary:Object.fromEntries(Object.entries(data.local).filter(([k])=>k.startsWith(PREFIX)))});
-    const checkId=id=>{if(typeof id!=="string"||!/^[a-zA-Z0-9_-]{1,128}$/.test(id)||["__proto__","constructor","prototype"].includes(id))throw Error("课题 ID 无效");};
+    // Use the same inherited-key and reserved-name guard as the authority
+    // database. Object keys such as "toString" must never impersonate records.
+    const checkId=id=>Core.requireProjectId(id);
+    const TOPIC_FIELDS=new Set(["id","name","goal","stage"]);
+    function safeTopicMetadata(meta,projectId) {
+      const fallback={id:projectId,name:"恢复的课题 "+projectId,goal:"",stage:"active"};
+      if(meta===null||meta===undefined)return fallback;
+      if(typeof meta!=="object"||Array.isArray(meta) ||
+          Object.keys(meta).some(key=>!TOPIC_FIELDS.has(key)))
+        throw Error("备份课题包含不支持的元信息字段；未写入");
+      if(meta.id!==projectId||typeof meta.name!=="string"||meta.name.length>80||
+          typeof meta.goal!=="string"||meta.goal.length>600||
+          !["active","closed"].includes(meta.stage))
+        throw Error("备份课题信息无效；未写入");
+      return {id:projectId,name:meta.name,goal:meta.goal,stage:meta.stage};
+    }
     function envelope(input) {
       if(!input||Core.bytes(JSON.stringify(input))>Core.LIMITS.packageBytes)throw Error("备份超过 20 MiB 或格式无效");
       const wrapped=input.format==="threadline-project-backup/1", pkg=wrapped?input.evidence:input;
       checkId(pkg?.projectId);
-      const meta=wrapped?input.topic:null;
-      if(meta&&(meta.id!==pkg.projectId||typeof meta.name!=="string"||meta.name.length>80||typeof meta.goal!=="string"||meta.goal.length>600||!["active","closed"].includes(meta.stage)))throw Error("备份课题信息无效");
-      return {pkg,meta:meta||{id:pkg.projectId,name:"恢复的课题 "+pkg.projectId,goal:"",stage:"active"}};
+      const meta=safeTopicMetadata(wrapped?input.topic:null,pkg.projectId);
+      return {pkg,meta};
     }
     function scrubState(value,id,bump=false) {
       const s=env.TopicCore.normalizedState(value),had=s.projects.some(p=>p.id===id);
@@ -45,7 +59,8 @@
           const local=await chrome.storage.local.get(null),s=topic(local),at=Date.now(),meta=p.restoreTopic;
           let t=s.projects.find(t=>t.id===p.projectId);
           if(!t){if(s.projects.length>=100)throw Error("课题数量达到上限，恢复已保存，等待腾出空间");t={id:p.projectId,knowledgeVersion:0,history:[],lastChange:null,createdAt:at,updatedAt:at,closedAt:null,decision:""};s.projects.push(t);}
-          Object.assign(t,meta,{evidenceTakeover:true,evidenceProjectionRevision:0});s.revision++;
+          Object.assign(t,safeTopicMetadata(meta,p.projectId),
+            {evidenceTakeover:true,evidenceProjectionRevision:0});s.revision++;
           // Preserve old raw data via explicit diagnostic export; never restore stale summaries.
           await chrome.storage.local.set({[STORE]:s});
           await DB.markRestoreDone(data.db,p.projectId,p.evidenceRevision);
