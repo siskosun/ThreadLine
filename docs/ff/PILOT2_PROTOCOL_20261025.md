@@ -19,6 +19,7 @@
 该修订必须在 `threadline-s2-pilot/2` 首次 SHA-256 冻结之前进入协议与评估器。**没有真实标注、实测日志或冻结收据，不能称为筛选通过。**
 
 - 冻结协议增加 `tierRuleId=threadline-s2-tier/1` 与 `tierRuleSha256`：必须等于 `scripts/pilot2-tier-rule.mjs` 的准确文件字节 SHA-256，并由人工确认在分析/观察工具输出之前签署 `ruleFrozenBeforeScoring:true`；**这仅是可审计的声明，必须有独立时间/提交证据，布尔值本身不能证明盲法执行。** 代码更改须重签新协议，不能以更新后的规则复算旧试点而冒充预注册。
+- **禁止情景标签泄漏**：`kind=premise_error/definition_change/source_lost/wording_only/unrelated` 仅用于样本构造与人工真值审核，绝不能输入分层规则。纯规则只能使用事先记录的 `observedChangeKind=amend|withdraw`（与 S3 实际 `changeKind` 一致）及下述来源/关系/交接证据；若尚不能证实仅措辞，则按保守规则维持 `must_review`，不得借看过 G* 后的“非实质”标签降级。
 - G* 仍由 `goldAffectedIds` 表示每事件真实下游影响集合。每个 G* 成员必须在冻结前以 `goldMateriality[targetId]=substantive|non_substantive` 标注；关键实质错误目标列在 `goldCriticalIds`（为实质 G* 子集）。误报是**不属于 G*** 却被预测的目标，不得伪造“非实质真值”来提高分母。双人独立标注须先于工具输出，分歧裁定及原始标注另存收据。
 - 每事件冻结来源状态 `sourceSnapshotStatus=verified|missing|hash_mismatch|unknown`；只有 `verified` 可连同 `sourceSnapshotEvidenceSha256` 的独立材料哈希进入降级规则。当前交接作用范围使用 `handoffIncludedIds` + `handoffScopeSha256` 固定；缺失范围显式为 `null`。**哈希只证明相同字节，不能单独证明来源真实有效**；需要独立人工核对。当前 S3 仅有 `necessary` 边、`amend/withdraw` 改动事件，不得凭空假定背景边或通用 S4 来源状态已上线。
 - flat 与 tiered 在同一冻结 `Research.impacts` 预测集合上对比：flat 全部待核对，tiered 由无模型调用、无真值输入的保守纯函数输出 `must_review/before_use`。`reviewNeeded` 安全状态及所有详情/Handoff 的“上游已变更未复核”不消失。`deferred` 只来自真实用户操作（事件、目标、理由、独立收据），不算预测命中，不自动确认/关闭；新 `triggerEventId` 必须重开。
