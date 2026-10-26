@@ -496,7 +496,7 @@
 
   function renderVersionHistory(holder, data) {
     holder.replaceChildren();
-    const labels={adopt:"首次采纳",amend:"修订"};
+    const labels={create:"首次采纳",adopt:"首次采纳",amend:"修订"};
     const impacts={wording:"仅措辞",substantive:"实质修改",conditions:"适用条件变化"};
     const relations={cites:"引用",supports:"支持",opposes:"反对",background:"背景"};
     if(data.status==="withdrawn"){
