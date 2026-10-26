@@ -643,14 +643,24 @@
         });
         const withdraw=document.createElement("button");withdraw.type="button";withdraw.className="secondary";withdraw.textContent="撤回";
         withdraw.addEventListener("click",async()=>{
+          const targetProjectId=evidenceListCache?.projectId;
+          if(!targetProjectId)return;
           const accepted=await ThreadLineDialogs.confirm({
             title:"撤回这条结论？",
             description:"撤回后它不再作为当前有效结论展示，但历史版本、适用条件和来源片段会保留。",
             confirmLabel:"撤回结论",cancelLabel:"取消",danger:true
           });
           if(!accepted)return;
+          if(targetProjectId!==ev$("evidence-project").value){
+            notifyCritical("查看课题已切换，撤回未发送。请回到原课题核对后再操作。");
+            return;
+          }
           try{
             await evSend({type:"EV_WITHDRAW",conclusionId:c.id,reason:"面板撤回",expectedVersionId:row.current.id,operationId:"op_wd_"+crypto.randomUUID().replace(/-/g,"").slice(0,12)});
+            if(targetProjectId!==ev$("evidence-project").value){
+              notify("原课题中的结论已撤回；当前查看课题未变更。");
+              return;
+            }
             const refreshed=await renderEvidenceProject();
             if(refreshed){
               const current=[...ev$("evidence-list").querySelectorAll(".evidence-item")]
@@ -659,6 +669,10 @@
               notify("结论已撤回，历史与来源片段已保留");
             }else notifyCritical("撤回成功回执已收到，但当前证据列表刷新失败。请刷新核对，不要重复撤回。");
           }catch(error){
+            if(targetProjectId!==ev$("evidence-project").value){
+              notifyCritical("原课题中的撤回失败或结果未确认；当前查看课题已切换。请切回原课题核对状态，研线未自动重放。");
+              return;
+            }
             const refreshed=await renderEvidenceProject();
             notifyCritical("撤回失败或结果未确认："+error.message+
               "。"+(refreshed?"已刷新当前结论；":"当前结论刷新也失败；")+
