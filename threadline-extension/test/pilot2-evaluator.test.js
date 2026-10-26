@@ -97,7 +97,7 @@ test("rejects insufficient cases, missing dual rater, and incomplete three-arm r
  protocol.cases.pop();
  assert.throws(()=>evaluateData(protocol,observations,hash),/至少 6 个/);
  const a=fixture();
- a.protocol.cases[1].independentAnnotations=[];
+ a.protocol.cases[1].independentAnnotations.pop();
  assert.throws(()=>evaluateData(a.protocol,a.observations,a.hash),/独立双人标注/);
  const b=fixture();
  delete b.observations.records[0].arms.C;
