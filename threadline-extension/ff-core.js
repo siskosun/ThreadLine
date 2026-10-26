@@ -98,9 +98,9 @@ const ThreadLineFFCore = (() => {
   // never participates in experiment identity, hashes, decisions or exports.
   function shortTaskTitle(value) {
     if (typeof value !== "string" ||
-        /[\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F\\u007F-\\u009F]/u.test(value))
+        /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/u.test(value))
       return null;
-    const normalized = value.replace(/\\s+/gu, " ").trim();
+    const normalized = value.replace(/\s+/gu, " ").trim();
     if (!normalized) return null;
     const points = Array.from(normalized);
     return points.length > 42 ? points.slice(0, 42).join("") + "…" : normalized;
