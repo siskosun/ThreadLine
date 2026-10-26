@@ -276,4 +276,15 @@ test("FF P3 mapping is gated, seed-deterministic, and verdict is validated",asyn
   assert.equal(snap.frozen.textHashes.rule,"canonicalization-v1");
   assert.equal(snap.decision.mapping.X,m1.mapping.X);
   assert.equal(snap.decision.verdict.preference,"X");
+  assert.deepEqual(snap.sampling,{
+    classification:"same-source-sampling",independentFactualEvidence:false,
+    note:"同源采样：同一模型多分支一致不等于独立事实证据；偏好裁决不等于事实核验。"
+  });
+  const legacy={...snap};delete legacy.sampling;
+  const imported=await F.validateImport(legacy);
+  assert.equal(imported.id,done.id,"legacy export with no sampling metadata stays importable");
+  await assert.rejects(()=>F.validateImport({...snap,sampling:{...snap.sampling,independentFactualEvidence:true}}),
+    /invalid same-source sampling annotation/);
+  await assert.rejects(()=>F.validateImport({...snap,sampling:{...snap.sampling,note:"independently verified"}}),
+    /invalid same-source sampling annotation/);
 });
