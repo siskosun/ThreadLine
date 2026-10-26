@@ -62,6 +62,10 @@ def run():
             panel.locator("#nav-research").click()
             cancel=panel.locator("#capture-cancel")
             expect(cancel).to_be_visible(timeout=12000)
+            panel.set_viewport_size({"width":320,"height":720})
+            assert panel.evaluate("""() => document.documentElement.scrollWidth <=
+                document.documentElement.clientWidth + 1"""), "320px sidebar overflows horizontally"
+            expect(cancel).to_be_visible(timeout=12000)
             expect(panel.locator("#capture-progress")).to_contain_text("无进度",timeout=12000)
             assert source.evaluate("window.sent")==0
             # The only mutation is a user-confirmed stop. No source page reply,
