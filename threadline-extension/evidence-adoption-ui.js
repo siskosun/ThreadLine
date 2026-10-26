@@ -13,15 +13,15 @@
     const directory=await send({type:"EV_PROJECTS"}),projects=(directory.projects||[]).filter(p=>p.stage==="active"&&!p.deleted&&!p.unavailable);
     if(!projects.length)throw Error(directory.error||"请先在“对话切换 → 全部课题与管理”创建进行中的课题");
     return new Promise(resolve=>{
-      const opener=document.activeElement,dialog=el("dialog",{className:"evidence-adoption-dialog"}),heading=el("h2",{id:"evidence-adopt-heading"},"采纳一条证据结论");
+      const opener=document.activeElement,dialog=el("dialog",{className:"evidence-adoption-dialog"}),body=el("div",{className:"evidence-adoption-body",tabIndex:0,role:"region",ariaLabel:"采纳正文与依据"}),heading=el("h2",{id:"evidence-adopt-heading"},"采纳一条证据结论");
       dialog.setAttribute("aria-labelledby",heading.id);
-      dialog.append(heading,el("p",{className:"subtle"},"核对正文与原始依据后保存。采纳不等于事实已经证实。"));
+      body.append(heading,el("p",{className:"subtle"},"核对正文与原始依据后保存。采纳不等于事实已经证实。"));
       const project=el("select",{id:"evidence-adopt-project"});projects.forEach(p=>project.add(new Option(p.name||p.id,p.id)));
       const preferred=options.projectId||document.getElementById("evidence-project")?.value;if(projects.some(p=>p.id===preferred))project.value=preferred;
       const text=el("textarea",{id:"evidence-adopt-text",rows:4,placeholder:"一条可独立使用的重要结论，最多 4,000 字符"});text.value=options.text||"";
       const conditions=el("textarea",{id:"evidence-adopt-conditions",rows:2,placeholder:"例如适用时间、范围或尚未核实的限制（可选）"});
       const counter=el("small",{},"");const count=()=>counter.textContent=Array.from(text.value).length.toLocaleString()+" / 4,000 字符";text.addEventListener("input",count);count();
-      dialog.append(labelled("保存到课题",project),labelled("结论正文",text),counter,labelled("适用条件",conditions),el("h3",{},"核对依据"));
+      body.append(labelled("保存到课题",project),labelled("结论正文",text),counter,labelled("适用条件",conditions),el("h3",{},"核对依据"));
       const sources=el("div",{id:"evidence-adopt-sources"}),status=el("p",{role:"status",className:"tl-form-status"});status.setAttribute("aria-live","polite");
       function sourceRow(){
         const row=el("section",{className:"evidence-adoption-source"}),select=el("select"),original=el("textarea",{rows:5,readOnly:true,ariaLabel:"原始消息全文"}),excerpt=el("textarea",{rows:3,ariaLabel:"依据片段",placeholder:"粘贴唯一片段，或在上方选中文字后点击“使用上方选中文本”"}),relation=el("select");
@@ -35,9 +35,9 @@
         remove.onclick=()=>{if(sources.children.length===1){status.textContent="至少保留一条依据";return;}row.remove();};
         row.append(labelled("原始消息",select),coverage,labelled("原始消息全文（只读）",original),pick,labelled("依据片段",excerpt),labelled("与结论的关系",relation),remove);return row;
       }
-      sources.append(sourceRow());dialog.append(sources);
+      sources.append(sourceRow());body.append(sources);
       const actions=el("div",{className:"evidence-adoption-actions"}),add=el("button",{type:"button",className:"secondary"},"添加另一条依据"),cancel=el("button",{type:"button",className:"secondary"},"取消"),save=el("button",{type:"button",className:"primary"},"确认采纳");
-      actions.append(add,cancel,save);dialog.append(status,actions);document.body.append(dialog);
+      actions.append(add,cancel,save);dialog.append(body,status,actions);document.body.append(dialog);
       let busy=false,closed=false,signature=null,operationId=null;
       const close=value=>{if(closed)return;closed=true;dialog.close();dialog.remove();if(opener?.isConnected)opener.focus();resolve(value);};
       add.onclick=()=>{if(sources.children.length>=8){status.textContent="最多 8 条依据；未增加或截断";return;}sources.append(sourceRow());};

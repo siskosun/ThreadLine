@@ -54,6 +54,30 @@ def run():
       panel.locator('#sender-test-frame').evaluate('(f)=>f.remove()')
       assert chat.evaluate('window.submitCount')==0
       panel.locator('#manage-accordion').evaluate('(node)=>node.open=true')
+      readability=panel.evaluate("""() => {
+        const read=(selector,background)=>{
+          const style=getComputedStyle(document.querySelector(selector));
+          return {selector,font:parseFloat(style.fontSize),color:style.color,
+            background:getComputedStyle(document.querySelector(background)).backgroundColor};
+        };
+        return [read('.brand-text p','body'),read('#nav-research','.workspace-tabs'),
+          read('.manage-desc','.manage-accordion'),read('.manage-content .stat span','.stat'),
+          read('.quick-empty','.quick-section')];
+      }""")
+      def contrast(foreground,background):
+        def luminance(color):
+          channels=[float(value) for value in color.removeprefix('rgb(').removesuffix(')').split(',')]
+          linear=[value/255/12.92 if value/255<=0.04045 else ((value/255+0.055)/1.055)**2.4 for value in channels]
+          return sum(value*weight for value,weight in zip(linear,[0.2126,0.7152,0.0722]))
+        high,low=sorted([luminance(foreground),luminance(background)],reverse=True)
+        return (high+0.05)/(low+0.05)
+      for sample in readability:
+        assert sample['font']>=12,sample
+        assert contrast(sample['color'],sample['background'])>=4.5,sample
+      panel.get_by_role('tab',name='证据与交接').click()
+      panel.get_by_role('button',name='创建课题',exact=True).click()
+      assert panel.locator('#manage-accordion').get_attribute('open') is not None
+      assert panel.evaluate('document.activeElement.id')=='topic-name'
       panel.locator('#topic-name').fill('真实扩展模拟验收')
       panel.locator('#create-form button[type=submit]').click()
       # The write is complete only once both the background snapshot and the
@@ -87,6 +111,10 @@ def run():
       assert isinstance(state,dict) and state.get('schema')==2, f'v2 schema not persisted: {verified!r}'
       assert verified['background']['revision']==state['revision'], 'worker and persistent revision differ'
       pid=state['projects'][0]['id']
+      panel.get_by_role('tab',name='证据与交接').click()
+      panel.get_by_role('button',name='打开研究整理',exact=True).click()
+      assert panel.locator('#workspace-research').is_visible()
+      panel.get_by_role('tab',name='对话切换').click()
       # The page's UUID route must retain identity when moved into a ChatGPT project URL.
       assert panel.evaluate("() => ThreadLineCore.getChatKey('https://chatgpt.com/g/g-p-123/c/demo-alpha')")=='chat:demo-alpha'
       # Write through the actual MV3 service worker runtime, then close/reopen profile.

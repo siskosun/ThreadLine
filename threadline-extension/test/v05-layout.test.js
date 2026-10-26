@@ -34,3 +34,9 @@ test('stale branch reminder stays nonblocking, unlike explicit closure',()=>{
  const fn=content.slice(content.indexOf('  function guarded()'), content.indexOf('  function paint()'));
  assert.ok(!fn.includes('stale'));
 });
+test('legacy backup copy states its actual scope and exclusions',()=>{
+ assert.ok(html.includes('不包含已采纳结论与证据、Fork 实验或临时采集全文'));
+ assert.ok(html.includes('检查并替换本地课题与关联'));
+ assert.ok(!html.includes('检查并导入（覆盖当前课题）'));
+ assert.ok(panel.includes('替换当前所有本地课题与对话关联'));
+});

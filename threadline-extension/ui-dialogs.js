@@ -4,9 +4,9 @@
   const element=(tag,attrs={},text="")=>{const n=document.createElement(tag);Object.assign(n,attrs);n.textContent=text;return n;};
   function form({title,description="",fields,submitLabel="保存",onSubmit}) {
     return new Promise(resolve=>{
-      const opener=document.activeElement,dialog=element("dialog",{className:"tl-dialog"}),body=element("form",{noValidate:true});
+      const opener=document.activeElement,dialog=element("dialog",{className:"tl-dialog"}),body=element("form",{noValidate:true}),content=element("div",{className:"tl-dialog-body",tabIndex:0,role:"region",ariaLabel:title+"内容"});
       const heading=element("h2",{id:"tl-dialog-title"},title),help=element("p",{className:"subtle"},description);
-      dialog.setAttribute("aria-labelledby",heading.id);body.append(heading,help);
+      dialog.setAttribute("aria-labelledby",heading.id);content.append(heading,help);body.append(content);
       const controls={};let busy=false,finished=false;
       for(const field of fields){
         const label=element("label",{className:"tl-field"},field.label),id="tl-field-"+field.name;
@@ -20,7 +20,7 @@
         if(field.readOnly)control.readOnly=true;
         label.append(control);
         if(field.hint)label.append(element("small",{className:"subtle"},field.hint));
-        controls[field.name]=control;body.append(label);
+        controls[field.name]=control;content.append(label);
       }
       const status=element("p",{className:"tl-form-status",role:"status"});status.setAttribute("aria-live","polite");
       const actions=element("div",{className:"tl-actions"}),cancel=element("button",{type:"button",className:"secondary"},"取消"),save=element("button",{type:"submit",className:"primary"},submitLabel);
