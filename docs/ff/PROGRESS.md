@@ -1,5 +1,12 @@
 # ThreadLine 开发进度记录
 
+## 2026-10-26 PR #47 发布标签完整性修复（Agent 复核后追加）
+
+- **复核发现**：`gh release create` 在标签不存在时会把它创建在**默认分支最新提交**上。发布作业要先跑完 verify / release-drift（约十分钟），期间若有新提交落到 main，不可覆盖的 Release 就会指向所有者未审阅的提交，而归档和说明仍写着 `GITHUB_SHA`。已在 `87159973` 修复：创建时加 `--target "$GITHUB_SHA"`，并在创建前拒绝已存在的同名标签（已存在标签会让 `--target` 静默失效）。新增两条断言覆盖上述行为，未改动应用源代码，未放宽任何既有断言。
+- **本地验证**：Node 242/242（floor 220）；真实 Chromium 156 + 真实 IndexedDB 的五套合成 E2E 全部 PASS。
+- **CI**：`87159973` [Linux verify](https://github.com/siskosun/ThreadLine/actions/runs/40272551379) success；[Windows baseline](https://github.com/siskosun/ThreadLine/actions/runs/40272551383) 首次在 `ff-core-e2e.py` 的 K=4 标签导航断言失败（D 标签 40 秒内仍停在 `chrome://new-tab-page/`，与本次改动的两个文件无关），同 SHA 重跑 attempt 2 success。该抖动与 main 上 `c629ee62` 同类，未改断言、未吞失败。
+- **边界**：本条由 Agent 在所有者授权下执行技术复核与修复，不构成所有者审批，未合并、未发布。发布仍须版本号递增、`scripts/test-floors.json` 补对应条目，并由所有者手动输入准确 SHA 触发。
+
 ## 2026-10-26 UX P0：普通对话接续横幅误报修复候选
 
 - **代码候选准确 HEAD** `dc8f683b664e0a7349598e5815d623da89cbebd1`：[Linux verify](https://github.com/siskosun/ThreadLine/actions/runs/40255902588) **success**；[Windows baseline](https://github.com/siskosun/ThreadLine/actions/runs/40255902576) **success**。均为自动化与合成 Chromium 场景；真实登录 ChatGPT、既有数据、真人交互/无障碍验收 **NOT_EXECUTED**。本条文档更新后的准确 HEAD 仍需单独检查，保持 Draft / Open、未合并/发布。
