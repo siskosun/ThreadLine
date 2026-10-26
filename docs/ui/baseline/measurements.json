@@ -1,9 +1,10 @@
 {
-  "source": "3ce5d93040fa44cd3a5dda109da2c87b5343fc0d",
+  "source": "80f4524668b42ac36cdd65dd13ff5c44726cb71e",
+  "sourceDirty": false,
   "extensionFingerprint": "e758dc0c87ec59aeddc7d7a28fffabfe40894a138874a8c597003e88d45fcd1a",
-  "capturedAt": "2026-10-26T06:17:58.067Z",
+  "capturedAt": "2026-10-26T09:54:40.366Z",
   "playwright": "1.62.1",
-  "scope": "Synthetic extension profile. Solid-background leaf text and target candidates only, not full WCAG conformance or a render benchmark.",
+  "scope": "Synthetic extension profile. Opaque solid-background leaf text, dialog action visibility and target candidates only; translucent colors are skipped. Not full WCAG conformance or a render benchmark.",
   "browser": "156.0.8078.4",
   "complete": true,
   "extensionFingerprintAfter": "e758dc0c87ec59aeddc7d7a28fffabfe40894a138874a8c597003e88d45fcd1a",
@@ -209,7 +210,8 @@
           "contrast": 2.51,
           "disabled": false
         }
-      ]
+      ],
+      "dialog": null
     },
     {
       "name": "manage-empty-360",
@@ -800,7 +802,8 @@
           "contrast": 9.37,
           "disabled": false
         }
-      ]
+      ],
+      "dialog": null
     },
     {
       "name": "evidence-empty-360",
@@ -828,16 +831,6 @@
           "color": "rgb(118, 132, 151)",
           "background": "rgb(247, 248, 251)",
           "contrast": 3.58,
-          "disabled": false
-        },
-        {
-          "selector": "#nav-switch",
-          "text": "⇄ 对话切换",
-          "font": 12,
-          "weight": "650",
-          "color": "rgb(123, 139, 157)",
-          "background": "rgb(237, 241, 246)",
-          "contrast": 3.07,
           "disabled": false
         },
         {
@@ -878,8 +871,8 @@
           "font": 12,
           "weight": "650",
           "color": "rgb(123, 139, 157)",
-          "background": "rgb(237, 241, 246)",
-          "contrast": 3.07,
+          "background": null,
+          "contrast": null,
           "disabled": false
         },
         {
@@ -898,8 +891,8 @@
           "font": 12,
           "weight": "650",
           "color": "rgb(32, 77, 122)",
-          "background": "rgb(237, 241, 246)",
-          "contrast": 7.7,
+          "background": null,
+          "contrast": null,
           "disabled": false
         },
         {
@@ -982,7 +975,8 @@
           "contrast": 8.99,
           "disabled": false
         }
-      ]
+      ],
+      "dialog": null
     },
     {
       "name": "research-empty-360",
@@ -1017,16 +1011,6 @@
         {
           "selector": "#nav-switch",
           "text": "⇄ 对话切换",
-          "font": 12,
-          "weight": "650",
-          "color": "rgb(123, 139, 157)",
-          "background": "rgb(237, 241, 246)",
-          "contrast": 3.07,
-          "disabled": false
-        },
-        {
-          "selector": "#nav-evidence",
-          "text": "◇ 证据与交接",
           "font": 12,
           "weight": "650",
           "color": "rgb(123, 139, 157)",
@@ -1082,8 +1066,8 @@
           "font": 12,
           "weight": "650",
           "color": "rgb(32, 77, 122)",
-          "background": "rgb(237, 241, 246)",
-          "contrast": 7.7,
+          "background": null,
+          "contrast": null,
           "disabled": false
         },
         {
@@ -1092,8 +1076,8 @@
           "font": 12,
           "weight": "650",
           "color": "rgb(123, 139, 157)",
-          "background": "rgb(237, 241, 246)",
-          "contrast": 3.07,
+          "background": null,
+          "contrast": null,
           "disabled": false
         },
         {
@@ -1156,7 +1140,8 @@
           "contrast": 8.7,
           "disabled": true
         }
-      ]
+      ],
+      "dialog": null
     },
     {
       "name": "research-report-360",
@@ -1829,7 +1814,8 @@
           "contrast": 3.5,
           "disabled": false
         }
-      ]
+      ],
+      "dialog": null
     },
     {
       "name": "adoption-dialog-360",
@@ -1980,7 +1966,31 @@
           "contrast": 6.71,
           "disabled": false
         }
-      ]
+      ],
+      "dialog": {
+        "scrollClientHeight": 866,
+        "scrollHeight": 1065,
+        "actions": [
+          {
+            "text": "添加另一条依据",
+            "top": 1028.1,
+            "bottom": 1066.1,
+            "inView": false
+          },
+          {
+            "text": "取消",
+            "top": 1028.1,
+            "bottom": 1066.1,
+            "inView": false
+          },
+          {
+            "text": "确认采纳",
+            "top": 1028.1,
+            "bottom": 1066.1,
+            "inView": false
+          }
+        ]
+      }
     },
     {
       "name": "evidence-1-360",
@@ -2230,7 +2240,8 @@
           "contrast": 8.99,
           "disabled": false
         }
-      ]
+      ],
+      "dialog": null
     },
     {
       "name": "evidence-10-360",
@@ -2853,7 +2864,8 @@
           "contrast": 7.1,
           "disabled": false
         }
-      ]
+      ],
+      "dialog": null
     },
     {
       "name": "evidence-50-360",
@@ -3756,7 +3768,8 @@
           "contrast": 7.1,
           "disabled": false
         }
-      ]
+      ],
+      "dialog": null
     },
     {
       "name": "evidence-200-360",
@@ -5709,7 +5722,8 @@
           "contrast": 7.1,
           "disabled": false
         }
-      ]
+      ],
+      "dialog": null
     },
     {
       "name": "evidence-200-320",
@@ -5867,8 +5881,8 @@
           "font": 12,
           "weight": "400",
           "color": "rgb(59, 87, 119)",
-          "background": "rgb(255, 255, 255)",
-          "contrast": 7.46,
+          "background": "rgb(253, 254, 254)",
+          "contrast": 7.38,
           "disabled": false
         },
         {
@@ -6261,7 +6275,8 @@
           "contrast": 7.1,
           "disabled": false
         }
-      ]
+      ],
+      "dialog": null
     },
     {
       "name": "evidence-200-768",
@@ -8225,7 +8240,8 @@
           "contrast": 7.1,
           "disabled": false
         }
-      ]
+      ],
+      "dialog": null
     },
     {
       "name": "evidence-200-1280",
@@ -10189,7 +10205,8 @@
           "contrast": 7.1,
           "disabled": false
         }
-      ]
+      ],
+      "dialog": null
     },
     {
       "name": "amend-dialog-360",
@@ -10259,7 +10276,25 @@
           "contrast": 6.71,
           "disabled": false
         }
-      ]
+      ],
+      "dialog": {
+        "scrollClientHeight": 530,
+        "scrollHeight": 530,
+        "actions": [
+          {
+            "text": "取消",
+            "top": 661,
+            "bottom": 699,
+            "inView": true
+          },
+          {
+            "text": "保存新版本",
+            "top": 661,
+            "bottom": 699,
+            "inView": true
+          }
+        ]
+      }
     },
     {
       "name": "fork-disabled-360",
@@ -10357,7 +10392,8 @@
           "contrast": 11.32,
           "disabled": false
         }
-      ]
+      ],
+      "dialog": null
     },
     {
       "name": "fork-create-360",
@@ -10564,7 +10600,8 @@
           "contrast": 11.32,
           "disabled": false
         }
-      ]
+      ],
+      "dialog": null
     },
     {
       "name": "fork-frozen-360",
@@ -10743,7 +10780,7 @@
         },
         {
           "selector": "button.secondary",
-          "text": "ff_f8c9915b-67ee-4100-889b-9a06bfe13cf6 · K=2 · A… B…",
+          "text": "ff_86922d19-0059-4d4d-b701-549cc9d019e9 · K=2 · A… B…",
           "font": 14,
           "weight": "400",
           "color": "rgb(37, 56, 79)",
@@ -10763,7 +10800,7 @@
         },
         {
           "selector": "#ff-meta",
-          "text": "实验 ff_f8c9915b-67ee-4100-889b-9a06bfe13cf6 · revision 0 · 155 UTF-8 字节",
+          "text": "实验 ff_86922d19-0059-4d4d-b701-549cc9d019e9 · revision 0 · 155 UTF-8 字节",
           "font": 13,
           "weight": "400",
           "color": "rgb(36, 50, 71)",
@@ -10861,7 +10898,8 @@
           "contrast": 11.32,
           "disabled": false
         }
-      ]
+      ],
+      "dialog": null
     }
   ],
   "errors": []
