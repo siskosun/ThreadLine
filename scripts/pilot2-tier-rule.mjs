@@ -33,7 +33,15 @@ export function classifyImpact(event,impact,projectId) {
   if(!Array.isArray(causes)||!causes.length)return must("传播路径缺失");
   const paths=causes.map(c=>{
     if(!Array.isArray(c.edgeIds)||!c.edgeIds.length||!Array.isArray(c.path)||
-       c.path.length!==c.edgeIds.length+1)return null;
+       c.path.length!==c.edgeIds.length+1||
+       !Array.isArray(c.contributingEdgeIds)||!c.contributingEdgeIds.length)
+      return null;
+    // Research.impacts exposes one representative path per root, but also the
+    // union of contributing edges for alternate paths. A direct MUST path
+    // could be hidden by a lexicographically earlier indirect path. Do not
+    // downgrade an impact if other contributing edges remain unclassified.
+    const chosen=new Set(c.edgeIds);
+    if(c.contributingEdgeIds.some(id=>!chosen.has(id)))return null;
     const linked=c.edgeIds.map(id=>byId.get(id));
     if(linked.some((edge,i)=>!edge||
       edge.upstreamConclusionId!==c.path[i]||
