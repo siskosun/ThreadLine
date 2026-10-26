@@ -1,5 +1,13 @@
 # ThreadLine 开发进度记录
 
+## 2026-10-26 PR #36 复核后修复三项硬缺陷
+
+- **接续权威门禁**：`openChatWithDraft` 在创建标签前检查该课题是否被证据库接管；有接管标记时先加载权威库，库缺失或不一致即拒绝交接，不打开新标签。未接管课题不受影响。此前接续路径只调用 `readState()`，与计划"权威缺失时阻止交接"不符。
+- **投影待更新可见**：`projectEvidenceLocked` 不再丢弃 `clearProjectionTodo` 的 `{cleared:false,stale:true}`；清除失败时保留 todo 标记，并在 `EV_SUMMARY` / `EV_LIST` / 采纳返回中报 `projectionPending`，不再把过期修订当作最新。
+- **采纳不再留下孤儿项目**：`EV_ADOPT` 先调用 `Core.validateAdoption` 再 `ensureProject`，被拒绝的输入不会创建证据项目行。
+- **本地验证**：Node 259/259（新增 3 条回归：交接门禁与未接管不受阻、拒绝采纳零残留、投影 CAS 过期显式待更新）；真实 Chromium + 真实 IndexedDB 五套合成 E2E 全 PASS。
+- **边界**：本条为工程修复，真实旧数据备份/恢复/迁移与 L3 风险签署仍 NOT_EXECUTED，不代表 S1 验收或可合并；准确 HEAD 的双平台 CI 以 PR 检查为准。
+
 ## 2026-10-26 UX P0：普通对话接续横幅误报修复候选
 
 - **代码候选准确 HEAD** `dc8f683b664e0a7349598e5815d623da89cbebd1`：[Linux verify](https://github.com/siskosun/ThreadLine/actions/runs/40255902588) **success**；[Windows baseline](https://github.com/siskosun/ThreadLine/actions/runs/40255902576) **success**。均为自动化与合成 Chromium 场景；真实登录 ChatGPT、既有数据、真人交互/无障碍验收 **NOT_EXECUTED**。本条文档更新后的准确 HEAD 仍需单独检查，保持 Draft / Open、未合并/发布。

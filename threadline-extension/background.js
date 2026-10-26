@@ -226,9 +226,21 @@ async function receiveCapture(payload,sender){
     default:throw new Error("未知采集状态");
   }
 }
+// A handoff carries the decision text rendered when the panel was last read.
+// If that project's conclusion came from the evidence library, refuse to hand
+// it off while the authoritative records are missing or inconsistent.
+async function guardHandoffAuthorityLocked(projectId){
+  if(!projectId)return;
+  const local=await chrome.storage.local.get(null);
+  const topic=ThreadLineCore.normalizedState(local[STORE_KEY]);
+  const marked=topic.projects.some(p=>p.id===projectId&&p.evidenceTakeover) ||
+    (local[EVIDENCE_SUMMARY_PREFIX+projectId]?.evidenceRevision||0)>0;
+  if(marked)await loadEvidenceAuthorityLocked();
+}
 async function openChatWithDraft(handoff,windowId,projectId){
   const text=String(handoff||"").slice(0,30000);
   if(!text)throw new Error("没有可用于接续的研究信息");
+  if(projectId)await serialize(()=>guardHandoffAuthorityLocked(projectId));
   const tab=await chrome.tabs.create({url:"https://chatgpt.com/",active:true,...(Number.isInteger(windowId)?{windowId}:{})});
   await chrome.storage.session.set({[`tl_handoff_${tab.id}`]:{text,createdAt:Date.now()}});
   if(projectId){
@@ -946,7 +958,7 @@ async function loadEvidenceAuthorityLocked() {
 }
 async function projectEvidenceLocked(authority) {
   const {db,state,local,topic,taken} = authority;
-  const next = structuredClone(topic), updates = {}, completed = [];
+  const next = structuredClone(topic), updates = {}, completed = [], pending = [];
   let topicChanged = false;
   for (const id of taken) {
     const p = state.projects[id];
@@ -980,13 +992,17 @@ async function projectEvidenceLocked(authority) {
     // Topic projection, monotonic revision marker and summary become visible together.
     await writeState(topic,next,"evidenceProjection",updates);
   } else if (Object.keys(updates).length) await chrome.storage.local.set(updates);
-  for (const [id,revision] of completed) await ThreadLineEvidenceDB.clearProjectionTodo(db,id,revision);
-  return {ok:true};
+  for (const [id,revision] of completed) {
+    // A stale CAS means a newer revision landed while this one was projected.
+    // Keep the todo flag and report pending instead of claiming the summary is current.
+    const cleared=await ThreadLineEvidenceDB.clearProjectionTodo(db,id,revision);
+    if(!cleared?.cleared)pending.push(id);
+  }
+  return {ok:true,pending};
 }
 async function reconcileEvidenceLocked() {
   const authority = await loadEvidenceAuthorityLocked();
-  await projectEvidenceLocked(authority);
-  return authority;
+  return projectEvidenceLocked(authority);
 }
 async function readFreshState() {
   return serialize(async () => { await reconcileEvidenceLocked(); return readState(); });
@@ -1040,7 +1056,10 @@ async function handleEvidence(payload, sender) {
     return serialize(async () => {
     const authority = await loadEvidenceAuthorityLocked();
     let projectionError = null;
-    try { await projectEvidenceLocked(authority); } catch (e) { projectionError = String(e.message || e); }
+    try {
+      const projection = await projectEvidenceLocked(authority);
+      if (projection.pending.length) projectionError = "共享摘要待更新";
+    } catch (e) { projectionError = String(e.message || e); }
     const state = await ThreadLineEvidenceDB.snapshot(authority.db);
     const rows = Object.values(state.conclusions)
       .filter(c => c.projectId === payload.projectId)
@@ -1062,9 +1081,18 @@ async function handleEvidence(payload, sender) {
   if (payload.type === "EV_SUMMARY") {
     return serialize(async () => {
       const authority = await loadEvidenceAuthorityLocked();
-      let projectionPending = false;
-      try { await projectEvidenceLocked(authority); } catch { projectionPending = true; }
-      return {summary:Core.projectSummary(authority.state,payload.projectId),projectionPending};
+      let projectionPending = false, projectionError;
+      try {
+        const projection = await projectEvidenceLocked(authority);
+        if (projection.pending.length) {
+          projectionPending = true;
+          projectionError = "共享摘要待更新";
+        }
+      } catch (e) {
+        projectionPending = true;
+        projectionError = String(e.message || e);
+      }
+      return {summary:Core.projectSummary(authority.state,payload.projectId),projectionPending,projectionError};
     });
   }
   if (payload.type === "EV_ADOPT" || payload.type === "EV_WITHDRAW" || payload.type === "EV_IMPORT" || payload.type === "EV_AMEND") {
@@ -1079,6 +1107,10 @@ async function handleEvidence(payload, sender) {
           if (Object.prototype.hasOwnProperty.call(payload,field)) input[field] = payload[field];
         plan = await Core.planAmendment(state,payload.conclusionId,input,payload.operationId);
       } else if (payload.type === "EV_ADOPT") {
+        // Reject invalid input before creating a project row, so a denied adopt
+        // never leaves an orphan evidence project behind.
+        Core.validateAdoption({projectId:payload.projectId,text:payload.text,
+          conditions:payload.conditions,fragments:payload.fragments});
         // Topic-store projects adopt without a prior EV_ENSURE call.
         await ThreadLineEvidenceDB.ensureProject(db, payload.projectId, Core);
         // Refresh after ensureProject so planning sees the project row.
@@ -1098,7 +1130,11 @@ async function handleEvidence(payload, sender) {
         plan = await Core.importPackage(state, payload.pkg, payload.operationId);
       const result = await ThreadLineEvidenceDB.applyPlan(db,plan);
       // Once authority committed, projection failure must never report the write as failed.
-      try { await reconcileEvidenceLocked(); return {...result,projectionPending:false}; }
+      try {
+        const projection = await reconcileEvidenceLocked();
+        return {...result,projectionPending:projection.pending.length>0,
+          ...(projection.pending.length?{projectionError:"共享摘要待更新"}:{})};
+      }
       catch (e) { return {...result,projectionPending:true,projectionError:String(e.message || e)}; }
     });
   }
