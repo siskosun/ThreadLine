@@ -57,7 +57,7 @@ function mock(body){return {ok:true,status:200,json:async()=>body};}
 test('canonical plan contains all required tasks and no unverified done claims', async()=>{
   const {validatePlan}=await checks();
   const actual=validatePlan(ROOT);
-  assert.equal(actual.tasks.length,12);
+  assert.equal(actual.tasks.length,13);
   // Done claims must stay limited to tasks with real merged-PR evidence JSONs.
   assert.deepEqual(actual.done.map(x=>x.task.id).sort(),
     ['BETA-RELEASE','P1-CORE','P2-FORK','P3-REPORT','P4-AUTO','R-REUSE','Z0-BASE','Z0-LIVE']);
@@ -66,6 +66,11 @@ test('canonical plan contains all required tasks and no unverified done claims',
     ['S0A-PROTOTYPE','S0B-LOCATE','S1A-PERSIST','S1B-ADOPT']);
   assert.deepEqual(actual.tasks.filter(x=>x.id.startsWith('S')).map(x=>x.status),
     ['blocked','blocked','blocked','blocked'], 'failed acceptance must reopen all affected stages');
+  const preflight=actual.tasks.find(x=>x.id==='LOCATE-PREFLIGHT');
+  assert.equal(preflight.status,'planned');
+  assert.deepEqual(preflight.dependencies,['Z0-BASE']);
+  const locate=actual.tasks.find(x=>x.id==='S0B-LOCATE');
+  assert.deepEqual(locate.dependencies,['S0A-PROTOTYPE','LOCATE-PREFLIGHT']);
   assert.ok(actual.tasks.filter(x=>x.id.startsWith('S')).every(x=>x.evidence==='docs/ff/BLOCKED.md'));
 });
 
