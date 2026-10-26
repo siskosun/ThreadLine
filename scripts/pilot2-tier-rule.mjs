@@ -5,7 +5,7 @@
  * action, not an output of this classifier.
  */
 export const TIER_RULE_ID="threadline-s2-tier/1";
-const MATERIAL_KINDS=new Set(["premise_error","definition_change"]);
+const OBSERVED_CHANGE_KINDS=new Set(["amend","withdraw"]);
 const SOURCE_STATES=new Set(["verified","missing","hash_mismatch","unknown"]);
 export function classifyImpact(event,impact,projectId) {
   if(!event||!impact||typeof impact.conclusionId!=="string"||typeof projectId!=="string")
@@ -17,8 +17,10 @@ export function classifyImpact(event,impact,projectId) {
     return must("目标身份失效或已撤回");
   if(!SOURCE_STATES.has(event.sourceSnapshotStatus)||event.sourceSnapshotStatus!=="verified")
     return must("来源未知、丢失或哈希无法核验");
-  if(event.kind==="source_lost"||event.kind==="withdraw")
-    return must("上游撤回或来源失效");
+  if(!OBSERVED_CHANGE_KINDS.has(event.observedChangeKind))
+    return must("缺少可观察的变更操作类型");
+  if(event.observedChangeKind==="withdraw")
+    return must("上游已撤回");
   const scope=event.handoffIncludedIds;
   if(!Array.isArray(scope)||scope.some(id=>typeof id!=="string"))
     return must("当前交接范围未知");
@@ -42,15 +44,13 @@ export function classifyImpact(event,impact,projectId) {
   if(paths.some(p=>p.types.some(t=>!["necessary","background"].includes(t))))
     return must("未知关系边类型");
   if(paths.some(p=>p.hops===1&&p.types[0]==="necessary") &&
-     MATERIAL_KINDS.has(event.kind)&&target.status==="adopted")
+     event.observedChangeKind==="amend"&&target.status==="adopted")
     return must("已采纳结论的直接必要前提实质变化");
   // A withdrawal or corrupted source never gets demoted by hop length.
   if(paths.every(p=>p.hops>=2))
     return before("经核验的间接影响，使用前仍须核对");
   if(paths.every(p=>p.types.includes("background")))
     return before("已核验的背景关系，使用前仍须核对");
-  if(event.kind==="wording_only"&&event.carryForwardConfirmed!==true)
-    return before("尚未确认的措辞变化，使用前仍须核对");
   return must("未满足安全降级条件");
 }
 export function classifyImpacts(event,impacts,projectId) {
