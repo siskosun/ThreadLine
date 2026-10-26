@@ -165,11 +165,7 @@
   async function tick(){
     if(done||working)return;working=true;
     try {
-      if(!validNewChatPage()){
-        done=true;
-        banner('当前不是全新的普通 ChatGPT 对话，已停止预填；不会覆盖草稿或自动发送。',true);
-        return;
-      }
+
       if(!data)data=await send({type:'HANDOFF_GET'});
       if(!data?.text)return;
       // A previous page/script may have inserted some or all of this draft.

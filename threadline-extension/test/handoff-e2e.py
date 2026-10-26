@@ -231,6 +231,42 @@ def run():
             assert page4.evaluate("window.editorInputs") == 0
             assert page4.evaluate("window.submissions") == 0
             page4.close()
+
+            # Actual MV3 scripts run on every ChatGPT tab. Ordinary saved
+            # chats must not show a handoff failure without a pending intent.
+            ordinary = ctx.new_page()
+            ordinary.goto("https://chatgpt.com/c/ordinary-existing-chat",
+                wait_until="domcontentloaded", timeout=15000)
+            ordinary.wait_for_timeout(1850)
+            expect(ordinary.locator("#tl-handoff-banner")).to_have_count(0)
+            assert ordinary.evaluate("window.submissions") == 0
+            project = ctx.new_page()
+            project.goto("https://chatgpt.com/g/g-p-synthetic-project",
+                wait_until="domcontentloaded", timeout=15000)
+            project.wait_for_timeout(1850)
+            expect(project.locator("#tl-handoff-banner")).to_have_count(0)
+            assert project.evaluate("window.submissions") == 0
+
+            # A *real* pending tab-bound intent redirected onto an old chat
+            # still warns without exposing the text or consuming the lease.
+            old_tab_id = panel.evaluate("""async () => {
+              const tabs=await chrome.tabs.query({url:"https://chatgpt.com/*"});
+              return tabs.find(t=>t.url?.includes("/c/ordinary-existing-chat"))?.id;
+            }""")
+            assert isinstance(old_tab_id,int), old_tab_id
+            panel.evaluate("""async id => chrome.storage.session.set({
+                ['tl_handoff_'+id]:{text:'SYNTHETIC REDIRECT ONLY'}
+            })""", old_tab_id)
+            ordinary.reload(wait_until="domcontentloaded",timeout=15000)
+            expect(ordinary.locator("#tl-handoff-banner")).to_contain_text(
+                "已停止预填",timeout=10000)
+            assert ordinary.get_by_role("button",name="复制接续提示").count() == 0
+            assert ordinary.evaluate("window.submissions") == 0
+            record=status_for(old_tab_id)
+            assert record and record["text"]=="SYNTHETIC REDIRECT ONLY",record
+            assert not record.get("attemptedAt"),record
+            project.close()
+            ordinary.close()
             ctx.close()
     print("PASS: real MV3 handoff exact 23569-byte multiline readback; "
           "whitespace/normal/native-style attachment drafts untouched; focus race refused; "
