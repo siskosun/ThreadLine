@@ -88,7 +88,7 @@
 
 目标以 [WCAG 2.2](https://www.w3.org/TR/WCAG22/) AA 的适用条款为基础：普通文字对比度至少 4.5:1；识别控件所需的非文字信息至少 3:1；支持键盘、200% 文字放大及 320 CSS px 重排。目标尺寸条款有例外，不能仅凭一个元素小于 24px 就宣称违规；本项目另设上文更大的产品目标。
 
-弹窗遵循 [WAI-ARIA Dialog 模式](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/)：有可访问名称、打开时移入焦点、焦点留在弹窗、取消后回到合理位置。导航参考 [Tabs 模式](https://www.w3.org/WAI/ARIA/apg/patterns/tabs/)。原生 HTML 能完成的行为优先复用。
+弹窗遵循 [WAI-ARIA Dialog 模式](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/)：有可访问名称、打开时移入焦点、焦点留在弹窗、取消后回到合理位置。长弹窗只滚动正文区域，提交、取消及结果状态在 360×900 初始视口内完整可见且键盘可达；滚动区域可键盘进入，固定动作区不得遮挡焦点或正文。导航参考 [Tabs 模式](https://www.w3.org/WAI/ARIA/apg/patterns/tabs/)。原生 HTML 能完成的行为优先复用。
 
 不以颜色独立表达错误、采纳或撤回。等待、成功、错误状态提供可读文本及适当的 `role=status`；不得持续抢焦点。尊重减少动态效果设置，状态变化不让整个页面跳位。
 

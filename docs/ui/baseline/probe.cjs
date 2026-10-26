@@ -1,15 +1,18 @@
 // Read-only UI measurement; all seeded data lives in a newly created profile.
 const fs=require('fs'),path=require('path'),os=require('os'),crypto=require('crypto');
 const {execFileSync}=require('child_process');
+const {pathToFileURL,fileURLToPath}=require('url');
 const {chromium}=require('playwright');
 const root=path.resolve(process.env.THREADLINE_REPO||path.join(__dirname,'../../..'));
 const extension=path.resolve(process.env.THREADLINE_EXTENSION_PATH||path.join(root,'threadline-extension'));
-if(!process.env.THREADLINE_BASELINE_OUTPUT)throw Error('Set THREADLINE_BASELINE_OUTPUT to a new output directory.');
+if(!process.env.THREADLINE_BASELINE_OUTPUT)throw Error('Set THREADLINE_BASELINE_OUTPUT to a new or empty output directory.');
 const out=path.resolve(process.env.THREADLINE_BASELINE_OUTPUT);
+if(fs.existsSync(out)&&fs.readdirSync(out).length)throw Error('Refusing to overwrite a non-empty baseline output directory.');
 const source=execFileSync('git',['-C',root,'rev-parse','HEAD'],{encoding:'utf8'}).trim();
+const sourceDirty=!!execFileSync('git',['-C',root,'status','--porcelain'],{encoding:'utf8'}).trim();
 function fingerprint(){const hash=crypto.createHash('sha256');function walk(dir){for(const name of fs.readdirSync(dir).sort()){if(['node_modules','test','scripts'].includes(name))continue;const p=path.join(dir,name);if(fs.statSync(p).isDirectory())walk(p);else{hash.update(path.relative(extension,p).split(path.sep).join('/')+'\0');hash.update(fs.readFileSync(p));hash.update('\0');}}}walk(extension);return hash.digest('hex');}
 const before=fingerprint();
-const meta={source,extensionFingerprint:before,capturedAt:new Date().toISOString(),playwright:require('playwright/package.json').version,scope:'Synthetic extension profile. Solid-background leaf text and target candidates only, not full WCAG conformance or a render benchmark.'};
+const meta={source,sourceDirty,extensionFingerprint:before,capturedAt:new Date().toISOString(),playwright:require('playwright/package.json').version,scope:'Synthetic extension profile. Opaque solid-background leaf text, dialog action visibility and target candidates only; translucent colors are skipped. Not full WCAG conformance or a render benchmark.'};
 fs.mkdirSync(out,{recursive:true});
 const audit=()=>{
  const visible=e=>{const r=e.getBoundingClientRect(),s=getComputedStyle(e);for(let n=e.parentElement;n;n=n.parentElement){if(n.tagName==='DETAILS'&&!n.open&&!n.querySelector(':scope > summary')?.contains(e))return false;}return e.checkVisibility()&&r.width>0&&r.height>0&&s.visibility!=='hidden'&&s.display!=='none';};
@@ -17,12 +20,15 @@ const audit=()=>{
  const rgb=s=>(s.match(/[\d.]+/g)||[]).slice(0,3).map(Number);
  const lum=arr=>arr.map(x=>{x/=255;return x<=.04045?x/12.92:((x+.055)/1.055)**2.4}).reduce((s,x,i)=>s+x*[.2126,.7152,.0722][i],0);
  const contrast=(a,b)=>{const x=lum(rgb(a)),y=lum(rgb(b));return (Math.max(x,y)+.05)/(Math.min(x,y)+.05)};
- const bg=e=>{for(let n=e;n;n=n.parentElement){const s=getComputedStyle(n);if(s.backgroundImage!=='none')return null;const c=s.backgroundColor;if(c!=='rgba(0, 0, 0, 0)'&&c!=='transparent'&&!c.includes('rgba'))return c;}return 'rgb(255,255,255)'};
+ const bg=e=>{for(let n=e;n;n=n.parentElement){const s=getComputedStyle(n);if(s.backgroundImage!=='none')return null;const c=s.backgroundColor;if(c==='rgba(0, 0, 0, 0)'||c==='transparent')continue;if(c.startsWith('rgba'))return null;return c;}return 'rgb(255,255,255)'};
  const scope=document.querySelector('dialog[open]')||document;
  const leaves=[...scope.querySelectorAll('*')].filter(e=>visible(e)&&![...e.children].some(visible)&&e.textContent.trim()&&!['SCRIPT','STYLE','OPTION'].includes(e.tagName));
- const samples=leaves.map(e=>{const s=getComputedStyle(e),b=bg(e);return {selector:identify(e),text:e.textContent.trim().slice(0,80),font:parseFloat(s.fontSize),weight:s.fontWeight,color:s.color,background:b,contrast:b?+contrast(s.color,b).toFixed(2):null,disabled:e.matches(':disabled')};});
+ const samples=leaves.map(e=>{const s=getComputedStyle(e),b=bg(e),opaque=!s.color.startsWith('rgba');return {selector:identify(e),text:e.textContent.trim().slice(0,80),font:parseFloat(s.fontSize),weight:s.fontWeight,color:s.color,background:b,contrast:b&&opaque?+contrast(s.color,b).toFixed(2):null,disabled:e.matches(':disabled')};});
  const controls=[...scope.querySelectorAll('button,a,input,textarea,select,summary')].filter(visible).map(e=>{const r=e.getBoundingClientRect();return {selector:identify(e),text:(e.getAttribute('aria-label')||e.innerText||e.title||'').trim().slice(0,70),w:+r.width.toFixed(1),h:+r.height.toFixed(1),disabled:!!e.disabled}});
- return {viewport:{width:innerWidth,height:innerHeight,dpr:devicePixelRatio},bodyHeight:document.documentElement.scrollHeight,documentWidth:document.documentElement.scrollWidth,visibleControls:controls.length,smallTargets:controls.filter(c=>c.w<24||c.h<24),fontHistogram:samples.reduce((a,v)=>(a[v.font]=(a[v.font]||0)+1,a),{}),textContrastCandidates:samples.filter(s=>!s.disabled&&s.contrast!==null&&s.contrast<4.5).slice(0,24),samples:samples.slice(0,50)};
+ const dialog=document.querySelector('dialog[open]');
+ let dialogAudit=null;
+ if(dialog){const outer=dialog.getBoundingClientRect(),scroller=dialog.querySelector('.tl-dialog-body,.evidence-adoption-body')||dialog,actions=[...dialog.querySelectorAll('.evidence-adoption-actions button,.tl-actions button')];dialogAudit={scrollClientHeight:scroller.clientHeight,scrollHeight:scroller.scrollHeight,actions:actions.map(e=>{const r=e.getBoundingClientRect(),inView=r.top>=Math.max(0,outer.top)&&r.bottom<=Math.min(innerHeight,outer.bottom)&&r.left>=Math.max(0,outer.left)&&r.right<=Math.min(innerWidth,outer.right);return {text:e.textContent.trim(),top:+r.top.toFixed(1),bottom:+r.bottom.toFixed(1),inView};})};}
+ return {viewport:{width:innerWidth,height:innerHeight,dpr:devicePixelRatio},bodyHeight:document.documentElement.scrollHeight,documentWidth:document.documentElement.scrollWidth,visibleControls:controls.length,smallTargets:controls.filter(c=>c.w<24||c.h<24),fontHistogram:samples.reduce((a,v)=>(a[v.font]=(a[v.font]||0)+1,a),{}),textContrastCandidates:samples.filter(s=>!s.disabled&&s.contrast!==null&&s.contrast<4.5).slice(0,24),samples:samples.slice(0,50),dialog:dialogAudit};
 };
 (async()=>{
  const profiles=path.resolve(os.tmpdir());
@@ -33,6 +39,33 @@ const audit=()=>{
  const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(String(e)));const results=[];
  async function measure(name,full=false){await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));await page.screenshot({path:path.join(out,name+'.png'),fullPage:full});results.push({name,...await page.evaluate(audit)});fs.writeFileSync(path.join(out,'measurements.json'),JSON.stringify({...meta,browser:context.browser()?.version(),complete:false,results,errors},null,2));}
  async function good(p,payload){const x=await p.evaluate(p=>new Promise(r=>chrome.runtime.sendMessage(p,r)),payload);if(!x?.ok)throw Error(JSON.stringify(x));return x.data;}
+ async function checkReference(){
+  const p=await context.newPage(),pageErrors=[];p.on('pageerror',e=>pageErrors.push(String(e)));
+  await p.goto(pathToFileURL(path.join(root,'docs/ui/reference.html')).href);
+  const referenceViewports=[],layouts=[];
+  for(const width of [1280,768,360,320]){await p.setViewportSize({width,height:900});referenceViewports.push(width);layouts.push(await p.evaluate(()=>({width:innerWidth,documentWidth:document.documentElement.scrollWidth,noOverflow:document.documentElement.scrollWidth<=innerWidth})));}
+  await p.locator('#search').fill('不存在的结论');
+  const search=await p.locator('#no-results').isVisible()&&(await p.locator('#results-status').textContent()).includes('0');
+  await p.locator('#search').fill('复访');
+  const matching=await p.locator('.conclusion:visible').count()===1;
+  await p.locator('#search').fill('');
+  await p.locator('[data-filter="withdrawn"]').click();
+  const filter=await p.locator('.conclusion:visible').count()===1&&await p.locator('.conclusion:visible').getAttribute('data-state')==='withdrawn';
+  await p.locator('[data-filter="all"]').click();
+  await p.locator('#preview-handoff').click();await p.locator('#demo-dialog').waitFor({state:'visible'});await p.keyboard.press('Escape');await p.locator('#demo-dialog').waitFor({state:'hidden'});
+  const dialogEscapeAndFocus=await p.evaluate(()=>document.activeElement?.id==='preview-handoff');
+  await p.locator('#sample-save').click();
+  const saved=await p.locator('#sample-status').textContent();
+  await p.locator('#sample-reason').fill('临时修改');await p.locator('#sample-reset').click();
+  const feedback=saved.includes('没有写入数据')&&(await p.locator('#sample-reason').inputValue())==='补充当前结论的适用范围'&&(await p.locator('#sample-status').textContent()).includes('没有写入数据');
+  const hrefs=await p.locator('a[href]').evaluateAll(nodes=>nodes.map(n=>n.href));
+  const links=hrefs.every(href=>!href.startsWith('file:')||fs.existsSync(fileURLToPath(href)));
+  const result={source,sourceDirty,capturedAt:new Date().toISOString(),playwright:meta.playwright,browser:context.browser()?.version(),referenceViewports,layouts,search:search&&matching,filter,dialogEscapeAndFocus,feedback,links,pageErrors};
+  fs.writeFileSync(path.join(out,'reference-check.json'),JSON.stringify(result,null,2));
+  await p.close();
+  if(!layouts.every(x=>x.noOverflow)||![result.search,result.filter,result.dialogEscapeAndFocus,result.feedback,result.links].every(Boolean)||pageErrors.length)throw Error('Reference check failed: '+JSON.stringify(result));
+  return result;
+ }
  try{
   await page.goto(base+'panel.html');await page.locator('#evidence-maintenance').waitFor({state:'attached'});await page.waitForFunction(()=>!document.querySelector('#current-content').textContent.includes('正在识别'));
   await measure('switch-empty-360');await page.locator('#manage-accordion > summary').click();await measure('manage-empty-360',true);
@@ -62,6 +95,7 @@ const audit=()=>{
   if(errors.length)throw Error('Page errors: '+errors.join('; '));
   const after=fingerprint();if(after!==before)throw Error('Extension source changed during capture');
   fs.writeFileSync(path.join(out,'measurements.json'),JSON.stringify({...meta,browser:context.browser()?.version(),complete:true,extensionFingerprintAfter:after,results,errors},null,2));
-  console.log(JSON.stringify({states:results.length,errors,files:fs.readdirSync(out).length}));
+  const reference=await checkReference();
+  console.log(JSON.stringify({states:results.length,errors,referenceErrors:reference.pageErrors,files:fs.readdirSync(out).length}));
  }finally{await context.close();const resolved=path.resolve(profile);if(path.dirname(resolved)!==profiles||!path.basename(resolved).startsWith('threadline-ui-audit-'))throw Error('profile cleanup boundary');fs.rmSync(resolved,{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1});
