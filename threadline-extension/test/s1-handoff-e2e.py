@@ -2,6 +2,7 @@
 Synthetic topic data; no real account, website request or automatic sending.
 """
 import os
+from copy import deepcopy
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from playwright.sync_api import sync_playwright
@@ -79,6 +80,37 @@ def run():
             assert backup["evidence"]["project"]["handoffs"][0]["events"][0]["text"] == edited
             assert "research" not in backup["evidence"]["project"]
 
+            # Reject untrusted topic fields before the preview can be used to
+            # replace a real user's history/version/decision. The S1 project
+            # archive only supports id/name/goal/stage, not arbitrary metadata.
+            topic_before = send({"type": "SNAPSHOT"})["state"]["projects"][0]
+            evidence_before = send({"type": "EV_LIST", "projectId": project_id})
+            for poison in [
+                {"history": [{"version": 999999, "field": "decision", "after": "FORGED"}]},
+                {"knowledgeVersion": 99999999, "decision": "FORGED"},
+                {"evidenceTakeover": False, "evidenceProjectionRevision": 99999},
+                {"__proto__": {"polluted": True}}
+            ]:
+                tampered = deepcopy(backup)
+                tampered["topic"].update(poison)
+                rejected = page.evaluate("p => chrome.runtime.sendMessage(p)", {
+                    "type": "EV_RESTORE_PREVIEW", "backup": tampered,
+                    "replace": True
+                })
+                assert rejected and not rejected["ok"], rejected
+                assert "备份课题" in rejected["error"], rejected
+            topic_after = send({"type": "SNAPSHOT"})["state"]["projects"][0]
+            evidence_after = send({"type": "EV_LIST", "projectId": project_id})
+            assert topic_after == topic_before, "rejected metadata must not rewrite topic state"
+            assert evidence_after["project"] == evidence_before["project"], (
+                "rejected backup must not rewrite authority state")
+            for reserved in ["toString", "valueOf", "hasOwnProperty"]:
+                rejected = page.evaluate("p => chrome.runtime.sendMessage(p)", {
+                    "type": "EV_DELETE_PREVIEW", "projectId": reserved
+                })
+                assert rejected and not rejected["ok"] and "课题 ID" in rejected["error"], (
+                    "inherited object properties must not appear as projects", reserved, rejected)
+
             deletion = send({"type": "EV_DELETE_PREVIEW", "projectId": project_id})
             send({"type": "EV_DELETE_COMMIT", "preview": deletion["preview"],
                 "operationId": op("delete")})
@@ -96,7 +128,33 @@ def run():
                 "handoffId": handoff["id"], "text": edited})
             assert checked["materialHash"] == result["materialHash"]
             context.close()
-    print("PASS: isolated S1 adoption, /3 handoff, delete and complete restore")
+
+            # Real persistent MV3/IndexedDB restart: restore metadata and
+            # durable handoff are still canonical, not arbitrary backup keys.
+            resumed = playwright.chromium.launch_persistent_context(
+                profile,
+                executable_path=os.environ.get("THREADLINE_CHROMIUM_PATH") or None,
+                channel="chromium",headless=True,args=["--no-sandbox",
+                    "--disable-dev-shm-usage",
+                    f"--disable-extensions-except={EXT}",f"--load-extension={EXT}"])
+            resumed_worker = resumed.service_workers[0] if resumed.service_workers                 else resumed.wait_for_event("serviceworker",timeout=15000)
+            resumed_page=resumed.new_page()
+            resumed_page.goto(
+                f"chrome-extension://{resumed_worker.url.split('/')[2]}/panel.html",
+                wait_until="domcontentloaded")
+            def restored_send(payload):
+                response=resumed_page.evaluate("p => chrome.runtime.sendMessage(p)",payload)
+                assert response and response.get("ok"),response
+                return response["data"]
+            persisted=restored_send({"type":"EV_LIST","projectId":project_id})
+            assert len(persisted["rows"])==1,persisted
+            assert persisted["project"]["handoffs"][0]["events"][0]["text"]==edited
+            topic=next(p for p in restored_send({"type":"SNAPSHOT"})["state"]["projects"]
+                if p["id"]==project_id)
+            assert isinstance(topic["knowledgeVersion"],int) and topic["knowledgeVersion"]<999999
+            assert topic["decision"]!="FORGED" and topic.get("evidenceTakeover") is True,topic
+            resumed.close()
+    print("PASS: isolated S1 /3 restore, forbidden metadata rejected, inherited keys denied, true MV3 restart")
 
 if __name__ == "__main__":
     run()
