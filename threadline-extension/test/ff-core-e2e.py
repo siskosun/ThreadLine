@@ -538,7 +538,7 @@ def run():
             assert mapping["X"] in ("A", "B") and mapping["Y"] != mapping["X"]
             # UI: X/Y columns visible WITHOUT the branch labels before the verdict.
             reopened.reload(wait_until="domcontentloaded")
-            reopened.locator("#ff-list button", has_text=p2id).click()
+            reopened.locator(f'#ff-list button[data-experiment-id="{p2id}"]').click()
             expect(reopened.locator("#ff-reply-X")).to_be_visible(timeout=15000)
             expect(reopened.locator("#ff-reply-Y")).to_be_visible(timeout=15000)
             assert reopened.locator("#ff-reply-X").text_content() == "好的，OK。"
@@ -552,7 +552,7 @@ def run():
                 "已通过", timeout=10000)
             page_errors = []
             reopened.on("pageerror", lambda e: page_errors.append(str(e)[:120]))
-            reopened.locator("#ff-list button", has_text=p2id).click()
+            reopened.locator(f'#ff-list button[data-experiment-id="{p2id}"]').click()
             reopened.wait_for_timeout(2000)
             print("PAGE-ERRORS:", page_errors,
                   "STATE:", reopened.evaluate(
