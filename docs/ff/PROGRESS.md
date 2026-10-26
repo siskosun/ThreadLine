@@ -1,5 +1,12 @@
 # ThreadLine 开发进度记录
 
+## 2026-10-26 PR #54 集成候选（未合并）
+
+- 真实 S5 基线 `337187ceeca24313f7894b1c63ed1c62c9b10dba`，当前候选经修复的**代码 HEAD** `cac1688470e7528ad9d3178fa72a84b4c4f7b398`：[Linux](https://github.com/siskosun/ThreadLine/actions/runs/40264882986) **success**、[Windows](https://github.com/siskosun/ThreadLine/actions/runs/40264882976) **success**。原有 S1–S5、备份白名单的 Node 和 MV3 E2E 完整回归，另含 #51 证据空状态、#50 手动分析、#48 有意图才告警、#52 待核对徽标集成回归。详情见 [集成与边界](INTEGRATION_RECONCILIATION_20261026.md)。
+- 旧移植 HEAD `d40e0dc` 与 `bff2cbb` 因意外遗漏页面资格判断失败；随后恢复守卫并重新跑双平台准确 HEAD 全绿。未处理真人已登录站点、旧用户库或正式机验收。此条文档提交后仍须核验新准确 HEAD。
+- **Draft/Open，未合并/发布，未更改用户数据、manifest 版本或正式 PLAN 完成状态。**
+
+
 ## 2026-10-26 S1 恢复元信息白名单已同步至 S5
 
 - 已将 #53 的恢复元信息白名单同步到 S5 候选：仅允许课题 ID、名称、目标、状态进入课题投影；额外历史、版本、决策与继承键拒绝。项目 ID 使用权威库统一校验。
