@@ -10,7 +10,7 @@ async function scenario(fail, options={}){
   const document={querySelector(){return null},querySelectorAll(){return rows}};
   const chrome={runtime:{id:'ext',lastError:null,sendMessage(payload,cb){actions.push(payload);Promise.resolve().then(()=>cb({ok:true,data:{}}))},onMessage:{addListener(fn){tabListeners.push(fn)}}}};
   vm.runInNewContext(main,{window,location,Headers,URL,URLSearchParams,AbortController,setTimeout,console},{filename:'main.js'});
-  vm.runInNewContext(isolated,{window,location,document,chrome,console,Promise},{filename:'page.js'});
+  vm.runInNewContext(isolated,{window,location,document,chrome,console,Promise,setTimeout,clearTimeout},{filename:'page.js'});
   const ack=await new Promise(resolve=>tabListeners[0]({type:'TL_CAPTURE_START',id:'cap_123',conversationId:'t1-123'},null,resolve));
   assert.equal(ack.ok,true);
   let n=0;while(!actions.some(m=>m.type==='CAPTURE_END')&&n++<120){await new Promise(r=>setTimeout(r,10));}
