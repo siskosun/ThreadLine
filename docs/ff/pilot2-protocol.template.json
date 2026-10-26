@@ -4,7 +4,8 @@
   "freeze": {
     "at": null,
     "commitSha": null,
-    "reviewedBy": null
+    "reviewedBy": null,
+    "ruleFrozenBeforeScoring": false
   },
   "explanation": "Only a schema template. No research cases have been frozen or executed.",
   "cases": [
@@ -41,9 +42,17 @@
             "conclusions": {},
             "versions": {}
           },
-          "sourceCorpusSha256": null
+          "sourceCorpusSha256": null,
+          "goldMateriality": {},
+          "goldCriticalIds": [],
+          "sourceSnapshotStatus": "unknown",
+          "sourceSnapshotEvidenceSha256": null,
+          "handoffIncludedIds": null,
+          "handoffScopeSha256": null
         }
       ]
     }
-  ]
+  ],
+  "tierRuleId": "threadline-s2-tier/1",
+  "tierRuleSha256": null
 }
