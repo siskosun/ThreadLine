@@ -70,6 +70,7 @@
       done:"采集已完成，分支结果已确认",
       capturing:"采集正在执行，等待来源响应",
       stalled:"采集超过 30 秒未更新，结果未确认；请检查分支标签与日志，勿自动重试",
+      untracked:"旧采集没有可核验的运行标记，不能推定成功；确认源标签已停止后，可人工解除旧运行",
       needs_review:"原始采集已结束，但分支完成条件不足；请核对来源、完成信号和输入一致性",
       integration_error:"原文已保存，Fork 结果关联失败；请保留原文并报告此错误",
       error:"采集失败，没有获得完整结果",
@@ -126,6 +127,14 @@
             if(recovery) {
               const previous = await send({type:"FF_CAPTURE_STATUS",experimentId:data.id,
                 branch,runId:ev.captureRunId});
+              if(previous.state==="untracked" && previous.manualRecoveryAvailable===true) {
+                if(!confirm("旧采集已失去运行标记且至少 30 秒未更新。请先核对源标签页没有仍在执行的采集。确定仅将旧运行标记为未完成？原始片段保留，本次不会启动新采集或发送消息。"))return;
+                await send({type:"FF_CAPTURE_ABANDON",experimentId:data.id,branch,
+                  runId:ev.captureRunId,ack:"manual-reviewed-no-replay"});
+                notice("旧采集已人工标记未完成，原始片段保留。请刷新源对话，再次点击并确认，才会开始新采集。",true);
+                await read(data.id);
+                return;
+              }
               if(!["error","needs_review"].includes(previous.state)) {
                 notice("此前采集仍在执行或状态未确认；先查看采集状态，不可重复启动。",true);
                 return;
