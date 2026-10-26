@@ -548,6 +548,11 @@ async function ffCaptureEnded(run, tabId) {
   const existing = await ThreadLineFFDB.read(bind.experimentId);
   const attempt = existing?.branches[bind.branch]?.attempts.find(a => a.id === bind.attemptId);
   if (!attempt || attempt.status !== "pending") return;
+  // A tab alone cannot establish ownership. Reject unrelated panel captures,
+  // superseded runs and other conversations before writing evidence status.
+  if (attempt.evidence?.captureRunId !== run.id ||
+      attempt.evidence?.tabId !== tabId ||
+      attempt.evidence?.sessionId !== run.conversationId) return;
   const inputLevel = attempt.evidence?.inputLevel;
   const canComplete = run.complete === true && signals.length >= 2 &&
     typeof attempt.evidence?.sessionId === "string" &&
@@ -575,8 +580,9 @@ async function ffRecoverBindings() {
   // already sent. Never re-seeds a prefill automatically.
   const rows = await ThreadLineFFDB.list();
   for (const row of rows) {
-    for (const branch of ["A", "B"]) {
-      const attempt = row.branches[branch].attempts.at(-1);
+    // K=2-4: recover exactly the persisted branches, never assume A/B only.
+    for (const branch of Object.keys(row.branches || {})) {
+      const attempt = row.branches[branch]?.attempts?.at(-1);
       if (!attempt || attempt.status !== "pending" || attempt.evidence?.sessionId) continue;
       const tabId = attempt.evidence?.tabId;
       if (!Number.isInteger(tabId)) continue;
