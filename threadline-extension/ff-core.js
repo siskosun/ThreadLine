@@ -94,6 +94,18 @@ const ThreadLineFFCore = (() => {
       (a.frozen === b.frozen || a.compare === b.compare) ? "canonical_equivalent" : "differs";
     return {level, rule:RULE, expected:a, observed:b};
   }
+  // Display-only title derived from frozen P. It is never persisted and
+  // never participates in experiment identity, hashes, decisions or exports.
+  function shortTaskTitle(value) {
+    if (typeof value !== "string" ||
+        /[\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F\\u007F-\\u009F]/u.test(value))
+      return null;
+    const normalized = value.replace(/\\s+/gu, " ").trim();
+    if (!normalized) return null;
+    const points = Array.from(normalized);
+    return points.length > 42 ? points.slice(0, 42).join("") + "…" : normalized;
+  }
+
   const BRANCH_LABELS = Object.freeze(["A", "B", "C", "D"]);
   const MAX_BRANCHES = 4;
   function newExperiment(frozen, experimentId, branchCount = 2) {
@@ -415,7 +427,7 @@ const ThreadLineFFCore = (() => {
       branches:structuredClone(snapshot.branches), decision};
   }
   return {MAX_BYTES, RULE, STATES, PHASES, CHECKS, PREFERENCES, BRANCH_LABELS, MAX_BRANCHES,
-    canonical, compare, byteLength,
+    canonical, compare, byteLength, shortTaskTitle,
     hash, wellFormed, fingerprints, formatText, freeze, verifyFrozen, classify, newExperiment, advance,
     eligibleForComparison, assignMapping, recordVerdict, exportSnapshot,
     judgeCalibration, CALIBRATION_ITEMS, validateImport};
