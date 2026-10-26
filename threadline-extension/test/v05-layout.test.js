@@ -40,3 +40,10 @@ test('legacy backup copy states its actual scope and exclusions',()=>{
  assert.ok(!html.includes('检查并导入（覆盖当前课题）'));
  assert.ok(panel.includes('替换当前所有本地课题与对话关联'));
 });
+test('empty evidence next action preserves any existing legacy note',()=>{
+ const start=panel.indexOf('if(data.project?.legacyNote?.text)');
+ const end=panel.indexOf('for (const row of data.rows)',start);
+ assert.ok(start>=0&&end>start);
+ const segment=panel.slice(start,end);
+ assert.ok(segment.includes('holder.append(createEvidenceNext("open-research","打开研究整理"))'));
+});

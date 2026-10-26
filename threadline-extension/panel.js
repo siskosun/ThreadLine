@@ -456,15 +456,15 @@
     else await renderEvidenceProject();
   }
 
-  function showEvidenceNext(action,label) {
+  function createEvidenceNext(action,label) {
     const next=document.createElement("button");
     next.type="button";next.className="secondary evidence-next";next.dataset.action=action;next.textContent=label;
-    ev$("evidence-list").replaceChildren(next);
+    return next;
   }
 
   async function renderEvidenceProject() {
     const request=++evidenceRequest,projectId = ev$("evidence-project").value;
-    if (!projectId) { evidenceHasRows=false; ev$("evidence-handoff").disabled=true; ev$("evidence-summary").textContent = "暂无课题。先创建课题，再从整理结果逐条采纳。"; showEvidenceNext("start-new-topic","创建课题"); return; }
+    if (!projectId) { evidenceHasRows=false; ev$("evidence-handoff").disabled=true; ev$("evidence-summary").textContent = "暂无课题。先创建课题，再从整理结果逐条采纳。"; ev$("evidence-list").replaceChildren(createEvidenceNext("start-new-topic","创建课题")); return; }
     let data;
     try { data = await evSend({ type: "EV_LIST", projectId }); }
     catch (e) {
@@ -485,7 +485,7 @@
     const holder = ev$("evidence-list");
     holder.replaceChildren();
     if(data.project?.legacyNote?.text){const legacy=document.createElement("details"),title=document.createElement("summary"),body=document.createElement("pre");title.textContent="接管前的课题备注（未核验）";body.textContent=data.project.legacyNote.text;legacy.append(title,body);holder.append(legacy);}
-    if(!data.rows.length)showEvidenceNext("open-research","打开研究整理");
+    if(!data.rows.length)holder.append(createEvidenceNext("open-research","打开研究整理"));
     for (const row of data.rows) {
       const item = document.createElement("div");
       item.className = "evidence-item";
