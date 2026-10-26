@@ -1,13 +1,17 @@
 const test=require("node:test");
 const assert=require("node:assert/strict");
 const {createHash}=require("node:crypto");
+const {readFileSync}=require("node:fs");
+const {resolve}=require("node:path");
 const evaluate=import("../../scripts/evaluate-pilot2.mjs");
 let evaluateData;
 test.before(async()=>{({evaluateData}=await evaluate);});
 const digest=x=>createHash("sha256").update(x).digest("hex");
 function fixture(){
  const protocol={format:"threadline-pilot2-protocol/1",status:"FROZEN",
-   freeze:{at:"2026-10-25T08:00:00Z",commitSha:"synthetic-commit",reviewedBy:"synthetic-independent-human"},
+   freeze:{at:"2026-10-25T08:00:00Z",commitSha:"synthetic-commit",reviewedBy:"synthetic-independent-human",
+     ruleFrozenBeforeScoring:true},tierRuleId:"threadline-s2-tier/1",
+   tierRuleSha256:digest(readFileSync(resolve(__dirname,"../../scripts/pilot2-tier-rule.mjs"))),
    cases:[]},observations={format:"threadline-pilot2-observations/1",status:"EXECUTED",records:[]};
  for(let i=0;i<6;i++){
   const projectId="p_synthetic_"+i,root="con_root"+String(i).padStart(8,"0"),
@@ -26,15 +30,28 @@ function fixture(){
    const kind=kinds[j],sourceCorpusSha256=digest("shared synthetic source "+i+"/"+j),carryForwardConfirmed=kind==="wording_only",
       rootConclusionId=kind==="unrelated"?unrelated:root,goldAffectedIds=j<3?[dependent]:[];
    c.events.push({id:"event_"+j,kind,rootConclusionId,critical:j===0,sourceCorpusSha256,carryForwardConfirmed,
-     goldAffectedIds,frozenState});
-   observations.records.push({caseId:c.id,eventId:"event_"+j,arms:{
+     goldAffectedIds,goldMateriality:Object.fromEntries(goldAffectedIds.map(id=>[id,"substantive"])),
+     goldCriticalIds:j===0?[dependent]:[],sourceSnapshotStatus:"verified",
+     sourceSnapshotEvidenceSha256:digest("source-snapshot-"+i+"-"+j),
+     handoffIncludedIds:[],handoffScopeSha256:digest("handoff-scope-"+i+"-"+j),frozenState});
+   const record={caseId:c.id,eventId:"event_"+j,arms:{
     A:{correctContinuation:false,wronglyRevisedTrueClaim:false,elapsedMs:100000,learningMs:0,humanInterventions:3,modelCalls:2,
       receiptId:"synthetic-A-"+i+"-"+j,modelVersion:"synthetic",sourceCorpusSha256},
     B:{correctContinuation:true,wronglyRevisedTrueClaim:false,elapsedMs:70000,learningMs:0,humanInterventions:1,modelCalls:1,
       receiptId:"synthetic-B-"+i+"-"+j,modelVersion:"synthetic",sourceCorpusSha256},
     C:{correctContinuation:false,wronglyRevisedTrueClaim:true,elapsedMs:120000,learningMs:0,humanInterventions:4,modelCalls:3,
       receiptId:"synthetic-C-"+i+"-"+j,modelVersion:"synthetic",sourceCorpusSha256}
-   }});
+   }};
+   for(const arm of ["A","B","C"]){
+    const v=record.arms[arm];
+    v.reviewLogComplete=true;
+    v.reviewSegments=[{targetConclusionId:j<3?dependent:unrelated,
+      elapsedMs:arm==="A"?15000:arm==="B"?10000:20000,learningMs:0,
+      receiptId:"synthetic-review-"+arm+"-"+i+"-"+j}];
+    v.handoffCorrectSubstantiveIds=j<3&&arm==="B"?[dependent]:[];
+    if(arm==="B")v.deferrals=[];
+   }
+   observations.records.push(record);
   }
   protocol.cases.push(c);
  }
@@ -83,6 +100,9 @@ test("rejects insufficient cases, missing dual rater, and incomplete three-arm r
 test("actual impacted ids cannot be replaced by gold labels",()=>{
  const {protocol,observations,hash}=fixture();
  protocol.cases[0].events[0].goldAffectedIds=[];
+ protocol.cases[0].events[0].goldMateriality={};
+ protocol.cases[0].events[0].goldCriticalIds=[];
+ protocol.cases[0].events[0].critical=false;
  const result=evaluateData(protocol,observations,hash);
  assert.equal(result.affected.fp,1);
  assert.equal(result.affected.tp,17);
