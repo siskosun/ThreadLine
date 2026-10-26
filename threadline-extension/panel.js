@@ -488,6 +488,85 @@
   }
 
 
+  function historyTime(value) {
+    return Number.isSafeInteger(value) && value >= 0
+      ? new Date(value).toLocaleString()
+      : "时间未知";
+  }
+
+  function renderVersionHistory(holder, data) {
+    holder.replaceChildren();
+    const labels={adopt:"首次采纳",amend:"修订"};
+    const impacts={wording:"仅措辞",substantive:"实质修改",conditions:"适用条件变化"};
+    const relations={cites:"引用",supports:"支持",opposes:"反对",background:"背景"};
+    if(data.status==="withdrawn"){
+      const withdrawn=document.createElement("p");
+      withdrawn.className="subtle";
+      withdrawn.textContent="当前结论已撤回"+(data.withdrawnAt?" · "+historyTime(data.withdrawnAt):"")+
+        (data.withdrawalReason?" · 原因："+data.withdrawalReason:"");
+      holder.appendChild(withdrawn);
+    }
+    for(const [index,version] of data.versions.entries()){
+      const details=document.createElement("details"),summary=document.createElement("summary"),body=document.createElement("div");
+      details.className="evidence-history-version";
+      summary.textContent="版本 "+(index+1)+(version.id===data.currentVersionId?"（当前）":"")+
+        " · "+(labels[version.changeType]||"历史版本")+
+        (version.changeImpact?" · "+(impacts[version.changeImpact]||version.changeImpact):"")+
+        " · "+historyTime(version.createdAt)+" · 来源 "+version.sourceCount+" 条";
+      body.className="evidence-history-version-body";
+      const meta=document.createElement("p");meta.className="subtle";
+      meta.textContent="版本 ID："+version.id+" · 作者："+(version.creator||"未知")+
+        (version.predecessorId?" · 前一版本："+version.predecessorId:"");
+      body.appendChild(meta);
+      const text=document.createElement("pre");text.className="evidence-history-fulltext";
+      text.textContent=version.text;
+      body.appendChild(text);
+      const conditions=document.createElement("p");
+      conditions.textContent="适用条件："+(version.conditions||"未填写");
+      body.appendChild(conditions);
+      const sourceTitle=document.createElement("p");sourceTitle.className="subtle";
+      sourceTitle.textContent="来源范围："+version.sourceCount+" 条连接"+
+        (version.recordedSourceCount!==null&&version.recordedSourceCount!==version.sourceCount
+          ?"（记录数 "+version.recordedSourceCount+" 与实际连接数不一致）":"");
+      body.appendChild(sourceTitle);
+      if(version.recordedSourceCount!==null&&version.recordedSourceCount!==version.sourceCount){
+        const warning=document.createElement("p");warning.className="evidence-history-warning";
+        warning.textContent="来源连接记录与版本元数据不一致，请按原始证据核对；系统未补造缺失来源。";
+        body.appendChild(warning);
+      }
+      if(!version.fragments.length){
+        const none=document.createElement("p");none.className="subtle";
+        none.textContent=version.recordedSourceCount>0
+          ?"该版本记录了来源数量，但未找到来源连接；来源不可用。"
+          :"该版本没有记录来源片段。";
+        body.appendChild(none);
+      }
+      for(const fragment of version.fragments){
+        if(!fragment.available){
+          const missing=document.createElement("p");missing.className="evidence-history-warning";
+          missing.textContent="来源记录缺失 · "+(relations[fragment.relation]||"来源")+
+            " · ID "+fragment.sourceId+"。仅显示已有版本正文，不推断原文。";
+          body.appendChild(missing);continue;
+        }
+        const source=document.createElement("details"),sourceSummary=document.createElement("summary");
+        source.className="evidence-history-source";
+        sourceSummary.textContent=(relations[fragment.relation]||"来源")+
+          (fragment.conversationId?" · 会话 "+fragment.conversationId:" · 仅片段（无会话 ID）");
+        const sourceMeta=document.createElement("p");sourceMeta.className="subtle";
+        sourceMeta.textContent="来源 ID："+fragment.sourceId+
+          (fragment.messageId?" · 消息 ID："+fragment.messageId:" · 无消息 ID")+
+          (fragment.sourceRole?" · 角色："+fragment.sourceRole:"")+
+          (fragment.capturedAt!==null?" · 采集时间："+historyTime(fragment.capturedAt):"")+
+          (fragment.completeness?" · 完整性："+fragment.completeness:"")+
+          (fragment.url?" · 来源 URL："+fragment.url:"");
+        const excerpt=document.createElement("pre");excerpt.className="evidence-history-fulltext";
+        excerpt.textContent=(fragment.before||"")+"【"+fragment.selection+"】"+(fragment.after||"");
+        source.append(sourceSummary,sourceMeta,excerpt);body.appendChild(source);
+      }
+      details.append(summary,body);holder.appendChild(details);
+    }
+  }
+
   function renderEvidenceRows() {
     const holder=ev$("evidence-list"),more=ev$("evidence-more"),count=ev$("evidence-list-count");
     const cache=evidenceListCache;
@@ -554,6 +633,43 @@
         }
         content.appendChild(box);
       }
+      const historyButton=document.createElement("button");
+      historyButton.type="button";historyButton.className="secondary evidence-history-toggle";
+      historyButton.textContent="查看版本历史（"+row.versions.length+"）";
+      historyButton.setAttribute("aria-expanded","false");
+      const historyPanel=document.createElement("div");historyPanel.className="evidence-history";historyPanel.hidden=true;
+      const historyStatus=document.createElement("p");historyStatus.className="subtle";
+      historyStatus.setAttribute("role","status");historyStatus.setAttribute("aria-live","polite");
+      const historyItems=document.createElement("div");
+      historyPanel.append(historyStatus,historyItems);
+      let historyLoaded=false,historyBusy=false;
+      historyButton.addEventListener("click",async()=>{
+        if(historyBusy)return;
+        if(!historyPanel.hidden){
+          historyPanel.hidden=true;historyButton.setAttribute("aria-expanded","false");return;
+        }
+        historyPanel.hidden=false;historyButton.setAttribute("aria-expanded","true");
+        if(historyLoaded)return;
+        const projectId=evidenceListCache?.projectId;
+        if(!projectId){historyStatus.textContent="请先选择课题后重试。";return;}
+        historyBusy=true;historyButton.disabled=true;historyStatus.textContent="正在读取版本历史…";
+        try{
+          const history=await evSend({type:"EV_HISTORY",projectId,conclusionId:c.id});
+          if(!item.isConnected||evidenceListCache?.projectId!==projectId)return;
+          if(history.projectId!==projectId||history.conclusionId!==c.id||!Array.isArray(history.versions))
+            throw new Error("返回的课题或结论身份不匹配");
+          renderVersionHistory(historyItems,history);
+          historyStatus.textContent="已读取 "+history.versions.length+" 个版本；历史正文与来源仅供核对，不可在此修改。";
+          historyLoaded=true;
+        }catch(error){
+          if(item.isConnected&&evidenceListCache?.projectId===projectId)
+            historyStatus.textContent="版本历史读取失败："+error.message+"。可重新尝试。";
+        }finally{
+          historyBusy=false;
+          if(item.isConnected)historyButton.disabled=false;
+        }
+      });
+      content.append(historyButton,historyPanel);
       if(c.status!=="withdrawn"){
         const row2=document.createElement("div");row2.className="line";
         const amend=document.createElement("button");amend.type="button";amend.className="secondary";amend.textContent="修订";
