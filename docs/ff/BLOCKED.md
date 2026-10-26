@@ -1,5 +1,12 @@
 # ThreadLine 当前阻塞
 
+## 2026-10-26 F3 恢复能力就绪，真实站点门禁仍未解除
+
+- PR [#40](https://github.com/siskosun/ThreadLine/pull/40) 工程提交 `12d11a55221bfd24f17bcceaf14aeaaf32b44ea2` 已通过 [Linux](https://github.com/siskosun/ThreadLine/actions/runs/40252510913) 和 [Windows](https://github.com/siskosun/ThreadLine/actions/runs/40252510938) 合成回归。新增丢失会话 lease 后 30 秒检测、人工两步解除、迟到完成保护、旧片段保留与真实 Chromium profile 重启测试。
+- F3 真实验收仍 **BLOCKED/NOT_EXECUTED**：在授权已登录浏览器跨 3 个自然日完成至少 12 次有效 K4 尝试；逐次验证采集→对照→裁决→导出→导入、来源一致性、无自动发送与显式失败提示；分别演练真实选择器失效、服务工作者中断和完整重启后的标签身份变化。仅记录脱敏、绑定准确 HEAD 的证据；待人工复核、签署后方可改变状态。
+- 当前不会自动寻找或重绑重启后可能改变的 tabId；用户人工解除旧采集也不代表新采集可在旧标签 ID 上继续。若源标签不存在或不匹配，停止重试并记录；禁止将合成通过改写为真实 F3 修复完成。
+
+
 该文件登记事实及解除条件，不是第二份计划。官方任务状态见 [docs/PLAN.md](../PLAN.md)。
 
 ## 2026-10-25 F3 工程加固后仍未解除的真实站点门禁

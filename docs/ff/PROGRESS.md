@@ -1,5 +1,12 @@
 # ThreadLine 开发进度记录
 
+## 2026-10-26 F3 完整浏览器重启的失联采集恢复（PR #40）
+
+- 提交 `12d11a55221bfd24f17bcceaf14aeaaf32b44ea2` 的 [Linux](https://github.com/siskosun/ThreadLine/actions/runs/40252510913) / [Windows](https://github.com/siskosun/ThreadLine/actions/runs/40252510938) CI 均 success；241/241 Node 与合成 Chromium MV3（含 profile 关闭后重新启动）全部通过。保留原有 F3 注入诊断、桥握手与选择器降级回归。
+- 失联运行需先核对 `FF_CAPTURE_STATUS` 的运行身份和无进度时长，再经用户确认只将旧运行标记未完成、保留原始片段；真正重采集需要第二次明确操作，不会自动发送/重放。采集终态与人工解除使用同一串行锁，迟到完成不能倒写旧运行。具体行为与限制见 [F3 握手与恢复记录](F3_BRIDGE_HANDSHAKE_20261025.md)。
+- 仍无真实已登录 ChatGPT 3 自然日 12 次 K4 验收、真实异常恢复和人工签署；F3 原线上问题不宣告已解决，PR #40 保持 Draft/Open，不合并/发布、不动用户数据或 PLAN 任务状态。完整重启后 tabId 可能变化，当前不会自动重绑源会话。
+
+
 ## 2026-10-25 F3 源运行归属与重复采集加固（PR #40，准确代码 HEAD 已核验）
 
 - 源码审计发现：`ffCaptureEnded` 曾仅按标签绑定和结果完成条件推进分支，而未对 `captureRunId` 与目标会话进行相等校验；同一标签页另一条独立采集可能被错误归属。现在要求运行 ID、标签 ID 与会话 ID 全部与当前待完成 attempt 精确一致，否则保留来源但不推进 Fork 分支。

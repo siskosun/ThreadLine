@@ -16,3 +16,13 @@
 - Fork 分支此前可能停留在 `phase=capturing`，尽管底层来源已经 `error` 或 `done` 但不满足完成条件；旧 UI 只显示「查看采集状态」，无法手动发起新的来源采集。
 - 现在在有既有运行 ID 的待完成分支显示「核对后手动重新采集」；点击先读取绑定该分支与运行 ID 的 `FF_CAPTURE_STATUS`，只有 `error` 或 `needs_review` 才显示用户确认框，再**显式**调用 `FF_CAPTURE`。仍在运行、`stalled`、身份未知或 `integration_error` 一律拒绝重复启动。
 - 后台单分支运行 ID 防覆盖与无自动重放规则继续生效。Node UI 测试覆盖仍在运行、来源关联错误、用户取消和用户同意四种情况。**本补丁未提供浏览器重启后失去 session marker 的自动恢复；此类来源仍需人工诊断，不得误记已修复。**
+
+## 2026-10-26 浏览器重启后失联采集的人工恢复（PR #40）
+
+- 新工程提交 `12d11a55221bfd24f17bcceaf14aeaaf32b44ea2`：[Linux verify](https://github.com/siskosun/ThreadLine/actions/runs/40252510913) 与 [Windows baseline](https://github.com/siskosun/ThreadLine/actions/runs/40252510938) 均 **success**；Linux 为 **241/241 Node** 与完整合成 Chromium/MV3 E2E 通过。
+- 原问题：`IndexedDB` 会保留 `capturing` 运行，但完整浏览器重启可能清除 `chrome.storage.session` 的 `tl_capture_owner_<runId>` 临时标记。此前只禁止覆盖运行中采集，失联运行无法退出。
+- 现在 `FF_CAPTURE_STATUS` 同时核对当前分支绑定的运行 ID/标签/会话与临时标记：仅当采集仍标记 `capturing`、标记缺失且至少 **30 秒无进度**，返回 `untracked` / `manualRecoveryAvailable:true`。该状态只表示无法确认运行活性，**不表示采集已失败、已成功或完整**。
+- 用户先核对源标签页不再执行采集，再点击「核对后手动重新采集」，第一次确认只发送 `FF_CAPTURE_ABANDON` 并将旧运行标记 `error/manual-untracked`，保留已采页面与分支运行 ID，不推进实验完成态；不会打开、发送或重新抓取。之后需再次点击并单独确认，才调用 `FF_CAPTURE`。若源标签页在重启后丢失或 tabId 改变，新请求仍可能被拒绝，**不自动重绑其他标签**。
+- 后台将 `CAPTURE_RESET/PROGRESS/END/FAIL` 的终态检查与人工解除放入同一串行区，禁止迟到的完成消息覆盖已解除状态；活动标记存在、30 秒内仍有活动、不同实验/分支/运行 ID、来源身份不符、已终结运行均不能被新命令误解除。重发同一已确认的解除请求仅返回此前状态。
+- 合成测试覆盖无标记/有标记、30 秒门槛、错误分支、幂等重放、旧片段保留、迟到完成拒绝、第一次不自动发起第二次采集。新增 `test/f3-orphan-recovery-e2e.py` 在一次性真实 Chromium/MV3 环境执行**完整浏览器重启**，验证存储生命周期与两步人工确认；0 自动发送。
+- 仍然 **NOT_EXECUTED**：登录真实 ChatGPT 的 3 自然日/≥12 次 K4 真实采集→对照→裁决→导出→导入，真实站点选择器退化、真实账户状态下的 worker 中断与 tabId 恢复、脱敏验收和真人签署。测试与代码修复不等于当时 F3 根因已确证或真实线上故障已经解除。保持 Draft，不合并/发布、不修改用户数据或唯一 PLAN 状态表。
