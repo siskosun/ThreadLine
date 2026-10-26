@@ -2,8 +2,18 @@
 
 **唯一正式计划：** 本文件 `docs/PLAN.md`。其他 ChatGPT 资料库、对话、PR 说明和 `docs/ff/` 附录仅作为参考或证据，均不能覆盖本文件的任务状态。
 **事实核查日：** 2026-10-26。
-**当前核查基线：** main `3ce5d93040fa44cd3a5dda109da2c87b5343fc0d`（v0.8.2）。S0A/S0B/S1A/S1B 当前均为 `blocked`；PR #36 已合并但不自动解除验收阻塞，S2–S5 仍在独立 Draft PR #37。F3 真人验收暂缓，旧版数据迁移已明确不在当前范围；以 [阻塞记录](ff/BLOCKED.md) 为准。
-**范围：** 保留历史完成证据；当前唯一机器状态表将 S0A/S0B/S1A/S1B 记为 blocked。PR #36 的代码修复已经合并，但不代表这四项任务已满足完成条件；S2–S5 仍为独立 Draft 候选，真实站点 F3 验收尚未完成。
+**当前核查基线：** main `3ce5d93040fa44cd3a5dda109da2c87b5343fc0d`（v0.8.2）。本表的 S0A/S0B/S1A/S1B 状态均为 `blocked`，PR #36 已合并但不自动解除任务验收门禁；PR #37 及本次 UI 评估仍在独立分支。2026-10-25 的旧复验记录见 [ACCEPTANCE_20261025.md](ff/ACCEPTANCE_20261025.md)。
+**范围：** UI 评估与设计标准不改既有机器任务状态；来源定位另以独立任务 `LOCATE-PREFLIGHT` 登记为 `planned`，S0B 仍 `blocked`，真实页面探针尚未执行。2026-10-26 所有者决定不做旧版数据迁移、暂缓 F3 真人验收（见 [阻塞记录](ff/BLOCKED.md)）；这两项范围决定不代表 S1/F3 已完成验收。
+
+## 2026-10-26 UI 评估与标准补充
+
+本轮按用户要求评估 UI/UX 并建立后续开发标准，分类 L1（评估与文档，不改生产行为），但对唯一正式计划的修改仍需 PR 独立人工治理复核。评估冻结 main `3ce5d93040fa44cd3a5dda109da2c87b5343fc0d`、源码 v0.8.2；上述旧核查说明保留其历史语境，不能代替本轮 UI 快照。完整结论、测量及边界见 [UI 基线](ui/BASELINE_20261026.md)，开发目标见 [DESIGN.md](../DESIGN.md)，复验方法见 [验收清单](ui/CHECKLIST.md)。
+
+实际结论：保留现有架构，先修文字可读性和备份范围，再局部改造空状态、搜索/详情、版本阅读与反馈。视觉样张仅用于评审；本轮未实施这些产品改造。UI 评估本身未改变既有任务状态或验收要求；来源定位预检另由 `LOCATE-PREFLIGHT` 正式登记。下一步按基线 UX-01/02 选择有界改动，保持数据与发送约束，再依据清单核验。真人效果及完整无障碍验收另计。
+
+## 2026-10-26 来源定位零发送预检
+
+`LOCATE-PREFLIGHT` 只在真实登录 ChatGPT 页面由所有者手动执行只读探针：不发送消息、不自动启动采集、不写产品状态。核对当前可见消息 ID/角色、滚动根与方向；只有存在用户已显式启动的采集样本时，才对照消息 ID 与历史顺序。没有样本、身份不一致或证据不足均记录 `unknown`/失败，不推断定位成功。该预检不解除 S0A/S0B 门禁。
 
 ## 执行任务与验收门禁
 
@@ -21,7 +31,7 @@
 | BETA-RELEASE | 安装升级与正式 Beta 验收 | done | P3-REPORT | 真实双分支闭环、同路径旧数据升级、CI 与用户验收均通过 | docs/ff/evidence/BETA-RELEASE.json | yes |
 | P4-AUTO | 第二期：K=4 多会话编排、等预算对照、裁判校准（隐藏校准题）与 JSON 导入；自动 Flush 经一期证据改判不可行，以批量预填+人工批量发送替代 | done | BETA-RELEASE | 等预算对照与裁判校准机制落地，K 可配置 2–4，导入经严格验证；0 自动发送不变 | docs/ff/evidence/P4-AUTO.json | yes |
 | S0A-PROTOTYPE | 第十一章 S0a：证据存储与采纳原型（单事务权威写入、投影、崩溃点/恢复设计、容量探针与工期估算） | blocked | P4-AUTO | 单事务采纳/撤回+幂等/CAS 经测试；崩溃点表与恢复顺序无待定项；首期默认容量经探针冻结；12 次有效采纳操作至少 11 次无帮助完成、耗时中位 ≤30s、P90 ≤60s（受托代理执行须在证据 scope 声明） | docs/ff/BLOCKED.md | yes |
-| LOCATE-PREFLIGHT | 来源定位零发送现场预检（只读真实页面结构，不发送、不自动启动采集、不写入产品状态） | planned | Z0-BASE | 用户在真实登录 ChatGPT 页面执行探针；记录可见消息 ID/角色、滚动根与方向；如存在用户已显式启动的采集样本，核对消息 ID 与顺序；结果可为失败或 unknown，必须保留脱敏记录，不能以选择器存在推断定位成功 | - | yes |
+| LOCATE-PREFLIGHT | 来源定位零发送现场预检（只读真实页面结构，不发送、不自动启动采集、不写入产品状态） | planned | Z0-BASE | 用户在真实登录 ChatGPT 页面执行探针；记录可见消息 ID/角色、滚动根与方向；如存在用户已显式启动的采集样本，核对消息 ID 与顺序；结果可为失败或 unknown，必须保留脱敏记录，不能以选择器存在推断定位成功 | docs/ff/BLOCKED.md | yes |
 | S0B-LOCATE | 第十一章 S0b：来源定位 spike（限 1 人日/8 小时：现有适配 vs Toolkit vendor 子集 vs 最小实现） | blocked | S0A-PROTOTYPE,LOCATE-PREFLIGHT | 基于预检记录完成三方案维护/包体/测试成本比较；利用可靠的历史消息 ID/顺序估算搜索方向；采纳代码须通过身份、分支隔离与取消测试并保留许可标注；3,000 条夹具≤5秒有效运行、取消后 200ms 内停止新增主动滚动；映射不可靠或失败时降级“片段+来源链接” | docs/ff/BLOCKED.md | no |
 | S1A-PERSIST | 第十一章 S1a：结论/证据持久化与恢复（chrome.storage 单向投影、旧 decision 编辑封口、备份恢复与错误处理） | blocked | S0A-PROTOTYPE | 跨重启/清缓存保存完整；崩溃点与旧数据兼容通过；持久化/删除实施经 L3 审查与人工风险确认 | docs/ff/BLOCKED.md | yes |
 | S1B-ADOPT | 第十一章 S1b：逐条采纳与可编辑交接（普通整理与 Fork 揭盲共用） | blocked | S1A-PERSIST,S0B-LOCATE | 主要操作只要求正文与依据确认；重复采纳不重复创建；旧分支可见更正/撤回；定位不可靠时显示“仅片段”不误跳转 | docs/ff/BLOCKED.md | yes |
@@ -431,10 +441,10 @@ S0a 原型至少 6 次直接采纳、6 次需要修改或缺证处理，预先�
 
 **决策：EXTEND EXISTING + VALIDATE FIRST。** 不整体重构现有 MV3 扩展，不把通用聊天整理、全局知识图谱或跨平台同步当作下一阶段核心。产品承诺是：重要前提发生变化后，用户能追溯来源、识别可能受影响的结论、局部复核并将可信研究状态带入新对话。
 
-- 当前核查基线：main `3ce5d93040fa44cd3a5dda109da2c87b5343fc0d`（v0.8.2）；PR #36 已合并；PR #37（S2–S5 工程候选）和 PR #59（UI 基线/标准）仍为 Draft。PR 分支不是当前产品事实，所有实施前须重查实时 SHA。
-- **当前任务状态：** 本计划机器表已将 S0A/S0B/S1A/S1B 标为 `blocked`。PR #36 的代码修复已合并，但没有自动满足任务完成契约；不能从旧证据或候选分支推断任务完成。
-- PR #37 分支包含 S2–S5 工程候选及三主导航/表单/草稿保护，但仍为 Draft，不是 main 的产品事实；PR #59 建立 UI 基线和设计标准，尚未合并，样张不等于生产 UI。
-- 尚未验证：真实 ChatGPT F3、真人工效与 6 案例效果。2026-10-26 所有者决定旧版本地数据迁移不在当前范围；不得再将其写为当前合并前置。
+- 核查基线：main `f43fd072eb6f85dc78bddcc9853899c103293b73`；[PR #36](https://github.com/siskosun/ThreadLine/pull/36) 为 S1 修复 Draft，先于 [PR #37](https://github.com/siskosun/ThreadLine/pull/37)（2026-10-25 最新审阅 HEAD `78d37950ea0eaace17e15a8e4aad31c2db787eed`）叠加候选。合并时重查实时 SHA 和分支基线，禁止沿用这些历史值冒充最新状态。
+- **重要状态差异：** 本文件 main 基线机器表将 S0A/S0B/S1A/S1B 标为 `done`，而 PR #36/#37 经 2026-10-25 复验将其标为 `blocked`。本次计划 PR 原样保留机器表，**不是确认旧 done 仍符合当前实际**。合并前由独立治理复审核对缺陷、证据、完成状态、`check-plan.mjs`、`PROGRESS.md` 与 `BLOCKED.md`，按正式流程另行纠偏，不能静默覆盖历史。
+- PR #37 已实现 S2–S5 工程候选，并完成“三主导航（对话切换／研究整理／证据与复核）”、表单、草稿与异步响应保护；**不重新开发已实现的 S4 复核/交接或 UI 重排**。[UI 实查](https://github.com/siskosun/ThreadLine/blob/78d37950ea0eaace17e15a8e4aad31c2db787eed/docs/ff/UI_AUDIT_20261025.md)；[工程边界](https://github.com/siskosun/ThreadLine/blob/78d37950ea0eaace17e15a8e4aad31c2db787eed/docs/ff/S0_S5_IMPLEMENTATION_20261025.md)。
+- 尚未验证：真实 ChatGPT 环境中的 F3 采集静默停滞、真实旧用户数据恢复/迁移、真人工效、6 案例效果。合成 E2E 或 PR 自述不得替代这些证据。
 
 ### 12.2 工作包与既有机器 ID
 
