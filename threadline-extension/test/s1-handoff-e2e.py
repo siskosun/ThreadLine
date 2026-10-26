@@ -2,6 +2,7 @@
 Synthetic topic data; no real account, website request or automatic sending.
 """
 import os
+from copy import deepcopy
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from playwright.sync_api import sync_playwright
@@ -35,6 +36,24 @@ def run():
 
             def op(n):
                 return "op_s1handoff_" + n
+
+            def authority_snapshot():
+                return page.evaluate("""async () => {
+                    const db=await new Promise((resolve,reject)=>{
+                        const r=indexedDB.open('threadline_evidence_v1');
+                        r.onsuccess=()=>resolve(r.result);
+                        r.onerror=()=>reject(r.error);
+                    });
+                    try {
+                        const names=[...db.objectStoreNames].sort();
+                        const tx=db.transaction(names,'readonly');
+                        return await Promise.all(names.map(name=>new Promise((resolve,reject)=>{
+                            const req=tx.objectStore(name).getAll();
+                            req.onsuccess=()=>resolve([name,req.result]);
+                            req.onerror=()=>reject(req.error);
+                        })));
+                    } finally {db.close();}
+                }""")
 
             created = send({"type": "MUTATE", "action": {
                 "type": "createProject", "name": "S1 恢复测试"
@@ -79,6 +98,35 @@ def run():
             assert backup["evidence"]["project"]["handoffs"][0]["events"][0]["text"] == edited
             assert "research" not in backup["evidence"]["project"]
 
+            topic_before = next(p for p in send({"type": "SNAPSHOT"})["state"]["projects"]
+                if p["id"] == project_id)
+            evidence_before = send({"type": "EV_LIST", "projectId": project_id})
+            authority_before = authority_snapshot()
+            for poison in [
+                {"history": [{"version": 999999, "field": "decision", "after": "FORGED"}]},
+                {"knowledgeVersion": 99999999, "decision": "FORGED"},
+                {"evidenceTakeover": False, "evidenceProjectionRevision": 99999},
+                {"constructor": {"polluted": True}}
+            ]:
+                tampered = deepcopy(backup)
+                tampered["topic"].update(poison)
+                rejected = page.evaluate("p => chrome.runtime.sendMessage(p)", {
+                    "type": "EV_RESTORE_PREVIEW", "backup": tampered, "replace": True
+                })
+                assert rejected and not rejected["ok"], (poison, rejected)
+                assert "备份课题" in rejected["error"], rejected
+            topic_after = next(p for p in send({"type": "SNAPSHOT"})["state"]["projects"]
+                if p["id"] == project_id)
+            evidence_after = send({"type": "EV_LIST", "projectId": project_id})
+            assert topic_after == topic_before
+            assert evidence_after["project"] == evidence_before["project"]
+            assert authority_snapshot() == authority_before
+            for reserved in ["toString", "valueOf", "hasOwnProperty"]:
+                rejected = page.evaluate("p => chrome.runtime.sendMessage(p)", {
+                    "type": "EV_DELETE_PREVIEW", "projectId": reserved
+                })
+                assert rejected and not rejected["ok"] and "课题 ID" in rejected["error"]
+
             deletion = send({"type": "EV_DELETE_PREVIEW", "projectId": project_id})
             send({"type": "EV_DELETE_COMMIT", "preview": deletion["preview"],
                 "operationId": op("delete")})
@@ -96,7 +144,27 @@ def run():
                 "handoffId": handoff["id"], "text": edited})
             assert checked["materialHash"] == result["materialHash"]
             context.close()
-    print("PASS: isolated S1 adoption, /3 handoff, delete and complete restore")
+
+            resumed = playwright.chromium.launch_persistent_context(
+                profile,executable_path=os.environ.get("THREADLINE_CHROMIUM_PATH") or None,
+                channel="chromium",headless=True,args=["--no-sandbox","--disable-dev-shm-usage",
+                    f"--disable-extensions-except={EXT}",f"--load-extension={EXT}"])
+            resumed_worker=resumed.service_workers[0] if resumed.service_workers else                 resumed.wait_for_event("serviceworker",timeout=15000)
+            resumed_page=resumed.new_page()
+            resumed_page.goto(f"chrome-extension://{resumed_worker.url.split('/')[2]}/panel.html",
+                wait_until="domcontentloaded")
+            def restored_send(payload):
+                response=resumed_page.evaluate("p => chrome.runtime.sendMessage(p)",payload)
+                assert response and response.get("ok"),response
+                return response["data"]
+            persisted=restored_send({"type":"EV_LIST","projectId":project_id})
+            assert len(persisted["rows"])==1
+            assert persisted["project"]["handoffs"][0]["events"][0]["text"]==edited
+            topic=next(p for p in restored_send({"type":"SNAPSHOT"})["state"]["projects"]
+                if p["id"]==project_id)
+            assert topic["decision"]!="FORGED" and topic.get("evidenceTakeover") is True
+            resumed.close()
+    print("PASS: S1 restore metadata guard, authority unchanged, full MV3 restart")
 
 if __name__ == "__main__":
     run()
