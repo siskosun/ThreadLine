@@ -2,6 +2,16 @@
 (() => {
   "use strict";
   const element=(tag,attrs={},text="")=>{const n=document.createElement(tag);Object.assign(n,attrs);n.textContent=text;return n;};
+  function restoreFocus(opener) {
+    if(opener?.isConnected){opener.focus();return;}
+    const action=opener?.dataset?.action,key=opener?.dataset?.key;
+    if(action&&key){
+      const replacement=Array.from(document.querySelectorAll("[data-action]"))
+        .find(node=>node.dataset.action===action&&node.dataset.key===key);
+      if(replacement){replacement.focus();return;}
+    }
+    document.querySelector('[data-workspace][aria-selected="true"]')?.focus();
+  }
   function form({title,description="",fields,submitLabel="保存",onSubmit}) {
     return new Promise(resolve=>{
       const opener=document.activeElement,dialog=element("dialog",{className:"tl-dialog"}),body=element("form",{noValidate:true}),content=element("div",{className:"tl-dialog-body",tabIndex:0,role:"region",ariaLabel:title+"内容"});
@@ -26,7 +36,7 @@
       const status=element("p",{className:"tl-form-status",role:"status"});status.setAttribute("aria-live","polite");
       const actions=element("div",{className:"tl-actions"}),cancel=element("button",{type:"button",className:"secondary"},"取消"),save=element("button",{type:"submit",className:"primary"},submitLabel);
       actions.append(cancel,save);body.append(status,actions);dialog.append(body);document.body.append(dialog);
-      const close=value=>{if(finished)return;finished=true;dialog.close();dialog.remove();if(opener?.isConnected)opener.focus();resolve(value);};
+      const close=value=>{if(finished)return;finished=true;dialog.close();dialog.remove();restoreFocus(opener);resolve(value);};
       cancel.onclick=()=>{if(!busy)close(null);};
       dialog.addEventListener("cancel",event=>{event.preventDefault();if(!busy)close(null);});
       body.onsubmit=async event=>{
@@ -60,7 +70,7 @@
       const close=value=>{
         if(finished)return;
         finished=true;dialog.close();dialog.remove();
-        if(opener?.isConnected)opener.focus();
+        restoreFocus(opener);
         resolve(value);
       };
       cancel.addEventListener("click",()=>close(false));
