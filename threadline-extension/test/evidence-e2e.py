@@ -350,15 +350,28 @@ def run():
             assert withdrawn_history["ok"] and withdrawn_history["data"]["status"] == "withdrawn"
             assert len(withdrawn_history["data"]["versions"]) == 4
             source_id = next(fragment["sourceId"] for fragment in withdrawn_history["data"]["versions"][0]["fragments"] if fragment["available"])
+            # Keep the authority store valid but remove live-location identity;
+            # the historical excerpt must remain readable as a fragment only.
             page.evaluate("""async sourceId => {
                 const db=await new Promise((resolve,reject)=>{const q=indexedDB.open("threadline_evidence_v1");q.onsuccess=()=>resolve(q.result);q.onerror=()=>reject(q.error);});
-                await new Promise((resolve,reject)=>{const tx=db.transaction(["sources"],"readwrite");tx.objectStore("sources").delete(sourceId);tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error);tx.onerror=()=>reject(tx.error);});
+                await new Promise((resolve,reject)=>{const tx=db.transaction(["sources"],"readwrite"),store=tx.objectStore("sources"),get=store.get(sourceId);
+                    get.onsuccess=()=>{const source=get.result;source.conversationId=null;source.messageId=null;store.put(source);};
+                    get.onerror=()=>reject(get.error);tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error);tx.onerror=()=>reject(tx.error);});
                 db.close();
             }""", source_id)
             damaged_history = send(panel, {"type":"EV_HISTORY","projectId":project_id,
                 "conclusionId":adopted2["data"]["conclusionId"]})
             assert damaged_history["ok"], damaged_history
-            assert any(not fragment["available"] for version in damaged_history["data"]["versions"] for fragment in version["fragments"])
+            assert any(fragment["available"] and not fragment["conversationId"] and fragment["selection"] == "封口用片段"
+                for version in damaged_history["data"]["versions"] for fragment in version["fragments"])
+            panel.click("#evidence-refresh")
+            panel.locator("#evidence-list button", has_text="查看版本历史（4）").click()
+            panel.wait_for_function("() => document.querySelectorAll('#evidence-list .evidence-history-version').length === 4")
+            first_history_version = panel.locator("#evidence-list .evidence-history-version").first
+            first_history_version.locator(":scope > summary").click()
+            first_history_version.locator(".evidence-history-source > summary").first.click()
+            assert "仅片段（无会话 ID）" in first_history_version.inner_text()
+            assert "封口用片段" in first_history_version.inner_text()
             before_delete = raw_evidence(page)
             refused_delete = send(panel, {"type": "MUTATE", "action": {"type": "deleteProject", "projectId": project_id}})
             assert not refused_delete["ok"] and "证据库接管" in refused_delete["error"]
