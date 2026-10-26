@@ -19,6 +19,10 @@
       <button id="nav-research" data-workspace="research" role="tab" aria-selected="false" aria-controls="workspace-research"><span class="nav-icon" aria-hidden="true">◎</span> 研究整理</button>
       <button id="nav-evidence" data-workspace="evidence" role="tab" aria-selected="false" aria-controls="workspace-evidence"><span class="nav-icon" aria-hidden="true">◇</span> 证据与交接</button>
     </nav>
+    <section id="critical-notice" role="alert" aria-live="assertive" aria-atomic="true" hidden>
+      <p id="critical-notice-text"></p>
+      <button id="critical-notice-dismiss" type="button" class="secondary">关闭提示</button>
+    </section>
     <section id="workspace-switch" class="workspace-pane" role="tabpanel" aria-labelledby="nav-switch">
     <section class="surface current" id="current-section">
       <div class="eyebrow"><span class="small-dot"></span> 当前浏览器标签页</div>
@@ -177,10 +181,6 @@
   </details>
     </section>
     <footer><span class="small-dot"></span> 采集缓存 3 天后清理；已采纳的证据、版本与复核记录独立保存，不随缓存清理，请定期备份。仅你明确开启模型分析时，采集文本才会发送至选定模型服务。</footer>
-    <section id="critical-notice" role="alert" aria-live="assertive" aria-atomic="true" hidden>
-      <p id="critical-notice-text"></p>
-      <button id="critical-notice-dismiss" type="button" class="secondary">关闭提示</button>
-    </section>
     <div id="toast" role="status" aria-live="polite"></div>
 </main>
   <script src="core.js"></script>
