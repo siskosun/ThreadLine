@@ -42,6 +42,12 @@ test('release guard rejects same-version source changes and passes a new version
     let result=check(dir);
     assert.notEqual(result.status,0,'a green verify cannot silently republish stale 0.8.1');
     assert.match(result.stderr,/without increasing manifest.version/);
+    const advisory=check(dir,'--advisory');
+    assert.equal(advisory.status,0,advisory.stderr);
+    assert.match(advisory.stderr,/::warning::Release drift:.*without increasing manifest.version/);
+    result=check(dir,'--publish');
+    assert.notEqual(result.status,0,'owner-publish cannot use the advisory escape hatch');
+    assert.match(result.stderr,/::error::Release guard:.*without increasing manifest.version/);
     fs.writeFileSync(path.join(dir,'threadline-extension/manifest.json'),
       JSON.stringify({version:'0.8.2'}));
     commit(dir,'bump version with source');
@@ -61,6 +67,11 @@ test('docs-only push stays green but publish requires a changed version',()=>{
     result=check(dir,'--publish');
     assert.notEqual(result.status,0);
     assert.match(result.stderr,/No extension changes to publish/);
+    result=check(dir,'--advisory');
+    assert.equal(result.status,0,result.stderr);
+    assert.match(result.stdout,/Release audit clean/);
+    result=check(dir,'--bogus');
+    assert.notEqual(result.status,0,'unknown flags must not silently bypass release validation');
     fs.writeFileSync(path.join(dir,'threadline-extension/manifest.json'),
       JSON.stringify({version:'0.7.9'}));
     commit(dir,'downgrade manifest');
