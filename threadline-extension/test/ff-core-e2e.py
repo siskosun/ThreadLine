@@ -74,11 +74,42 @@ def run():
             assert len(ctx.pages) == before, "Fork P1 must not open ChatGPT tabs"
             assert chat.evaluate("window.submitCount") == 0, "Fork P1 must never send"
             first = message({"type":"FF_LIST"})["data"][0]["id"]
+            first_button = page.locator(f'#ff-list button[data-experiment-id="{first}"]')
+            assert first_button.inner_text().startswith("回答问题 · ")
+            assert "K=2 · A… B…" in first_button.inner_text()
             record = message({"type":"FF_READ","id":first})
             assert record["ok"], record
             assert record["data"]["frozen"]["w0"] == evil
             assert len(record["data"]["frozen"]["textHashes"]["frozen"]) == 64
             assert record["data"]["branches"]["A"]["isolation"]["checks"]["model"] == "unknown"
+
+            # Duplicate task instructions fall back to stable IDs, while a long
+            # Chinese title is shortened only in the list; full frozen P stays intact.
+            duplicate = message({"type":"FF_CREATE","operationId":"op_duplicate001",
+                "w0":evil,"p":"回答问题","branchCount":3})
+            long_prompt = "很长的中文任务指令" * 10
+            long_record = message({"type":"FF_CREATE","operationId":"op_longtitle001",
+                "w0":evil,"p":long_prompt,"branchCount":4})
+            control_record = message({"type":"FF_CREATE","operationId":"op_controltitle01",
+                "w0":evil,"p":"危险\u0001任务","branchCount":2})
+            assert duplicate["ok"] and long_record["ok"] and control_record["ok"]
+            page.click("#ff-refresh")
+            page.wait_for_function("() => document.querySelectorAll('#ff-list button[data-experiment-id]').length === 4")
+            for experiment_id in [first,duplicate["data"]["id"]]:
+                button = page.locator(f'#ff-list button[data-experiment-id="{experiment_id}"]')
+                assert button.inner_text().startswith(experiment_id + " · ")
+            long_button = page.locator(f'#ff-list button[data-experiment-id="{long_record["data"]["id"]}"]')
+            short_title = page.evaluate("p => ThreadLineFFCore.shortTaskTitle(p)", long_prompt)
+            assert long_button.inner_text().startswith(short_title + " · ")
+            control_button = page.locator(f'#ff-list button[data-experiment-id="{control_record["data"]["id"]}"]')
+            assert control_button.inner_text().startswith(control_record["data"]["id"] + " · ")
+            long_button.click()
+            expect(page.locator("#ff-text")).to_contain_text(long_prompt)
+            page.evaluate("""() => {window.__copied=[]; Object.defineProperty(navigator,'clipboard',
+                {value:{writeText:async text=>window.__copied.push(text)},configurable:true});}""")
+            page.click("#ff-copy-id")
+            expect(page.locator("#ff-notice")).to_contain_text("已复制完整实验 ID")
+            assert page.evaluate("window.__copied") == [long_record["data"]["id"]]
 
             start = {"type":"FF_RECORD","experimentId":first,"branch":"A",
                      "expectedRevision":0,"operationId":"op_repeat001",
