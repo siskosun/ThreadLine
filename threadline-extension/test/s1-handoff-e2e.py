@@ -37,6 +37,26 @@ def run():
             def op(n):
                 return "op_s1handoff_" + n
 
+            def authority_snapshot():
+                # Compare all six authoritative stores, not just the
+                # currently projected conclusion, after rejected imports.
+                return page.evaluate("""async () => {
+                    const db=await new Promise((resolve,reject)=>{
+                        const r=indexedDB.open('threadline_evidence_v1');
+                        r.onsuccess=()=>resolve(r.result);
+                        r.onerror=()=>reject(r.error);
+                    });
+                    try {
+                        const names=[...db.objectStoreNames].sort();
+                        const tx=db.transaction(names,'readonly');
+                        return await Promise.all(names.map(name=>new Promise((resolve,reject)=>{
+                            const req=tx.objectStore(name).getAll();
+                            req.onsuccess=()=>resolve([name,req.result]);
+                            req.onerror=()=>reject(req.error);
+                        })));
+                    } finally {db.close();}
+                }""")
+
             created = send({"type": "MUTATE", "action": {
                 "type": "createProject", "name": "S1 恢复测试"
             }})
@@ -85,6 +105,7 @@ def run():
             # archive only supports id/name/goal/stage, not arbitrary metadata.
             topic_before = send({"type": "SNAPSHOT"})["state"]["projects"][0]
             evidence_before = send({"type": "EV_LIST", "projectId": project_id})
+            authority_before = authority_snapshot()
             for poison in [
                 {"history": [{"version": 999999, "field": "decision", "after": "FORGED"}]},
                 {"knowledgeVersion": 99999999, "decision": "FORGED"},
@@ -104,6 +125,8 @@ def run():
             assert topic_after == topic_before, "rejected metadata must not rewrite topic state"
             assert evidence_after["project"] == evidence_before["project"], (
                 "rejected backup must not rewrite authority state")
+            assert authority_snapshot() == authority_before, (
+                "rejected backup must not change any authoritative IDB store")
             for reserved in ["toString", "valueOf", "hasOwnProperty"]:
                 rejected = page.evaluate("p => chrome.runtime.sendMessage(p)", {
                     "type": "EV_DELETE_PREVIEW", "projectId": reserved
