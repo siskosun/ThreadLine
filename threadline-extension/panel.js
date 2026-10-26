@@ -537,8 +537,10 @@
           const result=await ThreadLineDialogs.form({title:"修订结论",description:"保存后生成新版本，原有正文和依据保留。",submitLabel:"保存新版本",fields:[
             {name:"text",label:"结论正文",type:"textarea",value:row.current.text,required:true,maxPoints:4000},
             {name:"conditions",label:"适用条件",type:"textarea",rows:2,value:row.current.conditions||""},
-            {name:"changeImpact",label:"变更类型",type:"select",value:"substantive",options:[{value:"substantive",label:"实质修改"},{value:"wording",label:"仅调整措辞"},{value:"conditions",label:"适用条件变化"}]}
+            {name:"changeImpact",label:"变更类型",type:"select",value:"substantive",options:[{value:"substantive",label:"实质修改"},{value:"wording",label:"仅调整措辞"},{value:"conditions",label:"适用条件变化"}]},
+            {name:"carryForward",label:"仅措辞修改时确认原输入依赖仍成立（不自动承认下游结论）",type:"checkbox",value:false}
                   ],onSubmit:async values=>{
+            if(values.carryForward&&values.changeImpact!=="wording")throw Error("承接确认仅适用于已核对的措辞修改");
             const nextSignature=JSON.stringify(values);if(signature!==nextSignature){signature=nextSignature;operationId="op_amend_"+crypto.randomUUID().replace(/-/g,"");}
             return evSend({type:"EV_AMEND",conclusionId:c.id,...values,expectedVersionId:row.current.id,operationId});
           }});

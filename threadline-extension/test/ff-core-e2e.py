@@ -606,18 +606,26 @@ def run():
             p4id = p4create["data"]["id"]
             p4row = reopened.evaluate("(id) => chrome.runtime.sendMessage({type:'FF_READ',id})", p4id)
             assert len(p4row["data"]["branches"]) == 4
-            tabs_before_p4 = sw_read("async () => (await chrome.tabs.query({url:'https://chatgpt.com/*'})).length")
+            # Count exact tab IDs, not an asynchronous URL-filtered total.
+            # New Chrome tabs may still report about:blank/pendingUrl while
+            # navigating to ChatGPT, and unrelated tabs may finish routing.
+            before_ids = set(sw_read("async () => (await chrome.tabs.query({})).map(t=>t.id)"))
             launched4 = reopened.evaluate("""id => chrome.runtime.sendMessage(
               {type:'FF_LAUNCH',experimentId:id,operationId:'op_p4e2e0002'})""", p4id)
             assert launched4["ok"] and len(launched4["data"]["tabIds"]) == 4, launched4
+            p4_tab_ids = list(launched4["data"]["tabIds"].values())
+            assert len(set(p4_tab_ids)) == 4, "each K=4 branch needs its own tab ID"
             deadline = time.time() + 40
-            tabs_now = 0
+            tabs_after = set()
             while time.time() < deadline:
-                tabs_now = sw_read("async () => (await chrome.tabs.query({url:'https://chatgpt.com/*'})).length")
-                if tabs_now == tabs_before_p4 + 4:
+                tabs_after = set(sw_read("async () => (await chrome.tabs.query({})).map(t=>t.id)"))
+                if set(p4_tab_ids).issubset(tabs_after):
                     break
                 time.sleep(0.5)
-            assert tabs_now == tabs_before_p4 + 4, "K=4 launch opens four tabs"
+            assert set(p4_tab_ids).issubset(tabs_after), (
+                "K=4 launch did not preserve its returned tab IDs", p4_tab_ids, sorted(tabs_after))
+            assert tabs_after - before_ids == set(p4_tab_ids), (
+                "K=4 created unexpected extra tabs", sorted(tabs_after - before_ids), p4_tab_ids)
             deadline = time.time() + 40
             p4row = None
             while time.time() < deadline:
