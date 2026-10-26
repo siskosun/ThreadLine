@@ -156,6 +156,12 @@
         <button class="secondary" id="evidence-refresh" type="button">刷新</button>
       </div>
       <p id="evidence-summary" class="subtle" role="status" aria-live="polite"></p>
+      <section id="evidence-empty" class="evidence-empty" aria-labelledby="evidence-empty-title" hidden>
+        <h3 id="evidence-empty-title"></h3>
+        <p id="evidence-empty-help"></p>
+        <button id="evidence-go-create" class="secondary" type="button" hidden>创建课题</button>
+        <button id="evidence-go-research" class="secondary" type="button" hidden>前往研究整理</button>
+      </section>
       <div id="evidence-list"></div>
       <div class="line">
         <button class="secondary" id="evidence-handoff" type="button">生成交接预览</button>
