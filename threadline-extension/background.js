@@ -405,19 +405,32 @@ async function organizeWeb(payload){
 }
 // Called during normal UI activity too: MV3 service workers can restart without onStartup.
 async function recoverCaptures(closedTabId=null) {
-  const all=await chrome.storage.session.get(null);
-  for (const [key,value] of Object.entries(all)) {
-    if (!key.startsWith(CAPTURE_PREFIX)) continue;
-    const id=key.slice(CAPTURE_PREFIX.length);
-    const run=await ThreadLineCaptureDB.getRun(id);
-    if (!run || run.status !== 'capturing') { await chrome.storage.session.remove(key); continue; }
-    const tab = await chrome.tabs.get(value.tabId).catch(()=>null);
-    if (closedTabId===value.tabId || !tab || Date.now() - (run.updatedAt||run.createdAt) > 15*60*1000) {
-      await ThreadLineCaptureDB.modifyRun(id,{status:'error',error:!tab?'来源对话标签页已关闭':'采集中断或超时，请重新采集'});
+  // Coordinate recovery with CAPTURE_END, CAPTURE_FAIL and manual cancellation:
+  // a stale read must never turn a completed or cancelled run into an error.
+  return serialize(async()=>{
+    const all=await chrome.storage.session.get(null);
+    for (const [key,value] of Object.entries(all)) {
+      if (!key.startsWith(CAPTURE_PREFIX)) continue;
+      const id=key.slice(CAPTURE_PREFIX.length);
+      const run=await ThreadLineCaptureDB.getRun(id);
+      if (!run || run.status !== "capturing") {
+        await chrome.storage.session.remove(key);
+        continue;
+      }
+      // Elapsed time is only a "stalled" signal, never evidence that a
+      // network request failed. Keep the lease and partial source intact while
+      // the original tab exists; the user must cancel it deliberately.
+      const tab=closedTabId===value.tabId ? null :
+        await chrome.tabs.get(value.tabId).catch(()=>null);
+      if (tab) continue;
+      await ThreadLineCaptureDB.modifyRun(id,{
+        status:"error",complete:false,phase:"source-closed",
+        error:"来源标签页已关闭，采集未能确认完成；已读取片段仍保留"
+      });
       await chrome.storage.session.remove(key);
       captureOwners.delete(id);
     }
-  }
+  });
 }
 const PAGE_HEALTH_KEY = 'tl_health_successes';
 async function markSuccess(kind) {
