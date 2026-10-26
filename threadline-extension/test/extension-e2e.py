@@ -125,6 +125,7 @@ def run():
       panel.locator('dialog.tl-dialog #tl-field-label').fill('A · 人工核验')
       panel.locator('dialog.tl-dialog button[type=submit]').click()
       panel.wait_for_function("() => !document.querySelector('dialog.tl-dialog')")
+      assert panel.evaluate("document.activeElement?.dataset?.action")=='label-chat'
       current=panel.evaluate("async () => (await chrome.runtime.sendMessage({type:'SNAPSHOT'})).data.state")
       assert current['chats']['chat:demo-alpha']['label']=='A · 人工核验',current
       panel.locator('[data-action="note-chat"][data-key="chat:demo-alpha"]').click()
@@ -160,6 +161,7 @@ def run():
       current=panel.evaluate("async () => (await chrome.runtime.sendMessage({type:'SNAPSHOT'})).data.state")
       assert current['chats']['chat:demo-alpha']['note']=='等待模型复核',current
       panel.locator('dialog.tl-dialog button',has_text='取消').click()
+      assert panel.evaluate("document.activeElement?.dataset?.action")=='note-chat'
       panel.evaluate('window.__restoreSendMessage()')
       panel.locator('#critical-notice-dismiss').click()
       assert panel.locator('#critical-notice').is_hidden()
