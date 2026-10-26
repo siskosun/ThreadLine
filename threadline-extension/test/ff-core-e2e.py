@@ -223,7 +223,7 @@ def run():
             reopened.goto(f"chrome-extension://{eid2}/ff.html")
             expect(reopened.locator("#ff-enable")).to_be_checked()
             rows = reopened.evaluate("() => chrome.runtime.sendMessage({type:'FF_LIST'})")
-            assert rows["ok"] and len(rows["data"]) == 2, rows
+            assert rows["ok"] and len(rows["data"]) == 5, rows
             after = reopened.evaluate("(id) => chrome.runtime.sendMessage({type:'FF_READ',id})", first)
             assert after["ok"] and after["data"]["revision"] == 3, after
             assert after["data"]["branches"]["A"]["attempts"][0]["status"] == "unknown"
@@ -262,7 +262,7 @@ def run():
             assert lost_op and len(lost_op) >= 6
             saved_once = reopened.evaluate(
                 "() => chrome.runtime.sendMessage({type:'FF_LIST'})")
-            assert saved_once["ok"] and len(saved_once["data"]) == 3, saved_once
+            assert saved_once["ok"] and len(saved_once["data"]) == 6, saved_once
             prior_ids = sorted(x["id"] for x in saved_once["data"])
             assert "ff_" + lost_op in prior_ids
             stored_lease = reopened.evaluate(
@@ -284,7 +284,7 @@ def run():
                 "已冻结并保存", timeout=10000)
             after_retry = reopened.evaluate(
                 "() => chrome.runtime.sendMessage({type:'FF_LIST'})")
-            assert after_retry["ok"] and len(after_retry["data"]) == 3, (
+            assert after_retry["ok"] and len(after_retry["data"]) == 6, (
                 "same manual retry after lost ACK created a duplicate",
                 after_retry)
             assert sorted(x["id"] for x in after_retry["data"]) == prior_ids
@@ -294,7 +294,7 @@ def run():
 
             # A real successful CREATE receipt followed by a display error is
             # still the same intent, including after reloading this tab.
-            expected_rows = 3
+            expected_rows = 6
             for failed_type in ["FF_LIST", "FF_READ"]:
                 for reload_before_retry in [False, True]:
                     reopened.reload(wait_until="domcontentloaded")
@@ -341,7 +341,7 @@ def run():
                         "display recovery created another experiment", failed_type, reload_before_retry)
                     assert reopened.evaluate("sessionStorage.getItem('tl_ff_create_intent_v1')") is None
 
-            assert expected_rows == 7
+            assert expected_rows == 10
 
             # An unreadable lease is an UNKNOWN create result, never a reason
             # to allocate another random ID and silently duplicate the record.
