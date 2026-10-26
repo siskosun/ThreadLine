@@ -248,9 +248,11 @@ def run():
                 arg=adopted_success["data"]["conclusionId"])
             assert panel.evaluate("id => document.activeElement?.closest('.evidence-item')?.dataset?.conclusionId===id",
                 adopted_success["data"]["conclusionId"])
-            success_history = send(panel, {"type":"EV_HISTORY","projectId":success_project_id,
-                "conclusionId":adopted_success["data"]["conclusionId"]})
-            assert success_history["ok"] and success_history["data"]["status"] == "withdrawn"
+            success_listing = send(panel, {"type":"EV_LIST","projectId":success_project_id})
+            assert success_listing["ok"], success_listing
+            success_row = next(row for row in success_listing["data"]["rows"]
+                if row["conclusion"]["id"] == adopted_success["data"]["conclusionId"])
+            assert success_row["conclusion"]["status"] == "withdrawn"
             panel.select_option("#evidence-project",project_id)
             panel.wait_for_function("id => document.querySelector('#evidence-project').value===id",arg=project_id)
             panel.wait_for_function("id => [...document.querySelectorAll('#evidence-list .evidence-item')].some(n=>n.dataset.conclusionId===id)",
