@@ -61,12 +61,12 @@
       <div id="ff-progress" class="caption" hidden></div>
       <a id="ff-preview-link" href="ff.html" target="_blank" rel="noopener noreferrer">打开 Fork 实验页面</a>
     </section>
-    <section class="backup-section" aria-label="备份与恢复">
-      <h3>课题备份与恢复</h3>
-      <p class="caption">导出本地课题、分支和结论历史（不包含临时采集全文）。导出文件可能含研究资料，请妥善保管。</p>
-      <div class="backup-actions"><button type="button" id="backup-export">导出 JSON 备份</button><button type="button" id="backup-rollback">恢复最近快照</button></div>
-      <label for="backup-file">从 JSON 恢复课题状态</label><input id="backup-file" type="file" accept=".json,application/json"/>
-      <button type="button" id="backup-import" class="soft">检查并导入（覆盖当前课题）</button>
+    <section class="backup-section" aria-label="课题与对话关联备份">
+      <h3>课题与对话关联备份</h3>
+      <p class="caption">导出课题、对话关联及旧版课题状态历史；不包含已采纳结论与证据、Fork 实验或临时采集全文。导出文件可能含研究资料，请妥善保管。</p>
+      <div class="backup-actions"><button type="button" id="backup-export">导出课题与对话关联</button><button type="button" id="backup-rollback">恢复最近快照</button></div>
+      <label for="backup-file">从 JSON 替换课题与对话关联</label><input id="backup-file" type="file" accept=".json,application/json"/>
+      <button type="button" id="backup-import" class="soft">检查并替换本地课题与关联</button>
       <p id="backup-status" role="status" class="caption"></p>
     </section>
     <section class="health-section" aria-label="网页适配自检">
