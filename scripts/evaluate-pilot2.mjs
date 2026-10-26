@@ -270,19 +270,49 @@ export function evaluateData(protocol,observations,protocolSha256){
  const recall=ratio(TP,totalGold),precision=ratio(TP,total),dependencyCoverage=ratio(edgesTP,edgeGold);
  const gain=median(cases.map(c=>c.gainBvsA).filter(x=>x!==null));
  const nonSlower=cases.filter(c=>c.gainBvsA!==null&&c.gainBvsA>=0).length;
+ const tiers={ruleId:TIER_RULE_ID,ruleSha256:TIER_RULE_SHA,
+  flatCount:flatBurden,mustReviewCount:mustBurden,beforeUseCount:beforeBurden,
+  deferredCount:deferredBurden,burdenReduction:ratio(flatBurden-mustBurden,flatBurden),
+  substantiveGoldCount:goldSubstantive,mustReviewSubstantiveCount:mustSubstantive,
+  substantiveRecall:ratio(mustSubstantive,goldSubstantive),
+  criticalMisses:tierCriticalMisses,leakedBeforeUse,leakedDeferred,
+  eligibleForPilot:tierCriticalMisses===0&&ratio(mustSubstantive,goldSubstantive)!==null&&
+    ratio(mustSubstantive,goldSubstantive)>=0.9};
+ const reviewNoise=Object.fromEntries(ARM.map(arm=>{
+  const rows=cases.map(c=>c.arms[arm]);
+  const sum=key=>rows.reduce((total,row)=>total+row[key],0);
+  const ms=sum("reviewMs"),msWith=sum("reviewWithLearningMs");
+  const correct=sum("substantiveHandoffCorrectCount"),material=sum("substantiveGoldCount");
+  return [arm,{reviewMs:ms,reviewWithLearningMs:msWith,
+   noiseMs:sum("noiseMs"),noiseWithLearningMs:sum("noiseWithLearningMs"),
+   unallocatedLearningMs:sum("unallocatedLearningMs"),
+   noiseShare:ratio(sum("noiseMs"),ms),
+   noiseShareWithLearning:ratio(sum("noiseWithLearningMs"),msWith),
+   substantiveHandoffCorrectRate:ratio(correct,material),
+   substantiveHandoffCorrectCount:correct,substantiveGoldCount:material}];
+ }));
+ const noiseShareReference=reviewNoise.A.noiseShareWithLearning!==null&&
+  reviewNoise.B.noiseShareWithLearning!==null?
+  reviewNoise.B.noiseShareWithLearning<=reviewNoise.A.noiseShareWithLearning:null;
  const thresholds={
   dependencyCoverage:dependencyCoverage!==null&&dependencyCoverage>=0.9,
   impactRecall:recall!==null&&recall>=0.9,
   impactPrecision:precision!==null&&precision>=0.8,
   zeroCriticalMisses:criticalMisses===0,
   gainAtLeast15Percent:gain!==null&&gain>=0.15,
-  nonSlowerAtLeastFourCases:nonSlower>=4
+  nonSlowerAtLeastFourCases:nonSlower>=4,
+  tierNoCriticalMisses:tiers.criticalMisses===0,
+  tierMustRecallAtLeast90Percent:tiers.substantiveRecall!==null&&tiers.substantiveRecall>=0.9,
+  nonSubstantiveReviewShareNotHigherThanA:noiseShareReference===true
  };
  // These are PRE-REGISTERED investment screening thresholds, not confidence proof.
  return {format:"threadline-pilot2-feasibility-screen/1",design,screeningOnly:true,
   caveat:"Pilot/2 has clustered events and small independent case count. Passing screening does not establish population performance or causality.",
   protocolSha256,affected:{tp:TP,fp:FP,fn:FN,recall,precision,criticalMisses},
   necessaryEdges:{tp:edgesTP,fp:edgesFP,fn:edgesFN,coverage:dependencyCoverage},
+  tiered:tiers,reviewNoise,noiseShareReference,
+  ruleCaveat:"Unknown source or handoff provenance remains MUST. Deferred actions are not confirmations. Learning time not attributable to a review segment is reported separately and cannot be silently assigned to noise.",
+  tierLeakageRequiresFlatFallback:!tiers.eligibleForPilot,
   caseSummary:{medianBvsAGain:gain,
     medianBvsAGainExcludingLearning:median(cases.map(c=>c.gainBvsAExcludingLearning).filter(x=>x!==null)),
     nonSlowerCases:nonSlower,totalCases:cases.length,
