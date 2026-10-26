@@ -11,7 +11,7 @@ const CaptureCore = require('../capture-core.js');
 // Background-level tests for the P2 dual-branch engine. The 0-send invariant is
 // asserted at the code level: every tab message and every tab creation is
 // recorded and inspected.
-function system() {
+function system({captureInjectionFails=false}={}) {
   const records = new Map(), runs = new Map(), pageStore = new Map();
   const session = new Map(), local = new Map(), events = {}, sent = [], newTabs = [], updates = [];
   let nextTab = 100;
@@ -60,7 +60,7 @@ function system() {
         return {ok:true};
       }
     },
-    scripting:{async executeScript(){}},
+    scripting:{async executeScript(){if(captureInjectionFails)throw Error('SIMULATED_INJECTION_FAILURE')}},
     sidePanel:{setPanelBehavior:async()=>{}},
     storage:{
       local:{async get(k){return {[k]:local.get(k)};},async set(v){for(const [k,x] of Object.entries(v))local.set(k,x);}},
@@ -186,9 +186,10 @@ test('completed capture with two attested signals marks the branch done',async()
   await s.message({type:'HANDOFF_ACK'},s.tabSender(r.tabIds.A,'https://chatgpt.com/'));
   const conv='https://chatgpt.com/c/conv-12345678';
   await s.message({type:'OBSERVE',href:conv,title:'会话',streaming:false},s.tabSender(r.tabIds.A,conv));
-  const runId='cap_test_000001';
-  s.runs.set(runId,{id:runId,tabId:r.tabIds.A,conversationId:'conv-12345678',
-    url:conv,status:'capturing',createdAt:Date.now(),complete:false});
+  s.tabsById.get(r.tabIds.A).url=conv;
+  const started=await s.message({type:'FF_CAPTURE',experimentId:created.id,branch:'A'},s.ffSender);
+  assert.equal(started.started,true);
+  const runId=started.runId;
   s.pageStore.set(`${runId}_0_0`,{id:runId,pageIndex:0,chunkIndex:0,messages:[
     {id:'m1',role:'user',content:frozen,finished:true},
     {id:'m2',role:'assistant',content:'好的，OK。',finished:true}
@@ -215,9 +216,10 @@ test('incomplete capture keeps the branch pending instead of claiming done',asyn
   await s.message({type:'HANDOFF_ACK'},s.tabSender(r.tabIds.A,'https://chatgpt.com/'));
   const conv='https://chatgpt.com/c/conv-12345678';
   await s.message({type:'OBSERVE',href:conv,title:'会话',streaming:false},s.tabSender(r.tabIds.A,conv));
-  const runId='cap_test_000002';
-  s.runs.set(runId,{id:runId,tabId:r.tabIds.A,conversationId:'conv-12345678',
-    url:conv,status:'capturing',createdAt:Date.now(),complete:false});
+  s.tabsById.get(r.tabIds.A).url=conv;
+  const started=await s.message({type:'FF_CAPTURE',experimentId:created.id,branch:'A'},s.ffSender);
+  assert.equal(started.started,true);
+  const runId=started.runId;
   s.pageStore.set(`${runId}_0_0`,{id:runId,pageIndex:0,chunkIndex:0,messages:[
     {id:'m1',role:'user',content:'只有半截'}
   ]});
@@ -280,9 +282,10 @@ test("FF comparison, verdict and export: gated, blind, deterministic, self-conta
     const conv='https://chatgpt.com/c/conv-p3-'+branch.toLowerCase();
     await s.message({type:'OBSERVE',href:conv,title:'会话',streaming:false},
       s.tabSender(tabId,conv));
-    const runId='cap_p3_'+branch;
-    s.runs.set(runId,{id:runId,tabId,conversationId:'conv-p3-'+branch.toLowerCase(),
-      url:conv,status:'capturing',createdAt:Date.now(),complete:false});
+    s.tabsById.get(tabId).url=conv;
+    const started=await s.message({type:'FF_CAPTURE',experimentId:created.id,branch},s.ffSender);
+    assert.equal(started.started,true);
+    const runId=started.runId;
     s.pageStore.set(`${runId}_0_0`,{id:runId,pageIndex:0,chunkIndex:0,messages:[
       {id:'m1',role:'user',content:frozen,finished:true},
       {id:'m2',role:'assistant',content:'回复 '+branch,finished:true}]});
@@ -384,9 +387,10 @@ test("FF P4 comparison records budget parity for K=4",async()=>{
     const conv='https://chatgpt.com/c/conv-p4b-'+branch.toLowerCase();
     await s.message({type:'OBSERVE',href:conv,title:'会话',streaming:false},
       s.tabSender(tabId,conv));
-    const runId='cap_p4b_'+branch;
-    s.runs.set(runId,{id:runId,tabId,conversationId:'conv-p4b-'+branch.toLowerCase(),
-      url:conv,status:'capturing',createdAt:Date.now(),complete:false});
+    s.tabsById.get(tabId).url=conv;
+    const started=await s.message({type:'FF_CAPTURE',experimentId:created.id,branch},s.ffSender);
+    assert.equal(started.started,true);
+    const runId=started.runId;
     s.pageStore.set(`${runId}_0_0`,{id:runId,pageIndex:0,chunkIndex:0,messages:[
       {id:'m1',role:'user',content:frozen,finished:true},
       {id:'m2',role:'assistant',content:'回复 '+branch,finished:true}]});
@@ -459,4 +463,212 @@ test('K=4: FF_CAPTURE and FF_REPREFILL address every branch of the experiment',a
     branch:'E'},s.ffSender),/invalid branch/);
   await assert.rejects(s.message({type:'FF_REPREFILL',experimentId:created.id,
     branch:'E',operationId:'k4re_000000002'},s.ffSender),/invalid branch/);
+});
+
+test('F3 startup injection failure is visible and cannot masquerade as capturing',async()=>{
+  const s=system({captureInjectionFails:true});
+  const created=await s.setupExperiment('create_op_failinject_0001');
+  const launched=await s.message({type:'FF_LAUNCH',experimentId:created.id,
+    operationId:'launch_op_failinject_0001'},s.ffSender);
+  const tabId=launched.tabIds.A;
+  await s.message({type:'HANDOFF_BEGIN'},s.tabSender(tabId,'https://chatgpt.com/'));
+  await s.message({type:'HANDOFF_ACK'},s.tabSender(tabId,'https://chatgpt.com/'));
+  const conv='https://chatgpt.com/c/synthetic-f3-error';
+  s.tabsById.get(tabId).url=conv;
+  await s.message({type:'OBSERVE',href:conv,title:'合成失败会话',streaming:false,
+    assistantBytes:50},s.tabSender(tabId,conv));
+  const started=await s.message({type:'FF_CAPTURE',experimentId:created.id,branch:'A'},s.ffSender);
+  assert.equal(started.started,false,'injection failure must not report capture started');
+  assert.match(started.error,/SIMULATED_INJECTION_FAILURE/);
+  assert.equal(s.runs.get(started.runId).status,'error','source run keeps failure metadata');
+  const info=await s.message({type:'FF_CAPTURE_STATUS',experimentId:created.id,
+    branch:'A',runId:started.runId},s.ffSender);
+  assert.equal(info.state,'error');
+  assert.match(info.error,/SIMULATED_INJECTION_FAILURE/);
+  assert.equal(info.branchStatus,'pending','the branch is not falsely completed');
+  await assert.rejects(s.message({type:'FF_CAPTURE_STATUS',experimentId:created.id,
+    branch:'B',runId:started.runId},s.ffSender),/does not belong|invalid|capture/i);
+  assert.ok(!s.sent.some(([,type])=>type==='TL_CAPTURE_START'),
+    'failed injection must not send a capture start to any tab');
+});
+
+test('F3 duplicate capture is rejected without replacing the first run or triggering another start',async()=>{
+  const s=system(),created=await s.setupExperiment('create_f3lease000001');
+  const opened=await s.message({type:'FF_LAUNCH',experimentId:created.id,
+    operationId:'launch_f3lease000001'},s.ffSender);
+  const tabId=opened.tabIds.A,conv='https://chatgpt.com/c/f3-lease-source';
+  await s.message({type:'HANDOFF_BEGIN'},s.tabSender(tabId,'https://chatgpt.com/'));
+  await s.message({type:'HANDOFF_ACK'},s.tabSender(tabId,'https://chatgpt.com/'));
+  s.tabsById.get(tabId).url=conv;
+  await s.message({type:'OBSERVE',href:conv,title:'合成采集会话',streaming:false,
+    assistantBytes:40},s.tabSender(tabId,conv));
+  const first=await s.message({type:'FF_CAPTURE',experimentId:created.id,branch:'A'},s.ffSender);
+  assert.equal(first.started,true);
+  const before=await s.message({type:'FF_READ',id:created.id},s.ffSender);
+  await assert.rejects(s.message({type:'FF_CAPTURE',experimentId:created.id,branch:'A'},s.ffSender),
+    /已有进行中的采集/);
+  const after=await s.message({type:'FF_READ',id:created.id},s.ffSender);
+  assert.equal(after.revision,before.revision);
+  assert.equal(after.branches.A.attempts.at(-1).evidence.captureRunId,first.runId);
+  assert.equal(s.runs.size,1,'no second authoritative run');
+  assert.equal(s.sent.filter(([,kind])=>kind==='TL_CAPTURE_START').length,1,
+    'no duplicate content-script start');
+});
+
+test('F3 same-tab foreign capture cannot complete a Fork attempt; only its linked run can',async()=>{
+  const s=system(),created=await s.setupExperiment('create_f3owned000001');
+  const opened=await s.message({type:'FF_LAUNCH',experimentId:created.id,
+    operationId:'launch_f3owned000001'},s.ffSender);
+  const tabId=opened.tabIds.A,conv='https://chatgpt.com/c/f3-owned-source';
+  await s.message({type:'HANDOFF_BEGIN'},s.tabSender(tabId,'https://chatgpt.com/'));
+  await s.message({type:'HANDOFF_ACK'},s.tabSender(tabId,'https://chatgpt.com/'));
+  s.tabsById.get(tabId).url=conv;
+  await s.message({type:'OBSERVE',href:conv,title:'合成采集归属',streaming:false,
+    assistantBytes:40},s.tabSender(tabId,conv));
+  const frozen=(await s.message({type:'FF_READ',id:created.id},s.ffSender)).frozen.text;
+  const linked=await s.message({type:'FF_CAPTURE',experimentId:created.id,branch:'A'},s.ffSender);
+  const foreign='cap_foreign_capture_01',sender=s.tabSender(tabId,conv);
+  s.runs.set(foreign,{id:foreign,tabId,conversationId:'f3-owned-source',
+    url:conv,status:'capturing',createdAt:Date.now(),updatedAt:Date.now(),complete:false});
+  s.pageStore.set(foreign+'_0_0',{id:foreign,pageIndex:0,chunkIndex:0,messages:[
+    {id:'m1',role:'user',content:frozen,finished:true},
+    {id:'m2',role:'assistant',content:'外部来源不能替代这次采集',finished:true}]});
+  const ownPages=async id=>{
+    s.pageStore.set(id+'_0_0',{id,pageIndex:0,chunkIndex:0,messages:[
+      {id:'m1',role:'user',content:frozen,finished:true},
+      {id:'m2',role:'assistant',content:'正确关联的原始回复',finished:true}]});
+  };
+  await s.message({type:'CAPTURE_END',id:foreign,complete:true,mode:'paginated',
+    pageCount:1,count:2},sender);
+  let row=await s.message({type:'FF_READ',id:created.id},s.ffSender);
+  assert.equal(row.branches.A.status,'pending','same tab does not prove run ownership');
+  assert.equal(row.branches.A.attempts.at(-1).evidence.captureRunId,linked.runId);
+  assert.equal(row.branches.A.attempts.at(-1).evidence.reply,undefined);
+  await ownPages(linked.runId);
+  await s.message({type:'CAPTURE_END',id:linked.runId,complete:true,mode:'paginated',
+    pageCount:1,count:2},sender);
+  row=await s.message({type:'FF_READ',id:created.id},s.ffSender);
+  assert.equal(row.branches.A.status,'done');
+  assert.equal(row.branches.A.attempts.at(-1).evidence.reply,'正确关联的原始回复');
+});
+
+test('F3 untracked run requires missing lease, idle window and manual abandonment before retry',async()=>{
+  const s=system(),created=await s.setupExperiment('create_f3orphan_001');
+  const opened=await s.message({type:'FF_LAUNCH',experimentId:created.id,
+    operationId:'launch_f3orphan_001'},s.ffSender);
+  const tabId=opened.tabIds.A,conv='https://chatgpt.com/c/f3-orphan-source';
+  await s.message({type:'HANDOFF_BEGIN'},s.tabSender(tabId,'https://chatgpt.com/'));
+  await s.message({type:'HANDOFF_ACK'},s.tabSender(tabId,'https://chatgpt.com/'));
+  s.tabsById.get(tabId).url=conv;
+  await s.message({type:'OBSERVE',href:conv,title:'重启孤儿采集',streaming:false,
+    assistantBytes:40},s.tabSender(tabId,conv));
+  const first=await s.message({type:'FF_CAPTURE',experimentId:created.id,branch:'A'},s.ffSender);
+  assert.equal(first.started,true);
+  const req={type:'FF_CAPTURE_ABANDON',experimentId:created.id,
+    branch:'A',runId:first.runId,ack:'manual-reviewed-no-replay'};
+  const pageKey=first.runId+'_0_0';
+  s.pageStore.set(pageKey,{id:first.runId,pageIndex:0,chunkIndex:0,
+    messages:[{id:'m1',role:'user',content:'保留的部分片段'}]});
+  const snapshot=structuredClone(s.pageStore.get(pageKey));
+  const status=()=>s.message({type:'FF_CAPTURE_STATUS',experimentId:created.id,
+    branch:'A',runId:first.runId},s.ffSender);
+  assert.equal((await status()).state,'capturing');
+  s.runs.get(first.runId).updatedAt=Date.now()-61000;
+  await assert.rejects(s.message(req,s.ffSender),/活动标记/);
+  assert.equal((await status()).state,'stalled','a live session lease blocks recovery');
+  s.session.delete('tl_capture_owner_'+first.runId);
+  assert.equal((await status()).state,'untracked');
+  s.runs.get(first.runId).updatedAt=Date.now();
+  assert.equal((await status()).manualRecoveryAvailable,false);
+  await assert.rejects(s.message(req,s.ffSender),/最近仍有更新/);
+  s.runs.get(first.runId).updatedAt=Date.now()-61000;
+  const stale=await status();
+  assert.equal(stale.state,'untracked');
+  assert.equal(stale.manualRecoveryAvailable,true);
+  assert.equal(stale.branchStatus,'pending');
+  const before=await s.message({type:'FF_READ',id:created.id},s.ffSender);
+  await assert.rejects(s.message({type:'FF_CAPTURE',experimentId:created.id,branch:'A'},s.ffSender),
+    /已有进行中的采集/);
+  await assert.rejects(s.message({...req,ack:'silently-retry'},s.ffSender),/需要用户确认/);
+  await assert.rejects(s.message({...req,branch:'B'},s.ffSender),/不匹配/);
+  await assert.rejects(s.message({...req,runId:'cap_other'},s.ffSender),/不匹配/);
+  assert.equal(s.runs.get(first.runId).status,'capturing');
+  const ended=await s.message(req,s.ffSender);
+  assert.equal(ended.manualAbandoned,true);
+  const replay=await s.message(req,s.ffSender);
+  assert.equal(replay.runId,first.runId);
+  assert.equal(replay.state,'error');
+  assert.equal(replay.alreadyAbandoned,true,'a repeated acknowledgement cannot mutate the old run');
+  assert.equal(s.runs.get(first.runId).status,'error');
+  assert.equal(s.runs.get(first.runId).complete,false);
+  assert.deepEqual(s.pageStore.get(pageKey),snapshot,'stored partial pages survive');
+  assert.equal((await s.message({type:'FF_READ',id:created.id},s.ffSender)).revision,before.revision);
+  assert.equal((await status()).state,'error');
+  await assert.rejects(s.message({type:'CAPTURE_END',id:first.runId,complete:true,
+    mode:'paginated',pageCount:1,count:1},s.tabSender(tabId,conv)),/已结束/);
+  assert.equal((await s.message({type:'FF_READ',id:created.id},s.ffSender)).branches.A.status,'pending');
+  assert.equal(s.sent.filter(([,kind])=>kind==='TL_CAPTURE_START').length,1,
+    'abandonment does not initiate a new capture');
+  const next=await s.message({type:'FF_CAPTURE',experimentId:created.id,branch:'A'},s.ffSender);
+  assert.notEqual(next.runId,first.runId);
+  assert.equal(s.runs.get(first.runId).status,'error');
+  assert.equal(s.runs.size,2,'new capture requires a separate manual request');
+  assert.equal(s.sent.filter(([,kind])=>kind==='TL_CAPTURE_START').length,2);
+});
+
+test('F3 an already completed run cannot be manually reclassified as abandoned',async()=>{
+  const s=system(),created=await s.setupExperiment('create_f3done_00001');
+  const opened=await s.message({type:'FF_LAUNCH',experimentId:created.id,
+    operationId:'launch_f3done_00001'},s.ffSender);
+  const tabId=opened.tabIds.B,conv='https://chatgpt.com/c/f3-done-source';
+  await s.message({type:'HANDOFF_BEGIN'},s.tabSender(tabId,'https://chatgpt.com/'));
+  await s.message({type:'HANDOFF_ACK'},s.tabSender(tabId,'https://chatgpt.com/'));
+  s.tabsById.get(tabId).url=conv;
+  await s.message({type:'OBSERVE',href:conv,title:'采集完成优先',streaming:false,
+    assistantBytes:30},s.tabSender(tabId,conv));
+  const run=await s.message({type:'FF_CAPTURE',experimentId:created.id,branch:'B'},s.ffSender);
+  const text=(await s.message({type:'FF_READ',id:created.id},s.ffSender)).frozen.text;
+  s.pageStore.set(run.runId+'_0_0',{id:run.runId,pageIndex:0,chunkIndex:0,messages:[
+    {id:'m1',role:'user',content:text,finished:true},
+    {id:'m2',role:'assistant',content:'先完成的合成采集',finished:true}
+  ]});
+  await s.message({type:'CAPTURE_END',id:run.runId,complete:true,mode:'paginated',
+    pageCount:1,count:2},s.tabSender(tabId,conv));
+  assert.equal((await s.message({type:'FF_READ',id:created.id},s.ffSender)).branches.B.status,'done');
+  s.runs.get(run.runId).updatedAt=Date.now()-61000;
+  await assert.rejects(s.message({type:'FF_CAPTURE_ABANDON',experimentId:created.id,
+    branch:'B',runId:run.runId,ack:'manual-reviewed-no-replay'},s.ffSender),
+    /不匹配|已变化/);
+  assert.equal(s.runs.get(run.runId).status,'done');
+});
+
+test('K=4 startup recovery rebinds C/D as well as A/B without auto-prefill',async()=>{
+  const s=system();
+  await s.message({type:'FF_SET_ENABLED',enabled:true,ack:'local-only-no-send'},s.ffSender);
+  const created=await s.message({type:'FF_CREATE',
+    operationId:'create_k4recover0001',w0:'合成材料',p:'合成任务',branchCount:4},s.ffSender);
+  const launched=await s.message({type:'FF_LAUNCH',experimentId:created.id,
+    operationId:'launch_k4recover0001'},s.ffSender);
+  for(const branch of ['A','B','C','D']){
+    const tabId=launched.tabIds[branch];
+    s.tabsById.get(tabId).url='https://chatgpt.com/c/recover-'+branch.toLowerCase()+'-1234';
+  }
+  // Mimic a Chrome restart: ephemerally registered intents vanish, while
+  // existing tabs and user-created conversation identities remain durable.
+  s.session.clear();
+  const sentBefore=s.sent.length;
+  s.events.startup();
+  let last;
+  for(let i=0;i<100;i++){
+    last=await s.message({type:'FF_READ',id:created.id},s.ffSender);
+    if(Object.values(last.branches).every(b=>b.phase==='generating'))break;
+    await new Promise(r=>setTimeout(r,10));
+  }
+  for(const branch of ['A','B','C','D']){
+    const attempt=last.branches[branch].attempts.at(-1);
+    assert.equal(attempt.evidence.sessionId,'recover-'+branch.toLowerCase()+'-1234',
+      'recovered branch '+branch);
+    assert.equal(last.branches[branch].phase,'generating');
+  }
+  assert.equal(s.sent.length,sentBefore,'startup recovery never re-seeds user drafts');
 });

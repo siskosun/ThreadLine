@@ -36,12 +36,29 @@ async function page(options={}){
      }
      if(payload.type==='FF_LIST')return [...model.records.values()];
      if(payload.type==='FF_READ')return model.records.get(payload.id);
+      if(payload.type==='FF_CAPTURE_STATUS') {
+        model.statusReads=(model.statusReads||0)+1;
+        return {state:options.captureState||'stalled',runId:payload.runId,
+          manualRecoveryAvailable:options.manualRecoveryAvailable===true};
+      }
+      if(payload.type==='FF_CAPTURE') {
+        model.captureStarts=(model.captureStarts||0)+1;
+        return {runId:'cap_manual_retry0001',started:true};
+      }
+      if(payload.type==='FF_CAPTURE_ABANDON') {
+        assert.equal(payload.ack,'manual-reviewed-no-replay');
+        assert.equal(payload.runId,'cap_previous');
+        model.manualAbandons=(model.manualAbandons||0)+1;
+        options.captureState='error';
+        return {runId:payload.runId,manualAbandoned:true};
+      }
      throw new Error('unexpected message');
    })().then(data=>cb({ok:true,data}),error=>cb({ok:false,error:error.message}));
  }}};
  vm.runInNewContext(source,{document:{getElementById:$,createElement:element},
    sessionStorage:{getItem:k=>model.storage.get(k)??null,setItem:(k,v)=>model.storage.set(k,v),
-     removeItem:k=>model.storage.delete(k)},chrome,ThreadLineFFCore:F,crypto:webcrypto});
+     removeItem:k=>model.storage.delete(k)},chrome,ThreadLineFFCore:F,crypto:webcrypto,
+    confirm:()=>options.confirmRetry===true,setTimeout:()=>0});
  await new Promise(resolve=>setImmediate(resolve));
  return {model,$,fill(){for(const [id,value] of [['ff-w0','fictional W'],['ff-p','fictional P']]){
    $(id).value=value;$(id).handlers.input();}},
@@ -87,3 +104,61 @@ test('launch without a selected experiment explains instead of silently doing no
   await btn.handlers.click({target:btn,preventDefault(){}});
   assert.match(ui.$('ff-notice').textContent,/请先在下方/);
 });
+
+test('F3 manual re-capture requires terminal diagnostics and explicit user approval',async()=>{
+  const record=F.newExperiment(await F.freeze('虚构材料','虚构任务'),'ff_retry_fixture');
+  record.branches.A.status='pending';
+  record.branches.A.phase='capturing';
+  record.branches.A.attempts=[{id:'att_retry_0000001',status:'pending',
+    evidence:{tabId:123,sessionId:'synthetic-conversation',captureRunId:'cap_previous'}}];
+  const options={captureState:'stalled',confirmRetry:true,
+    model:{records:new Map([[record.id,record]]),storage:new Map(),creates:[]}};
+  const ui=await page(options);
+  const selection=ui.$('ff-list').children[0];
+  await selection.handlers.click();
+  const boxes=ui.$('ff-branch-boxes').children;
+  const retry=boxes[0].children.flatMap(item=>item.children||[])
+    .find(item=>item.textContent==='核对后手动重新采集');
+  assert.ok(retry,'pending capture has a manual recovery control');
+  await retry.handlers.click();
+  assert.equal(ui.model.statusReads,1);
+  assert.equal(ui.model.captureStarts||0,0,'stalled run cannot be restarted blindly');
+  assert.match(ui.$('ff-notice').textContent,/不可重复启动/);
+  options.captureState='integration_error';
+  await retry.handlers.click();
+  assert.equal(ui.model.captureStarts||0,0,'source integration error is not a silent retry');
+  options.captureState='needs_review';
+  options.confirmRetry=false;
+  await retry.handlers.click();
+  assert.equal(ui.model.captureStarts||0,0,'user cancellation prevents a new capture');
+  options.confirmRetry=true;
+  await retry.handlers.click();
+  assert.equal(ui.model.captureStarts,1,'user-approved terminal-status retry creates one run');
+});
+
+test('F3 orphaned run is only abandoned after confirmation; recapture needs a separate click',async()=>{
+  const record=F.newExperiment(await F.freeze('虚构材料','虚构任务'),'ff_orphan_ui_fixture');
+  record.branches.A.status='pending';
+  record.branches.A.phase='capturing';
+  record.branches.A.attempts=[{id:'att_orphan0000001',status:'pending',
+    evidence:{tabId:123,sessionId:'synthetic-conversation',captureRunId:'cap_previous'}}];
+  const options={captureState:'untracked',manualRecoveryAvailable:true,confirmRetry:false,
+    model:{records:new Map([[record.id,record]]),storage:new Map(),creates:[]}};
+  const ui=await page(options);
+  await ui.$('ff-list').children[0].handlers.click();
+  const recoveryButton=()=>ui.$('ff-branch-boxes').children[0].children
+    .flatMap(item=>item.children||[])
+    .find(item=>item.textContent==='核对后手动重新采集');
+  assert.ok(recoveryButton());
+  await recoveryButton().handlers.click();
+  assert.equal(ui.model.manualAbandons||0,0,'user refusal preserves the original run');
+  assert.equal(ui.model.captureStarts||0,0);
+  options.confirmRetry=true;
+  await recoveryButton().handlers.click();
+  assert.equal(ui.model.manualAbandons,1);
+  assert.equal(ui.model.captureStarts||0,0,'abandon must never start an automatic capture');
+  assert.match(ui.$('ff-notice').textContent,/再次点击并确认/);
+  await recoveryButton().handlers.click();
+  assert.equal(ui.model.captureStarts,1,'new capture requires a second explicit user action');
+});
+

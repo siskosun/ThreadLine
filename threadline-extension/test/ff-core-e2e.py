@@ -455,6 +455,18 @@ def run():
                     break
                 time.sleep(0.5)
             assert done_row, "capture completion must mark the branch done"
+            # F3: explicit read-only capture diagnostic is bound to the
+            # captured branch, not the active tab or caller-provided claim.
+            status = reopened.evaluate("(p) => chrome.runtime.sendMessage(p)",
+                {"type":"FF_CAPTURE_STATUS","experimentId":p2id,
+                 "branch":"A","runId":cap["data"]["runId"]})
+            assert status["ok"] and status["data"]["state"] == "done", status
+            assert status["data"]["captureComplete"] is True, status
+            assert "reply" not in status["data"] and "url" not in status["data"], status
+            wrong = reopened.evaluate("(p) => chrome.runtime.sendMessage(p)",
+                {"type":"FF_CAPTURE_STATUS","experimentId":p2id,
+                 "branch":"B","runId":cap["data"]["runId"]})
+            assert not wrong["ok"], "another branch cannot read this capture"
             a = done_row["branches"]["A"]["attempts"][-1]
             assert a["evidence"]["captureComplete"] is True and a["evidence"]["persisted"] is True
             assert a["evidence"]["taskCount"] == 1 and a["evidence"]["reply"] == "好的，OK。"

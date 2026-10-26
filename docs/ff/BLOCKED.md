@@ -1,6 +1,20 @@
 # ThreadLine 当前阻塞
 
+## 2026-10-26 F3 恢复能力就绪，真实站点门禁仍未解除
+
+- PR [#40](https://github.com/siskosun/ThreadLine/pull/40) 工程提交 `12d11a55221bfd24f17bcceaf14aeaaf32b44ea2` 已通过 [Linux](https://github.com/siskosun/ThreadLine/actions/runs/40252510913) 和 [Windows](https://github.com/siskosun/ThreadLine/actions/runs/40252510938) 合成回归。新增丢失会话 lease 后 30 秒检测、人工两步解除、迟到完成保护、旧片段保留与真实 Chromium profile 重启测试。
+- F3 真实验收仍 **BLOCKED/NOT_EXECUTED**：在授权已登录浏览器跨 3 个自然日完成至少 12 次有效 K4 尝试；逐次验证采集→对照→裁决→导出→导入、来源一致性、无自动发送与显式失败提示；分别演练真实选择器失效、服务工作者中断和完整重启后的标签身份变化。仅记录脱敏、绑定准确 HEAD 的证据；待人工复核、签署后方可改变状态。
+- 当前不会自动寻找或重绑重启后可能改变的 tabId；用户人工解除旧采集也不代表新采集可在旧标签 ID 上继续。若源标签不存在或不匹配，停止重试并记录；禁止将合成通过改写为真实 F3 修复完成。
+
+
 该文件登记事实及解除条件，不是第二份计划。官方任务状态见 [docs/PLAN.md](../PLAN.md)。
+
+## 2026-10-25 F3 工程加固后仍未解除的真实站点门禁
+
+- PR [#40](https://github.com/siskosun/ThreadLine/pull/40) 候选代码 `fcbc652fe43a81ab29b91b39b04ba8dd408d32cc` 已完成 [Linux](https://github.com/siskosun/ThreadLine/actions/runs/40205674802) / [Windows](https://github.com/siskosun/ThreadLine/actions/runs/40205674806) 合成回归。新增运行 ID + 会话身份归属校验、单分支在途拒绝、API/DOM 选择器失败显式降级、终态人工确认后才允许重新采集；**没有用户数据操作或自动发送**。这是工程候选，不证明当时真实 F3 根因已找到。
+- 剩余人工门禁：使用明确授权的隔离浏览器和真实已登录站点，在至少三自然日完成 12 次有效 K=4 全流程（采集→对照→裁决→导出→导入），核对来源会话、分支与运行 ID；各记录脱敏且绑定准确提交。另分别验证真实选择器失效与 MV3 中断恢复；未得到的记录维持 `NOT_EXECUTED`，不补造。
+- 浏览器重启导致 `chrome.storage.session` 标记丢失、但持久运行仍为 `capturing` 时，当前候选**不自动判定成功、不自动重放或静默覆盖**，恢复操作可能继续受阻；该窗口须实际验证并根据证据决定是否另开数据恢复修复。终态（`error` / `needs_review`）的显式手动重试不能替代此类未知状态的恢复验收。
+
 
 ## 2026-10-24 v0.8.1 后已知问题（真人 K=4 实测遗留）
 

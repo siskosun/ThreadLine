@@ -166,9 +166,16 @@ async function beginCapture(tabId) {
     await chrome.scripting.executeScript({target:{tabId},files:["capture-page.js"],world:"ISOLATED"});
     const reply=await chrome.tabs.sendMessage(tabId,{type:"TL_CAPTURE_START",id,conversationId});
     if(!reply?.ok)throw new Error(reply?.error||"无法与源标签页通讯");
-  }catch(e){captureOwners.delete(id);await chrome.storage.session.remove(`${CAPTURE_PREFIX}${id}`);await ThreadLineCaptureDB.modifyRun(id,{status:"error",error:String(e.message||e)});}
+  }catch(e){
+    captureOwners.delete(id);
+    await chrome.storage.session.remove(`${CAPTURE_PREFIX}${id}`);
+    const message=String(e?.message||e).slice(0,1200);
+    await ThreadLineCaptureDB.modifyRun(id,{status:"error",error:message,phase:"start-failed"});
+    await chrome.storage.local.set({tl_last_capture_id:id});
+    return {id,started:false,error:message};
+  }
   await chrome.storage.local.set({tl_last_capture_id:id});
-  return {id};
+  return {id,started:true};
 }
 async function receiveCapture(payload,sender){
   if(!sender.tab?.id)throw new Error("此消息只能由采集标签页提交");
@@ -177,8 +184,13 @@ async function receiveCapture(payload,sender){
   if(!ThreadLineCaptureCore.conversationId(sender.tab.url)||ThreadLineCaptureCore.conversationId(sender.tab.url)!==run.conversationId)throw new Error("源标签页已改变对话");
   switch(payload.type){
     case "CAPTURE_RESET":
-      await ThreadLineCaptureDB.resetPages(run.id);
-      await ThreadLineCaptureDB.modifyRun(run.id,{pageCount:0,messageCount:0});return {ok:true};
+      return serialize(async()=>{
+        const live=await ThreadLineCaptureDB.getRun(run.id);
+        if(!live || live.status!=="capturing")throw new Error("采集任务已结束或人工停止");
+        await ThreadLineCaptureDB.resetPages(run.id);
+        await ThreadLineCaptureDB.modifyRun(run.id,{pageCount:0,messageCount:0});
+        return {ok:true};
+      });
     case "CAPTURE_PAGE":{
       if(!Number.isInteger(payload.pageIndex)||payload.pageIndex<0||payload.pageIndex>2500||!Number.isInteger(payload.chunkIndex)||payload.chunkIndex<0||payload.chunkIndex>10000)throw new Error("分页序号错误");
       if(!Array.isArray(payload.messages)||payload.messages.length>20)throw new Error("消息批次不合法");
@@ -186,16 +198,38 @@ async function receiveCapture(payload,sender){
       await ThreadLineCaptureDB.putPage({id:run.id,pageIndex:payload.pageIndex,chunkIndex:payload.chunkIndex,messages:sanitized});return {ok:true};
     }
     case "CAPTURE_PROGRESS":
-      await ThreadLineCaptureDB.modifyRun(run.id,{pageCount:Number(payload.pageCount)||0,messageCount:Number(payload.messageCount)||0,phase:String(payload.phase||"")});return {ok:true};
-    case "CAPTURE_END":{
-      const finished=await ThreadLineCaptureDB.modifyRun(run.id,{status:"done",complete:payload.complete===true,mode:String(payload.mode||""),pageCount:Number(payload.pageCount)||0,messageCount:Number(payload.count)||0,notice:String(payload.notice||"").slice(0,1200)});
-      captureOwners.delete(run.id);await chrome.storage.session.remove(`${CAPTURE_PREFIX}${run.id}`);await markSuccess("capture");
-      // Fork branches turn a completed capture into their completion evidence.
-      try { await serialize(() => ffCaptureEnded(finished, sender.tab.id)); } catch {}
-      return {ok:true};
-    }
+      return serialize(async()=>{
+        const live=await ThreadLineCaptureDB.getRun(run.id);
+        if(!live || live.status!=="capturing")throw new Error("采集任务已结束或人工停止");
+        await ThreadLineCaptureDB.modifyRun(run.id,{pageCount:Number(payload.pageCount)||0,messageCount:Number(payload.messageCount)||0,phase:String(payload.phase||"")});
+        return {ok:true};
+      });
+    case "CAPTURE_END":
+      return serialize(async()=>{
+        // Manual-abandon uses the same lock: late completion cannot overwrite it.
+        const live=await ThreadLineCaptureDB.getRun(run.id);
+        if(!live || live.status!=="capturing")throw new Error("采集任务已结束或人工停止");
+        const finished=await ThreadLineCaptureDB.modifyRun(run.id,{status:"done",complete:payload.complete===true,mode:String(payload.mode||""),pageCount:Number(payload.pageCount)||0,messageCount:Number(payload.count)||0,notice:String(payload.notice||"").slice(0,1200)});
+        captureOwners.delete(run.id);
+        await chrome.storage.session.remove(CAPTURE_PREFIX+run.id);
+        await markSuccess("capture");
+        try {
+          // Already inside serialize; never acquire the same lock twice.
+          await ffCaptureEnded(finished,sender.tab.id);
+        }catch(error){
+          await ThreadLineCaptureDB.modifyRun(run.id,{forkIntegrationError:String(error?.message||error).slice(0,1200)});
+        }
+        return {ok:true};
+      });
     case "CAPTURE_FAIL":
-      await ThreadLineCaptureDB.modifyRun(run.id,{status:"error",error:String(payload.message||"采集失败").slice(0,1200)});captureOwners.delete(run.id);await chrome.storage.session.remove(`${CAPTURE_PREFIX}${run.id}`);return {ok:true};
+      return serialize(async()=>{
+        const live=await ThreadLineCaptureDB.getRun(run.id);
+        if(!live || live.status!=="capturing")throw new Error("采集任务已结束或人工停止");
+        await ThreadLineCaptureDB.modifyRun(run.id,{status:"error",error:String(payload.message||"采集失败").slice(0,1200)});
+        captureOwners.delete(run.id);
+        await chrome.storage.session.remove(CAPTURE_PREFIX+run.id);
+        return {ok:true};
+      });
     default:throw new Error("未知采集状态");
   }
 }
@@ -478,6 +512,12 @@ async function ffCaptureEnded(run, tabId) {
   const existing = await ThreadLineFFDB.read(bind.experimentId);
   const attempt = existing?.branches[bind.branch]?.attempts.find(a => a.id === bind.attemptId);
   if (!attempt || attempt.status !== "pending") return;
+  // A source captured from the same tab is NOT proof that the current Fork
+  // attempt initiated it. Panel captures and superseded runs must never
+  // complete a different attempt, even when their conversation text matches.
+  if (attempt.evidence?.captureRunId !== run.id ||
+      attempt.evidence?.tabId !== tabId ||
+      attempt.evidence?.sessionId !== run.conversationId) return;
   const inputLevel = attempt.evidence?.inputLevel;
   const canComplete = run.complete === true && signals.length >= 2 &&
     typeof attempt.evidence?.sessionId === "string" &&
@@ -505,8 +545,9 @@ async function ffRecoverBindings() {
   // already sent. Never re-seeds a prefill automatically.
   const rows = await ThreadLineFFDB.list();
   for (const row of rows) {
-    for (const branch of ["A", "B"]) {
-      const attempt = row.branches[branch].attempts.at(-1);
+    // K can be 2–4. Reconcile every persisted branch, not only A/B.
+    for (const branch of Object.keys(row.branches || {})) {
+      const attempt = row.branches[branch]?.attempts?.at(-1);
       if (!attempt || attempt.status !== "pending" || attempt.evidence?.sessionId) continue;
       const tabId = attempt.evidence?.tabId;
       if (!Number.isInteger(tabId)) continue;
@@ -719,16 +760,99 @@ async function handleFF(payload, sender) {
       if (!await ffEnabled()) throw new Error("Fork Beta is disabled");
       const existing = await ThreadLineFFDB.read(payload.experimentId);
       if (!existing) throw new Error("experiment not found");
-      // K=2-4 (live K=4 finding): capture must be addressable for every
-      // branch; the previous A/B guard made C/D completion impossible.
+      // K=2-4: require the branch to belong to this experiment.
       if (!Object.prototype.hasOwnProperty.call(existing.branches, payload.branch))
         throw new Error("invalid branch");
       const attempt = existing.branches[payload.branch].attempts.at(-1);
       if (!attempt || attempt.status !== "pending" ||
         !Number.isInteger(attempt.evidence?.tabId) || !attempt.evidence.sessionId)
         throw new Error("branch has no bound conversation to capture");
+      // The authoritative run ID is a single-flight lease for this branch.
+      // A second click/window must not replace its identity while running.
+      // Terminal errors or incomplete completed runs can be retried manually.
+      const previousId=attempt.evidence?.captureRunId;
+      if (previousId) {
+        const previous=await ThreadLineCaptureDB.getRun(previousId);
+        if (!previous) throw new Error("此前采集记录缺失，不能直接覆盖；请先核对或导出诊断");
+        if (previous.status==="capturing")
+          throw new Error("该分支已有进行中的采集；请先查看采集状态，勿重复启动");
+      }
       const run = await beginCapture(attempt.evidence.tabId);
-      return {runId:run.id};
+      // Persist exact run identity before returning. After ff.html reloads the
+      // pending capture is still inspectable; a silent injection failure is
+      // never reported as "capture started".
+      await ffAdvance({experimentId:existing.id,branch:payload.branch,attemptId:attempt.id},
+        {status:"pending",phase:run.started?"capturing":attempt.phase,
+         operationId:"ff_capture_"+run.id,
+         reason:run.started?"capture started; receipt pending":"capture injection failed; no source collected",
+         updates:{captureRunId:run.id,captureStartedAt:Date.now(),
+           captureError:run.started?null:run.error}});
+      return {runId:run.id,started:run.started,error:run.error||null};
+    });
+  }
+  if (payload.type === "FF_CAPTURE_STATUS") {
+    // Read-only diagnostics scoped to the exact branch and capture run.
+    // No raw messages, URLs, tokens, or automatic replay are exposed.
+    const existing=await ThreadLineFFDB.read(payload.experimentId);
+    if(!existing || !Object.prototype.hasOwnProperty.call(existing.branches,payload.branch))
+      throw new Error("invalid experiment or branch");
+    const branch=existing.branches[payload.branch],
+      attempt=branch.attempts.at(-1),runId=attempt?.evidence?.captureRunId;
+    if(!runId || (payload.runId!==undefined && payload.runId!==runId))
+      throw new Error("capture run does not belong to this branch");
+    const run=await ThreadLineCaptureDB.getRun(runId);
+    if(!run || run.tabId!==attempt.evidence.tabId ||
+       run.conversationId!==attempt.evidence.sessionId)
+      throw new Error("capture identity mismatch; manual verification required");
+    const ageMs=Math.max(0,Date.now()-(run.updatedAt||run.createdAt||Date.now()));
+    // A missing session lease after browser restart does not prove failure.
+    const leaseKey=CAPTURE_PREFIX+runId;
+    const lease=run.status==="capturing"?
+      (await chrome.storage.session.get(leaseKey))[leaseKey]:null;
+    const manualRecoveryAvailable=run.status==="capturing" && !lease && ageMs>=30000;
+    let state=run.status==="error"?"error":
+      run.forkIntegrationError?"integration_error":
+      run.status==="done"?(branch.status==="done"?"done":"needs_review"):
+      run.status==="capturing"?(manualRecoveryAvailable?"untracked":
+        ageMs>=30000?"stalled":"capturing"):"unknown";
+    return {runId,state,manualRecoveryAvailable,captureStatus:run.status,branchStatus:branch.status,
+      branchPhase:branch.phase,ageMs,phase:run.phase||"",
+      pageCount:run.pageCount||0,messageCount:run.messageCount||0,
+      captureComplete:run.complete===true,
+      error:(run.forkIntegrationError||run.error||attempt.evidence?.captureError||"").slice(0,600)};
+  }
+  if (payload.type === "FF_CAPTURE_ABANDON") {
+    // A deliberate abandonment, never a new capture, source deletion, or send.
+    return serialize(async()=>{
+      if(payload.ack!=="manual-reviewed-no-replay")
+        throw new Error("需要用户确认旧采集未完成，禁止自动恢复");
+      if(!await ffEnabled())throw new Error("Fork Beta is disabled");
+      const existing=await ThreadLineFFDB.read(payload.experimentId);
+      if(!existing || !Object.prototype.hasOwnProperty.call(existing.branches,payload.branch))
+        throw new Error("invalid experiment or branch");
+      const attempt=existing.branches[payload.branch].attempts.at(-1);
+      const runId=attempt?.evidence?.captureRunId;
+      if(!attempt || attempt.status!=="pending" || !runId || payload.runId!==runId)
+        throw new Error("旧采集与当前分支不匹配，请刷新后核对");
+      const run=await ThreadLineCaptureDB.getRun(runId);
+      if(!run || run.tabId!==attempt.evidence.tabId ||
+         run.conversationId!==attempt.evidence.sessionId)
+        throw new Error("旧采集的会话身份不匹配，禁止解除");
+      // Repeating an already completed abandonment is safe and read-only.
+      if(run.status==="error" && run.phase==="manual-untracked")
+        return {runId,state:"error",alreadyAbandoned:true};
+      if(run.status!=="capturing")
+        throw new Error("旧采集状态已变化，请核对后再操作");
+      const ageMs=Math.max(0,Date.now()-(run.updatedAt||run.createdAt||Date.now()));
+      if(ageMs<30000)throw new Error("旧采集最近仍有更新，暂不能人工解除");
+      const leaseKey=CAPTURE_PREFIX+runId;
+      const lease=(await chrome.storage.session.get(leaseKey))[leaseKey];
+      if(lease)throw new Error("旧采集仍有活动标记，不允许人工解除");
+      await ThreadLineCaptureDB.modifyRun(runId,{status:"error",complete:false,
+        phase:"manual-untracked",
+        error:"用户确认旧采集未能验证完成；已人工结束本次运行，原始片段保留"});
+      captureOwners.delete(runId);
+      return {runId,state:"error",manualAbandoned:true};
     });
   }
   if (payload.type === "FF_COMPARE") {

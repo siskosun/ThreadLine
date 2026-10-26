@@ -8,7 +8,7 @@
 (()=>{
   if(window.__TL_CAPTURE_MAIN_V2__)return;
   Object.defineProperty(window,"__TL_CAPTURE_MAIN_V2__",{value:true,configurable:false});
-  const CHANNEL="threadline-capture-v2",MAX_PAGES=2500, PAGE_TURNS=10;
+  const CHANNEL="threadline-capture-v2",BRIDGE_PROTOCOL=3,MAX_PAGES=2500, PAGE_TURNS=10;
   const nativeFetch=window.fetch;
   let lastAuth="", active=null;
   function ownConversation(){return location.pathname.match(/(?:^|\/)c\/([a-z0-9-]+)(?:\/|$)/i)?.[1]?.toLowerCase()||"";}
@@ -103,6 +103,9 @@
     if(active){post(requestId,"error",{message:"此标签页已有采集任务"});return;}
     if(!/^[a-z0-9-]{4,120}$/i.test(conversationId)||conversationId!==ownConversation()){post(requestId,"error",{message:"仅可采集此标签页当前已保存的 ChatGPT 对话"});return;}
     const controller=new AbortController();active={requestId,controller};let paginatedError="";
+    // Liveness only, not a trust or authenticity signal. It precedes every
+    // asynchronous network request, so the extension knows the bridge ran.
+    post(requestId,"accepted",{bridgeProtocol:BRIDGE_PROTOCOL});
     try{
       let result;
       try{result=await capturePaginated(conversationId,requestId,controller.signal);}
