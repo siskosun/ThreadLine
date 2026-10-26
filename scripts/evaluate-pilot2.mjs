@@ -152,6 +152,7 @@ export function evaluateData(protocol,observations,protocolSha256){
      if(d?.triggerEventId!==frozenEvent.id||
        frozenEvent.frozenState.conclusions?.[d.targetConclusionId]?.projectId!==
           protocol.cases.find(c=>c.id===item.caseId).projectId||
+       d.targetVersionId!==frozenEvent.frozenState.conclusions?.[d.targetConclusionId]?.currentVersionId||
        typeof d.reason!=="string"||!d.reason.trim()||
        typeof d.receiptId!=="string"||!d.receiptId.trim()||
        receiptIds.has(d.receiptId))
@@ -191,6 +192,8 @@ export function evaluateData(protocol,observations,protocolSha256){
    const impactRows=e.carryForwardConfirmed===true?[]:
      Research.impacts(e.frozenState,c.projectId,[e.rootConclusionId]);
    const computed=impactRows.map(row=>row.conclusionId);
+   if(item.arms.B.deferrals.some(d=>!computed.includes(d.targetConclusionId)))
+     fail("暂缓只能作用于该触发事件实际待核对的影响目标");
    const tiered=classifyImpacts(e,impactRows,c.projectId);
    const mustIds=tiered.filter(x=>x.tier==="must_review").map(x=>x.conclusionId);
    const beforeIds=tiered.filter(x=>x.tier==="before_use").map(x=>x.conclusionId);
