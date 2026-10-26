@@ -55,3 +55,34 @@ test('current assistant hidden analysis messages are filtered from capture',asyn
   assert.deepEqual(Array.from(rows,x=>x.id),['visible']);
   assert.equal(r.posted.find(x=>x.kind==='done')?.complete,true);
 });
+
+test('MAIN bridge cancellation aborts a hung private read without claiming completion',async()=>{
+  const listeners=[],posted=[],location={
+    origin:'https://chatgpt.com',href:'https://chatgpt.com/c/cancel-source',
+    pathname:'/c/cancel-source'};
+  let abortSeen=false;
+  const window={location,addEventListener(type,cb){if(type==='message')listeners.push(cb);},
+    postMessage(packet,origin){posted.push(packet);for(const fn of listeners)
+      fn({source:window,origin,data:packet});},
+    fetch(_url,opts={}){
+      return new Promise((_resolve,reject)=>{
+        if(opts.signal?.aborted){abortSeen=true;reject(new Error('aborted'));return;}
+        opts.signal?.addEventListener('abort',()=>{
+          abortSeen=true;reject(new Error('aborted'));
+        },{once:true});
+      });
+    }};
+  vm.runInNewContext(source,{window,location,Headers,URL,URLSearchParams,
+    AbortController,console,setTimeout,clearTimeout,structuredClone},
+    {filename:'capture-main.js'});
+  const id='cap_cancelled_001';
+  window.postMessage({channel:'threadline-capture-v2',direction:'extension-to-main',
+    kind:'start',requestId:id,conversationId:'cancel-source'},location.origin);
+  await new Promise(resolve=>setImmediate(resolve));
+  window.postMessage({channel:'threadline-capture-v2',direction:'extension-to-main',
+    kind:'cancel',requestId:id},location.origin);
+  for(let i=0;i<20&&!abortSeen;i++)await new Promise(r=>setTimeout(r,10));
+  assert.equal(abortSeen,true,'cancel must abort the in-flight fetch');
+  assert.equal(posted.some(p=>p.kind==='done'),false,'aborted fetch is never a full capture');
+  assert.equal(posted.some(p=>p.kind==='page'),false,'aborted request creates no page');
+});
