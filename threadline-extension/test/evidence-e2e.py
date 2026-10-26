@@ -226,6 +226,32 @@ def run():
             panel.locator("#critical-notice-dismiss").click()
             assert panel.locator("#critical-notice").is_hidden()
 
+            # Successful withdrawal returns keyboard focus to the same conclusion,
+            # now visibly marked withdrawn, without changing the selected topic.
+            success_project_id = "ux08-success"
+            ensured_success = send(page, {"type":"EV_ENSURE","projectId":success_project_id})
+            assert ensured_success["ok"], ensured_success
+            adopted_success = send(page, {"type":"EV_ADOPT","projectId":success_project_id,
+                "text":"成功撤回焦点验收","conditions":"仅用于合成测试",
+                "fragments":[{"selection":"撤回后保留的来源片段"}],
+                "operationId":"op_ux08success001"})
+            assert adopted_success["ok"], adopted_success
+            panel.evaluate("() => window.dispatchEvent(new Event('threadline-evidence-changed'))")
+            panel.wait_for_function("id => [...document.querySelector('#evidence-project').options].some(o=>o.value===id)",
+                arg=success_project_id)
+            panel.select_option("#evidence-project",success_project_id)
+            panel.wait_for_function("() => document.querySelectorAll('#evidence-list .evidence-item').length===1")
+            panel.locator("#evidence-list button", has_text="撤回").click()
+            panel.locator("dialog.tl-confirm-dialog button", has_text="撤回结论").click()
+            panel.wait_for_function("id => [...document.querySelectorAll('#evidence-list .evidence-item')].some(n=>n.dataset.conclusionId===id&&n.textContent.includes('已撤回'))",
+                arg=adopted_success["data"]["conclusionId"])
+            assert panel.evaluate("id => document.activeElement?.closest('.evidence-item')?.dataset?.conclusionId===id",
+                adopted_success["data"]["conclusionId"])
+            success_history = send(panel, {"type":"EV_HISTORY","projectId":success_project_id,
+                "conclusionId":adopted_success["data"]["conclusionId"]})
+            assert success_history["ok"] and success_history["data"]["status"] == "withdrawn"
+            panel.select_option("#evidence-project",project_id)
+            panel.wait_for_function("id => document.querySelector('#evidence-project').value===id",arg=project_id)
             first = panel.locator("#evidence-list .evidence-item").first
             assert first.get_attribute("open") is not None
             summary = first.locator(":scope > summary")
