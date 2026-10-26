@@ -3,6 +3,10 @@
   const escape = value => String(value ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
   const stageLabels = { active:"研究中",review:"待验证",done:"分支完成" };
   let selectedId = null;
+  let selectionRevision = 0;
+  const setSelectedId = value => {
+    if(selectedId!==value){selectedId=value;selectionRevision++;}
+  };
   let filter = "all";
   let workspace = "switch"; // every newly opened panel starts with the main workflow
   let state = ThreadLineCore.emptyState();
@@ -54,7 +58,7 @@
       const typing = ["edit-name","edit-goal","edit-decision","topic-name"].some(id=>document.activeElement?.id === id);
       if (typing && !force) {rerenderPending = true;renderStats();return true;}
       rerenderPending = false;
-      if (selectedId && !state.projects.some(p=>p.id===selectedId)) selectedId = null;
+      if (selectedId && !state.projects.some(p=>p.id===selectedId)) setSelectedId(null);
       render();
       return true;
     } catch(error) {
@@ -85,10 +89,12 @@
   });
   async function change(action,success) {
     if (busy) {notify("上一项更改正在保存，请稍后再试");return;}
+    const requestedSelectionRevision=selectionRevision;
     busy=true;
     try {
       const res=await message({type:"MUTATE",action});
-      if (res?.result?.projectId) selectedId = res.result.projectId;
+      if (res?.result?.projectId && selectionRevision===requestedSelectionRevision)
+        setSelectedId(res.result.projectId);
       const refreshed=await refresh(true);
       if (success && refreshed) notify(success);
     } catch(error) {
@@ -313,7 +319,7 @@
       const json=await file.text();const state=ThreadLineBackup.parse(json);
       if(!confirm(`确认用备份中的 ${state.projects.length} 个课题、${Object.keys(state.chats).length} 条关联替换当前所有本地课题与对话关联吗？此操作不包含证据库或 Fork 实验；当前课题状态会先保留为本地快照。`))return;
       const info=await message({type:'BACKUP_IMPORT',json});
-      selectedId=null;await refresh(true);
+      setSelectedId(null);await refresh(true);
       $('#backup-status').textContent=`恢复成功：${info.projects} 个课题、${info.chats} 条关联。`;
     }catch(e){$('#backup-status').textContent='导入失败：'+e.message;}
   }
@@ -323,7 +329,7 @@
       if(!snapshots.length)return notify('尚无可恢复的快照',true);
       const latest=snapshots.at(-1);
       if(!confirm(`恢复 ${new Date(latest.at).toLocaleString()} 的快照（${latest.reason}）？当前状态也会存为新快照。`))return;
-      await message({type:'BACKUP_ROLLBACK',index:latest.index});selectedId=null;
+      await message({type:'BACKUP_ROLLBACK',index:latest.index});setSelectedId(null);
       await refresh(true);$('#backup-status').textContent='已恢复最近快照。';
     }catch(e){$('#backup-status').textContent='快照恢复失败：'+e.message;}
   }
@@ -389,12 +395,12 @@
     if (action==="quick-open-chat")return openChat(state.chats[key]);
     if (action==="accept-suggestion") {
       const tab=activeTab(),project=ThreadLineCore.getProject(state,id);
-      if (tab && project) {selectedId=project.id;return associateTab(tab,project);}
+      if (tab && project) {setSelectedId(project.id);return associateTab(tab,project);}
       return;
     }
-    if (action==="collapse-details") {selectedId=null;render();return;}
+    if (action==="collapse-details") {setSelectedId(null);render();return;}
     if (action==="select-project" || action==="view-project") {
-      selectedId=(action==="select-project" && selectedId===id)?null:id;filter='all';setWorkspace("switch");render();
+      setSelectedId((action==="select-project" && selectedId===id)?null:id);filter='all';setWorkspace("switch");render();
       if (selectedId) $("#detail-section").scrollIntoView({block:"start",behavior:"smooth"});
       return;
     }
