@@ -120,6 +120,49 @@ def run():
       # Write through the actual MV3 service worker runtime, then close/reopen profile.
       r=panel.evaluate('''async ({pid}) => chrome.runtime.sendMessage({type:'MUTATE',action:{type:'linkChat',key:'chat:demo-alpha',projectId:pid,title:'A',url:'https://chatgpt.com/c/demo-alpha'}})''', {'pid':pid})
       assert r['ok'],r
+      panel.wait_for_selector('[data-action="label-chat"][data-key="chat:demo-alpha"]')
+      panel.locator('[data-action="label-chat"][data-key="chat:demo-alpha"]').click()
+      panel.locator('dialog.tl-dialog #tl-field-label').fill('A · 人工核验')
+      panel.locator('dialog.tl-dialog button[type=submit]').click()
+      panel.wait_for_function("() => !document.querySelector('dialog.tl-dialog')")
+      current=panel.evaluate("async () => (await chrome.runtime.sendMessage({type:'SNAPSHOT'})).data.state")
+      assert current['chats']['chat:demo-alpha']['label']=='A · 人工核验',current
+      panel.locator('[data-action="note-chat"][data-key="chat:demo-alpha"]').click()
+      panel.locator('dialog.tl-dialog #tl-field-note').fill('等待模型复核')
+      panel.locator('dialog.tl-dialog button[type=submit]').click()
+      panel.wait_for_function("() => !document.querySelector('dialog.tl-dialog')")
+      current=panel.evaluate("async () => (await chrome.runtime.sendMessage({type:'SNAPSHOT'})).data.state")
+      assert current['chats']['chat:demo-alpha']['note']=='等待模型复核',current
+      # A failed acknowledgement stays visible and does not trigger a retry.
+      panel.evaluate("""() => {
+        const original=chrome.runtime.sendMessage.bind(chrome.runtime);
+        window.__restoreSendMessage=()=>{chrome.runtime.sendMessage=original;};
+        window.__updateChatCalls=0;
+        chrome.runtime.sendMessage=(payload,callback)=>{
+          if(payload?.type==='MUTATE'&&payload.action?.type==='updateChat'&&
+             Object.prototype.hasOwnProperty.call(payload.action.patch||{},'note')){
+            window.__updateChatCalls++;
+            callback({ok:false,error:'SIMULATED_UPDATE_FAILURE'});
+            return;
+          }
+          return original(payload,callback);
+        };
+      }""")
+      panel.locator('[data-action="note-chat"][data-key="chat:demo-alpha"]').click()
+      panel.locator('dialog.tl-dialog #tl-field-note').fill('这次保存应失败且保留输入')
+      panel.locator('dialog.tl-dialog button[type=submit]').click()
+      panel.wait_for_function("() => document.querySelector('#critical-notice')?.hidden===false")
+      assert 'SIMULATED_UPDATE_FAILURE' in panel.locator('#critical-notice-text').inner_text()
+      assert panel.locator('dialog.tl-dialog #tl-field-note').input_value()=='这次保存应失败且保留输入'
+      panel.wait_for_timeout(3300)
+      assert panel.locator('#critical-notice').is_visible(), 'critical error must outlive the transient toast'
+      assert panel.evaluate('window.__updateChatCalls')==1, 'failed save must not auto-replay'
+      current=panel.evaluate("async () => (await chrome.runtime.sendMessage({type:'SNAPSHOT'})).data.state")
+      assert current['chats']['chat:demo-alpha']['note']=='等待模型复核',current
+      panel.locator('dialog.tl-dialog button',has_text='取消').click()
+      panel.evaluate('window.__restoreSendMessage()')
+      panel.locator('#critical-notice-dismiss').click()
+      assert panel.locator('#critical-notice').is_hidden()
       r=panel.evaluate('''async ({pid}) => chrome.runtime.sendMessage({type:'MUTATE',action:{type:'updateProject',projectId:pid,patch:{decision:'已经核验的测试结论'}}})''',{'pid':pid})
       assert r['ok'],r
       panel.wait_for_timeout(800)
