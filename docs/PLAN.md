@@ -31,7 +31,7 @@
 | BETA-RELEASE | 安装升级与正式 Beta 验收 | done | P3-REPORT | 真实双分支闭环、同路径旧数据升级、CI 与用户验收均通过 | docs/ff/evidence/BETA-RELEASE.json | yes |
 | P4-AUTO | 第二期：K=4 多会话编排、等预算对照、裁判校准（隐藏校准题）与 JSON 导入；自动 Flush 经一期证据改判不可行，以批量预填+人工批量发送替代 | done | BETA-RELEASE | 等预算对照与裁判校准机制落地，K 可配置 2–4，导入经严格验证；0 自动发送不变 | docs/ff/evidence/P4-AUTO.json | yes |
 | S0A-PROTOTYPE | 第十一章 S0a：证据存储与采纳原型（单事务权威写入、投影、崩溃点/恢复设计、容量探针与工期估算） | blocked | P4-AUTO | 单事务采纳/撤回+幂等/CAS 经测试；崩溃点表与恢复顺序无待定项；首期默认容量经探针冻结；12 次有效采纳操作至少 11 次无帮助完成、耗时中位 ≤30s、P90 ≤60s（受托代理执行须在证据 scope 声明） | docs/ff/BLOCKED.md | yes |
-| LOCATE-PREFLIGHT | 来源定位零发送现场预检（只读真实页面结构，不发送、不自动启动采集、不写入产品状态） | planned | Z0-BASE | 用户在真实登录 ChatGPT 页面执行探针；记录可见消息 ID/角色、滚动根与方向；如存在用户已显式启动的采集样本，核对消息 ID 与顺序；结果可为失败或 unknown，必须保留脱敏记录，不能以选择器存在推断定位成功 | docs/ff/BLOCKED.md | yes |
+| LOCATE-PREFLIGHT | 来源定位零发送现场预检（只读真实页面结构，不发送、不自动启动采集、不写入产品状态） | planned | Z0-BASE | 用户在真实登录 ChatGPT 页面执行探针；记录可见消息 ID/角色、滚动根与方向；如存在用户已显式启动的采集样本，核对消息 ID 与顺序；结果可为失败或 unknown，必须保留脱敏记录，不能以选择器存在推断定位成功 | - | yes |
 | S0B-LOCATE | 第十一章 S0b：来源定位 spike（限 1 人日/8 小时：现有适配 vs Toolkit vendor 子集 vs 最小实现） | blocked | S0A-PROTOTYPE,LOCATE-PREFLIGHT | 基于预检记录完成三方案维护/包体/测试成本比较；利用可靠的历史消息 ID/顺序估算搜索方向；采纳代码须通过身份、分支隔离与取消测试并保留许可标注；3,000 条夹具≤5秒有效运行、取消后 200ms 内停止新增主动滚动；映射不可靠或失败时降级“片段+来源链接” | docs/ff/BLOCKED.md | no |
 | S1A-PERSIST | 第十一章 S1a：结论/证据持久化与恢复（chrome.storage 单向投影、旧 decision 编辑封口、备份恢复与错误处理） | blocked | S0A-PROTOTYPE | 跨重启/清缓存保存完整；崩溃点与旧数据兼容通过；持久化/删除实施经 L3 审查与人工风险确认 | docs/ff/BLOCKED.md | yes |
 | S1B-ADOPT | 第十一章 S1b：逐条采纳与可编辑交接（普通整理与 Fork 揭盲共用） | blocked | S1A-PERSIST,S0B-LOCATE | 主要操作只要求正文与依据确认；重复采纳不重复创建；旧分支可见更正/撤回；定位不可靠时显示“仅片段”不误跳转 | docs/ff/BLOCKED.md | yes |
