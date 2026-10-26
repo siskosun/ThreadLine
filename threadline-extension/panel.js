@@ -438,6 +438,7 @@
   let evidenceHandoffStamp = null;
   let evidenceRequest = 0,evidenceDirectory=0,handoffGeneration=0,handoffEdits=0,handoffProject=null,handoffPending=null,evidenceHasRows=false;
   const handoffDrafts=new Map();
+  let evidenceListCache=null,evidenceVisibleLimit=ThreadLineEvidenceList.PAGE_SIZE;
 
   async function renderEvidence() {
     const ticket=++evidenceDirectory,snapshot = await evSend({ type: "EV_PROJECTS" });
@@ -464,13 +465,13 @@
 
   async function renderEvidenceProject() {
     const request=++evidenceRequest,projectId = ev$("evidence-project").value;
-    if (!projectId) { evidenceHasRows=false; ev$("evidence-handoff").disabled=true; ev$("evidence-summary").textContent = "暂无课题。先创建课题，再从整理结果逐条采纳。"; ev$("evidence-list").replaceChildren(createEvidenceNext("start-new-topic","创建课题")); return; }
+    if (!projectId) { evidenceListCache=null;evidenceHasRows=false;ev$("evidence-handoff").disabled=true;ev$("evidence-summary").textContent="暂无课题。先创建课题，再从整理结果逐条采纳。";ev$("evidence-list-count").textContent="";ev$("evidence-more").hidden=true;ev$("evidence-list").replaceChildren(createEvidenceNext("start-new-topic","创建课题"));return; }
     let data;
     try { data = await evSend({ type: "EV_LIST", projectId }); }
     catch (e) {
       if(request!==evidenceRequest)return;
       ev$("evidence-summary").textContent = "证据库不可用：" + e.message;
-      ev$("evidence-list").replaceChildren();
+      evidenceListCache=null;renderEvidenceRows();
       // Preserve any manually edited draft, but stop presenting it as current.
       ev$("evidence-handoff-copy").disabled = true;
       ev$("evidence-handoff-read").disabled = true;evidenceHasRows=false;
@@ -482,97 +483,120 @@
     evidenceHasRows=!!data.rows.length;ev$("evidence-handoff").disabled=!evidenceHasRows||!!handoffPending;
     const adopted=data.rows.filter(r=>r.conclusion.status!=="withdrawn").length,withdrawn=data.rows.length-adopted;
     ev$("evidence-summary").textContent=data.rows.length?`已采纳 ${adopted} 条 · 已撤回 ${withdrawn} 条 · 共 ${data.rows.reduce((n,r)=>n+r.versions.length,0)} 个版本`+(data.projectionPending?"\n证据已保存，共享摘要待更新。":"\n点击依据查看原文；修订和撤回均保留历史。") : "尚无采纳结论。先在“研究整理”或 Fork 对照结果中逐条采纳。";
-    const holder = ev$("evidence-list");
+    evidenceListCache={projectId,rows:data.rows,legacyNote:data.project?.legacyNote?.text||""};
+    renderEvidenceRows();
+  }
+
+
+  function renderEvidenceRows() {
+    const holder=ev$("evidence-list"),more=ev$("evidence-more"),count=ev$("evidence-list-count");
+    const cache=evidenceListCache;
+    if(!cache||cache.projectId!==ev$("evidence-project").value){
+      holder.replaceChildren();count.textContent="";more.hidden=true;return;
+    }
+    const opened=new Set([...holder.querySelectorAll(".evidence-item[open]")].map(el=>el.dataset.conclusionId));
+    const view=ThreadLineEvidenceList.select(cache.rows,{
+      query:ev$("evidence-query").value,status:ev$("evidence-filter-status").value,limit:evidenceVisibleLimit
+    });
     holder.replaceChildren();
-    if(data.project?.legacyNote?.text){const legacy=document.createElement("details"),title=document.createElement("summary"),body=document.createElement("pre");title.textContent="接管前的课题备注（未核验）";body.textContent=data.project.legacyNote.text;legacy.append(title,body);holder.append(legacy);}
-    if(!data.rows.length)holder.append(createEvidenceNext("open-research","打开研究整理"));
-    for (const row of data.rows) {
-      const item = document.createElement("div");
-      item.className = "evidence-item";
-      const head = document.createElement("p");
-      const c = row.conclusion;
-      head.textContent = (c.status === "withdrawn" ? "[已撤回] " : "") +
-        (row.current ? row.current.text : c.id) +
-        (row.versions && row.versions.length > 1 ? "（修订 " + (row.versions.length - 1) + " 次）" : "");
-      item.appendChild(head);
-      if (row.current?.conditions) {
-        const conditions = document.createElement("p");
-        conditions.textContent = "适用条件：" + row.current.conditions;
-        item.appendChild(conditions);
+    if(cache.legacyNote){
+      const legacy=document.createElement("details"),title=document.createElement("summary"),body=document.createElement("pre");
+      title.textContent="接管前的课题备注（未核验）";body.textContent=cache.legacyNote;
+      legacy.append(title,body);holder.appendChild(legacy);
+    }
+    count.textContent=`匹配 ${view.matched} / ${view.total} 条结论，当前显示 ${view.rows.length} 条`;
+    more.hidden=!view.hasMore;
+    more.textContent=`再显示 ${Math.min(ThreadLineEvidenceList.PAGE_SIZE,view.matched-view.rows.length)} 条结论`;
+    if(!view.rows.length){
+      if(!view.total)holder.appendChild(createEvidenceNext("open-research","打开研究整理"));
+      else {
+        const empty=document.createElement("p");empty.className="subtle";
+        empty.textContent="没有符合搜索或状态筛选的结论，可清除条件重新查找。";
+        holder.appendChild(empty);
       }
-      for (const fragment of row.fragments || []) {
-        const box = document.createElement("details");
-        const summary = document.createElement("summary");
-        summary.textContent = "依据片段 · " + ({cites:"引用",supports:"支持",opposes:"反对",background:"背景"}[fragment.relation] || "引用") +
-          (fragment.conversationId ? " · 会话 " + String(fragment.conversationId).slice(0, 8) + "…" : " · 仅片段（来源不可定位）");
-        const pre = document.createElement("pre");
-        pre.style.whiteSpace = "pre-wrap";
-        pre.textContent = (fragment.before || "") + "【" + fragment.selection + "】" + (fragment.after || "");
-        box.appendChild(summary); box.appendChild(pre);
-        if (fragment.conversationId) {
-          const locateRow = document.createElement("div");
-          locateRow.className = "line";
-          const btn = document.createElement("button");
-          btn.type = "button"; btn.className = "secondary"; btn.textContent = "在对话中定位";
-          const note = document.createElement("span");
-          note.className = "subtle";
-          btn.addEventListener("click", async () => {
-            note.textContent = "定位中…";
-            try {
-              const r = await evSend({ type: "EV_LOCATE",
-                conversationId: fragment.conversationId,
-                messageId: fragment.messageId || null,
-                role: null, contentPrefix: fragment.selection.slice(0, 40) });
-              note.textContent = r.located && r.verified
-                ? "已定位到原消息"
-                : (r.reason === "conversation-not-open"
-                    ? "对话未打开（仅片段）：https://chatgpt.com/c/" + fragment.conversationId
-                    : "定位不可靠，仅显示片段");
-            } catch (e) { note.textContent = "定位失败（仅片段）"; }
+    }
+    for(const row of view.rows){
+      const c=row.conclusion,item=document.createElement("details"),summary=document.createElement("summary"),content=document.createElement("div");
+      item.className="evidence-item";item.dataset.conclusionId=c.id;
+      item.open=opened.has(c.id)||view.rows.length===1;
+      summary.className="evidence-item-header";
+      summary.textContent=(c.status==="withdrawn"?"已撤回 · ":"已采纳 · ")+ThreadLineEvidenceList.preview(row)
+        +(row.versions?.length>1?" · 修订 "+(row.versions.length-1)+" 次":"")
+        +" · "+(row.fragments?.length||0)+" 条依据";
+      content.className="evidence-item-body";
+      const head=document.createElement("p");
+      head.textContent=(c.status==="withdrawn"?"[已撤回] ":"")+(row.current?.text||c.id);
+      content.appendChild(head);item.append(summary,content);
+      if(row.current?.conditions){
+        const conditions=document.createElement("p");conditions.textContent="适用条件："+row.current.conditions;
+        content.appendChild(conditions);
+      }
+      for(const fragment of row.fragments||[]){
+        const box=document.createElement("details"),sourceSummary=document.createElement("summary");
+        sourceSummary.textContent="依据片段 · "+({cites:"引用",supports:"支持",opposes:"反对",background:"背景"}[fragment.relation]||"引用")+
+          (fragment.conversationId?" · 会话 "+String(fragment.conversationId).slice(0,8)+"…":" · 仅片段（来源不可定位）");
+        const pre=document.createElement("pre");pre.style.whiteSpace="pre-wrap";
+        pre.textContent=(fragment.before||"")+"【"+fragment.selection+"】"+(fragment.after||"");
+        box.append(sourceSummary,pre);
+        if(fragment.conversationId){
+          const locateRow=document.createElement("div");locateRow.className="line";
+          const btn=document.createElement("button");btn.type="button";btn.className="secondary";btn.textContent="在对话中定位";
+          const note=document.createElement("span");note.className="subtle";
+          btn.addEventListener("click",async()=>{
+            note.textContent="定位中…";
+            try{
+              const result=await evSend({type:"EV_LOCATE",conversationId:fragment.conversationId,messageId:fragment.messageId||null,role:null,contentPrefix:fragment.selection.slice(0,40)});
+              note.textContent=result.located&&result.verified?"已定位到原消息":
+                (result.reason==="conversation-not-open"?"对话未打开（仅片段）：https://chatgpt.com/c/"+fragment.conversationId:"定位不可靠，仅显示片段");
+            }catch(error){note.textContent="定位失败（仅片段）";}
           });
-          locateRow.appendChild(btn); locateRow.appendChild(note);
-          box.appendChild(locateRow);
+          locateRow.append(btn,note);box.appendChild(locateRow);
         }
-        item.appendChild(box);
+        content.appendChild(box);
       }
-      if (c.status !== "withdrawn") {
-        const row2 = document.createElement("div");
-        row2.className = "line";
-        const amend = document.createElement("button");
-        amend.type = "button"; amend.className = "secondary"; amend.textContent = "修订";
-        amend.addEventListener("click", async () => {
+      if(c.status!=="withdrawn"){
+        const row2=document.createElement("div");row2.className="line";
+        const amend=document.createElement("button");amend.type="button";amend.className="secondary";amend.textContent="修订";
+        amend.addEventListener("click",async()=>{
           let signature=null,operationId=null;
           const result=await ThreadLineDialogs.form({title:"修订结论",description:"保存后生成新版本，原有正文和依据保留。",submitLabel:"保存新版本",fields:[
             {name:"text",label:"结论正文",type:"textarea",value:row.current.text,required:true,maxPoints:4000},
             {name:"conditions",label:"适用条件",type:"textarea",rows:2,value:row.current.conditions||""},
             {name:"changeImpact",label:"变更类型",type:"select",value:"substantive",options:[{value:"substantive",label:"实质修改"},{value:"wording",label:"仅调整措辞"},{value:"conditions",label:"适用条件变化"}]}
-                  ],onSubmit:async values=>{
-            const nextSignature=JSON.stringify(values);if(signature!==nextSignature){signature=nextSignature;operationId="op_amend_"+crypto.randomUUID().replace(/-/g,"");}
+          ],onSubmit:async values=>{
+            const nextSignature=JSON.stringify(values);
+            if(signature!==nextSignature){signature=nextSignature;operationId="op_amend_"+crypto.randomUUID().replace(/-/g,"");}
             return evSend({type:"EV_AMEND",conclusionId:c.id,...values,expectedVersionId:row.current.id,operationId});
           }});
           if(result){await renderEvidenceProject();window.dispatchEvent(new Event("threadline-evidence-changed"));notify(result.projectionPending?"新版本已保存，共享摘要待更新":"新版本已保存，历史已保留");}
         });
-        const withdraw = document.createElement("button");
-        withdraw.type = "button"; withdraw.className = "secondary"; withdraw.textContent = "撤回";
-        withdraw.addEventListener("click", async () => {
-          if (!confirm("撤回该结论？历史与片段保留。")) return;
-          try {
-            await evSend({ type: "EV_WITHDRAW", conclusionId: c.id, reason: "面板撤回",
-              expectedVersionId: row.current.id,
-              operationId: "op_wd_" + crypto.randomUUID().replace(/-/g, "").slice(0, 12) });
+        const withdraw=document.createElement("button");withdraw.type="button";withdraw.className="secondary";withdraw.textContent="撤回";
+        withdraw.addEventListener("click",async()=>{
+          if(!confirm("撤回该结论？历史与片段保留。"))return;
+          try{
+            await evSend({type:"EV_WITHDRAW",conclusionId:c.id,reason:"面板撤回",expectedVersionId:row.current.id,operationId:"op_wd_"+crypto.randomUUID().replace(/-/g,"").slice(0,12)});
             await renderEvidenceProject();
-          } catch (e) { alert("撤回失败：" + e.message); }
+          }catch(error){alert("撤回失败："+error.message);}
         });
-        row2.appendChild(amend); row2.appendChild(withdraw);
-        item.appendChild(row2);
+        row2.append(amend,withdraw);content.appendChild(row2);
       }
       holder.appendChild(item);
     }
   }
 
   ev$("evidence-refresh").addEventListener("click", () => renderEvidenceProject());
+  ev$("evidence-query").addEventListener("input",()=>{evidenceVisibleLimit=ThreadLineEvidenceList.PAGE_SIZE;renderEvidenceRows();});
+  ev$("evidence-filter-status").addEventListener("change",()=>{evidenceVisibleLimit=ThreadLineEvidenceList.PAGE_SIZE;renderEvidenceRows();});
+  ev$("evidence-more").addEventListener("click",()=>{
+    evidenceVisibleLimit+=ThreadLineEvidenceList.PAGE_SIZE;renderEvidenceRows();
+    const more=ev$("evidence-more");
+    if(!more.hidden)more.focus();
+    else ev$("evidence-list").querySelector(".evidence-item:last-of-type > summary")?.focus();
+  });
   ev$("evidence-handoff-view").addEventListener("input",()=>{++handoffEdits;});
   ev$("evidence-project").addEventListener("change",()=>{
+    evidenceListCache=null;evidenceVisibleLimit=ThreadLineEvidenceList.PAGE_SIZE;
+    ev$("evidence-query").value="";ev$("evidence-filter-status").value="all";renderEvidenceRows();
     const view=ev$("evidence-handoff-view");
     if(handoffProject&&!view.hidden)handoffDrafts.set(handoffProject,{text:view.value,stamp:evidenceHandoffStamp});
     ++handoffGeneration;++handoffEdits;handoffPending=null;evidenceHasRows=false;ev$("evidence-handoff").disabled=true;handoffProject=ev$("evidence-project").value;

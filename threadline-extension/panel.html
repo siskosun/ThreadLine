@@ -156,10 +156,20 @@
         <button class="secondary" id="evidence-refresh" type="button">刷新</button>
       </div>
       <p id="evidence-summary" class="subtle" role="status" aria-live="polite"></p>
-      <div id="evidence-list"></div>
+      <div class="line evidence-search-line" role="search" aria-label="查找已采纳结论">
+        <label for="evidence-query">查找结论
+          <input type="search" id="evidence-query" placeholder="搜索正文、适用条件或编号" autocomplete="off"/>
+        </label>
+        <label for="evidence-filter-status">状态
+          <select id="evidence-filter-status"><option value="all">全部</option><option value="active">已采纳</option><option value="withdrawn">已撤回</option></select>
+        </label>
+      </div>
       <div class="line">
         <button class="secondary" id="evidence-handoff" type="button">生成交接预览</button>
       </div>
+      <p id="evidence-list-count" class="subtle" role="status" aria-live="polite"></p>
+      <div id="evidence-list"></div>
+      <button class="secondary" id="evidence-more" type="button" hidden>显示更多结论</button>
       <textarea id="evidence-handoff-view" rows="12" aria-label="可编辑的研究交接材料" hidden></textarea>
       <button class="secondary" id="evidence-handoff-copy" type="button" hidden>复制编辑后的交接</button>
       <button class="secondary" id="evidence-handoff-read" type="button" hidden>我已看过此份材料</button>
@@ -179,6 +189,7 @@
   <script src="ui-dialogs.js"></script>
   <script src="evidence-adoption-ui.js"></script>
   <script src="capture-ui.js"></script>
+  <script src="evidence-list-core.js"></script>
   <script src="panel.js"></script>
   <script src="evidence-maintenance-ui.js"></script>
 </body>

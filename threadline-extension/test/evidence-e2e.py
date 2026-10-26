@@ -174,11 +174,22 @@ def run():
             except Exception as error:
                 raise AssertionError(f"evidence panel failed to render: {panel_errors}") from error
             assert panel.locator("#evidence-list .evidence-item").count() == 1
+            assert "匹配 1 / 1 条结论" in panel.locator("#evidence-list-count").inner_text()
+            panel.locator("#evidence-query").fill("不存在的查询词")
+            assert "匹配 0 / 1 条结论" in panel.locator("#evidence-list-count").inner_text()
+            assert "没有符合搜索或状态筛选" in panel.locator("#evidence-list").inner_text()
+            panel.locator("#evidence-query").fill("")
+            panel.select_option("#evidence-filter-status","withdrawn")
+            assert "匹配 0 / 1 条结论" in panel.locator("#evidence-list-count").inner_text()
+            panel.select_option("#evidence-filter-status","all")
+            assert "匹配 1 / 1 条结论" in panel.locator("#evidence-list-count").inner_text()
             assert panel.locator("#evidence-list button", has_text="修订").count() == 1
             assert panel.locator("#evidence-list button", has_text="撤回").count() == 1
-            summary = panel.locator("#evidence-list details > summary")
+            first = panel.locator("#evidence-list .evidence-item").first
+            assert first.get_attribute("open") is not None
+            summary = first.locator(":scope > summary")
             assert summary.evaluate("node => node.getBoundingClientRect().height") >= 36
-            summary.click()
+            first.locator(".evidence-item-body > details > summary").first.click()
             panel.locator("#evidence-list button", has_text="在对话中定位").click()
             panel.wait_for_function(
                 "() => document.querySelector('#evidence-list').textContent"
