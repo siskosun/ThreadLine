@@ -66,8 +66,12 @@
     button.disabled=true;
     try{
       const result=await reply({type:"CAPTURE_CANCEL",id:run.id});
-      if(result.cancelled)showProgress("已手动取消采集；原始片段保留，不代表完整对话。",true);
       await poll(true);
+      if(result.cancelled){
+        showProgress("已停止写入本次采集；原始片段保留，不代表完整对话。",true);
+        if(!result.stopSignalDelivered)
+          showError("未能确认源页面收到停止信号；如页面仍在读取，请刷新来源标签页。旧运行已标记未完成。");
+      }
     }catch(error){showError("取消未确认："+error.message+"；请检查采集状态，勿重复操作。");}
     finally{button.disabled=false;}
   }
