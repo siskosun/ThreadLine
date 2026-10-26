@@ -151,6 +151,28 @@ def run():
                                 "url": "https://example.invalid/source"}],
                  "operationId": "op_s1a_e2e_0001"})
             assert adopted2["ok"], adopted2
+            # History is a panel-only, read-only query scoped to the owning project.
+            proto_rows = rows
+            single_before = raw_evidence(page)
+            single_history = send(panel, {"type":"EV_HISTORY","projectId":"proto-p1",
+                "conclusionId":proto_rows[0]["conclusion"]["id"]})
+            assert single_history["ok"], single_history
+            assert len(single_history["data"]["versions"]) == 1
+            withdrawn_proto = next(r for r in proto_rows if r["conclusion"]["status"] == "withdrawn")
+            withdrawn_history = send(panel, {"type":"EV_HISTORY","projectId":"proto-p1",
+                "conclusionId":withdrawn_proto["conclusion"]["id"]})
+            assert withdrawn_history["ok"] and withdrawn_history["data"]["status"] == "withdrawn"
+            assert len(withdrawn_history["data"]["versions"]) == 1
+            assert raw_evidence(page) == single_before, "history query must be read-only"
+            foreign_history = send(panel, {"type":"EV_HISTORY","projectId":project_id,
+                "conclusionId":proto_rows[0]["conclusion"]["id"]})
+            unknown_history = send(panel, {"type":"EV_HISTORY","projectId":project_id,
+                "conclusionId":"con_unknown_ux05_0001"})
+            assert not foreign_history["ok"] and not unknown_history["ok"]
+            assert foreign_history["error"] == unknown_history["error"] == "该课题下不存在该结论"
+            untrusted_history = send(page, {"type":"EV_HISTORY","projectId":"proto-p1",
+                "conclusionId":proto_rows[0]["conclusion"]["id"]})
+            assert not untrusted_history["ok"] and "仅限研线面板" in untrusted_history["error"]
             # Render the real panel, not only the prototype/message handlers.
             # No ChatGPT tab is opened: location must show the fragment fallback.
             panel_errors = []
@@ -224,6 +246,16 @@ def run():
             changed = send(panel, {"type": "EV_LIST", "projectId": project_id})["data"]["rows"][0]
             assert changed["current"]["conditions"] == original["current"]["conditions"]
             assert changed["fragments"] == original["fragments"], "text edits preserve source IDs, times and provenance"
+            panel.locator("#evidence-list button", has_text="查看版本历史（2）").click()
+            panel.wait_for_function("() => document.querySelectorAll('#evidence-list .evidence-history-version').length === 2")
+            history_text = panel.locator("#evidence-list .evidence-history").inner_text()
+            assert "封口课题的第一条结论" in history_text
+            assert "面板修订后的结论" in history_text
+            assert "仅适用合成样本 A" in history_text
+            assert "https://example.invalid/source" in history_text
+            version_one = panel.locator("#evidence-list .evidence-history-version").first
+            version_one.locator(":scope > summary").click()
+            assert version_one.locator(".evidence-history-fulltext").first.inner_text() == "封口课题的第一条结论"
             retry_request = {"type": "EV_AMEND", "conclusionId": adopted2["data"]["conclusionId"],
                              "text": "可重试修订", "operationId": "op_native_retry001"}
             retry_first = send(panel, retry_request)
@@ -254,7 +286,8 @@ def run():
             second_panel.goto(f"chrome-extension://{eid}/panel.html", wait_until="domcontentloaded")
             stale_version = retry_first["data"]["versionId"]
             fresh_edit = send(second_panel, {"type": "EV_AMEND", "conclusionId": adopted2["data"]["conclusionId"],
-                "text": "另一窗口的新修订", "expectedVersionId": stale_version, "operationId": "op_second_window01"})
+                "text": "另一窗口的新修订", "conditions":"仅适用合成样本 B","changeImpact":"conditions",
+                "expectedVersionId": stale_version, "operationId": "op_second_window01"})
             assert fresh_edit["ok"], fresh_edit
             before_stale = raw_evidence(page)
             stale_edit = send(panel, {"type": "EV_AMEND", "conclusionId": adopted2["data"]["conclusionId"],
@@ -286,6 +319,31 @@ def run():
             second_panel.wait_for_function("() => document.body.textContent.includes('课题状态已保存')")
             after_ui = send(second_panel, {"type": "SNAPSHOT"})["data"]["state"]
             assert next(p for p in after_ui["projects"] if p["id"] == project_id)["goal"] == "通过旧界面更新目标"
+            four_history = send(panel, {"type":"EV_HISTORY","projectId":project_id,
+                "conclusionId":adopted2["data"]["conclusionId"]})
+            assert four_history["ok"] and len(four_history["data"]["versions"]) == 4
+            assert four_history["data"]["versions"][0]["text"] == "封口课题的第一条结论"
+            assert four_history["data"]["versions"][2]["conditions"] == "仅适用合成样本 A"
+            assert four_history["data"]["versions"][3]["conditions"] == "仅适用合成样本 B"
+            withdrawn_commit = send(panel, {"type":"EV_WITHDRAW",
+                "conclusionId":adopted2["data"]["conclusionId"],"reason":"UX-05 历史验收",
+                "expectedVersionId":four_history["data"]["versions"][-1]["id"],
+                "operationId":"op_ux05_withdraw_0001"})
+            assert withdrawn_commit["ok"], withdrawn_commit
+            withdrawn_history = send(panel, {"type":"EV_HISTORY","projectId":project_id,
+                "conclusionId":adopted2["data"]["conclusionId"]})
+            assert withdrawn_history["ok"] and withdrawn_history["data"]["status"] == "withdrawn"
+            assert len(withdrawn_history["data"]["versions"]) == 4
+            source_id = next(fragment["sourceId"] for fragment in withdrawn_history["data"]["versions"][0]["fragments"] if fragment["available"])
+            page.evaluate("""async sourceId => {
+                const db=await new Promise((resolve,reject)=>{const q=indexedDB.open("threadline_evidence_v1");q.onsuccess=()=>resolve(q.result);q.onerror=()=>reject(q.error);});
+                await new Promise((resolve,reject)=>{const tx=db.transaction(["sources"],"readwrite");tx.objectStore("sources").delete(sourceId);tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error);tx.onerror=()=>reject(tx.error);});
+                db.close();
+            }""", source_id)
+            damaged_history = send(panel, {"type":"EV_HISTORY","projectId":project_id,
+                "conclusionId":adopted2["data"]["conclusionId"]})
+            assert damaged_history["ok"], damaged_history
+            assert any(not fragment["available"] for version in damaged_history["data"]["versions"] for fragment in version["fragments"])
             before_delete = raw_evidence(page)
             refused_delete = send(panel, {"type": "MUTATE", "action": {"type": "deleteProject", "projectId": project_id}})
             assert not refused_delete["ok"] and "证据库接管" in refused_delete["error"]
