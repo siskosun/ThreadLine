@@ -44,6 +44,25 @@ test('new chat is created in same window, draft retained locally, sidepanel clos
   assert.equal(s.session.has('tl_handoff_84'),false);
 });
 
+test('read-only handoff presence check is tab-bound and never consumes a reservation',async()=>{
+  const s=system();
+  const chat={url:'https://chatgpt.com/c/saved',tab:{id:84,url:'https://chatgpt.com/c/saved'}};
+  assert.equal((await s.message({type:'HANDOFF_PEEK'},chat)).pending,false);
+  await s.message({type:'NEW_CHAT',handoff:'SYNTHETIC DRAFT ONLY',windowId:4});
+  const first=await s.message({type:'HANDOFF_PEEK'},chat);
+  assert.equal(first.pending,true);
+  assert.equal(first.text,undefined,'saved chats must not read the draft text');
+  assert.equal(s.session.get('tl_handoff_84').attemptedAt,undefined);
+  assert.equal((await s.message({type:'HANDOFF_PEEK'},chat)).pending,true);
+  for(const url of ['https://example.com/','chrome-extension://capture-test/panel.html']){
+    await assert.rejects(s.message({type:'HANDOFF_PEEK'},
+      {url,tab:{id:84,url}}),/only a ChatGPT tab/);
+  }
+  await assert.rejects(s.message({type:'HANDOFF_GET'},chat),
+    /plain new ChatGPT/);
+  assert.equal(s.session.get('tl_handoff_84').attemptedAt,undefined);
+});
+
 test('handoff reservation refuses redirected and foreign documents',async()=>{
  const s=system();
  await s.message({type:'NEW_CHAT',handoff:'TEST INTENT',windowId:4});

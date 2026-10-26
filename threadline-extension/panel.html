@@ -96,10 +96,10 @@
         <div id="report-groups"></div>
         <section class="ai-workbench" aria-label="AI 深度分析">
           <div class="ai-head"><h3>AI 深度整理</h3><span class="badge muted">可选</span></div>
-          <p class="ai-help">优先使用已登录的 ChatGPT 网页进行分析，不需要安装 Ollama。网页自动分析属于实验模式，运行前会要求你确认；结果将更新报告和导图，不会自动修改课题收口状态。</p>
+          <p class="ai-help">默认手动分析：复制结构化提示，在 ChatGPT 自行发送，再导入核对后的 JSON。网页自动分析仍是实验功能，只有主动切换并确认后才会操作网页；任何方式均不会自动修改课题收口状态。</p>
           <div class="ai-field"><label for="ai-provider">分析方式</label><select id="ai-provider">
-            <option value="webui" selected>ChatGPT 网页自动分析（实验性，需确认）</option>
-            <option value="manual">ChatGPT 手动分析并导入（不自动操作网页）</option>
+            <option value="manual" selected>ChatGPT 手动分析并导入（默认，不自动操作网页）</option>
+            <option value="webui">ChatGPT 网页自动分析（实验性，需确认）</option>
             <optgroup label="其他模型方式（可选）">
               <option value="ollama">本机 Ollama（需自行安装）</option>
               <option value="openai">OpenAI API（独立 API Key）</option>

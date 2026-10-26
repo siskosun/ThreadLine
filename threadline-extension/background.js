@@ -72,6 +72,27 @@ async function readState() {
   const record = await chrome.storage.local.get(STORE_KEY);
   return ThreadLineCore.normalizedState(record[STORE_KEY]);
 }
+
+// Badge counts out-of-date *linked conversations*, not unread notifications.
+// The only input is the existing authoritative topic state; no new permissions.
+let reviewBadgeQueue=Promise.resolve();
+function refreshReviewBadge() {
+  if(typeof chrome.action?.setBadgeText!=="function")return Promise.resolve();
+  const next=reviewBadgeQueue.catch(()=>{}).then(async()=>{
+    const state=await readState();
+    const count=Object.values(state.chats)
+      .filter(chat=>ThreadLineCore.isOutdated(state,chat)).length;
+    await chrome.action.setBadgeText({text:count>99?"99+":count?String(count):""});
+    if(typeof chrome.action.setBadgeBackgroundColor==="function")
+      await chrome.action.setBadgeBackgroundColor({color:"#B36A24"}).catch(()=>{});
+    if(typeof chrome.action.setTitle==="function")
+      await chrome.action.setTitle({title:count
+        ? "研线：有 "+count+" 条关联对话待核对课题更新"
+        : "打开研线课题面板"}).catch(()=>{});
+  });
+  reviewBadgeQueue=next;
+  return next;
+}
 async function writeState(previous,next,reason,extra={}) {
   const preserve = !["observeChat", "acknowledgeProject"].includes(reason);
   if (!preserve) { await chrome.storage.local.set({...extra,[STORE_KEY]:next}); return; }
@@ -205,10 +226,22 @@ async function receiveCapture(payload,sender){
     default:throw new Error("未知采集状态");
   }
 }
+// A handoff carries the decision text rendered when the panel was last read.
+// If that project's conclusion came from the evidence library, refuse to hand
+// it off while the authoritative records are missing or inconsistent.
+async function guardHandoffAuthorityLocked(projectId){
+  if(!projectId)return;
+  const local=await chrome.storage.local.get(null);
+  const topic=ThreadLineCore.normalizedState(local[STORE_KEY]);
+  const marked=topic.projects.some(p=>p.id===projectId&&p.evidenceTakeover) ||
+    (local[EVIDENCE_SUMMARY_PREFIX+projectId]?.evidenceRevision||0)>0;
+  if(marked)await loadEvidenceAuthorityLocked();
+}
 async function openChatWithDraft(handoff,windowId,projectId){
   const text=String(handoff||"");
   if(new TextEncoder().encode(text).length>128*1024)throw new Error("接续材料超过 128 KiB，请缩小范围；未截断");
   if(!text)throw new Error("没有可用于接续的研究信息");
+  if(projectId)await serialize(()=>guardHandoffAuthorityLocked(projectId));
   const tab=await chrome.tabs.create({url:"https://chatgpt.com/",active:true,...(Number.isInteger(windowId)?{windowId}:{})});
   await chrome.storage.session.set({[`tl_handoff_${tab.id}`]:{text,projectId:projectId||null,createdAt:Date.now()}});
   if(projectId){
@@ -835,12 +868,18 @@ async function handleFF(payload, sender) {
 }
 chrome.runtime.onInstalled.addListener(() => {
   chrome.sidePanel.setPanelBehavior({openPanelOnActionClick:true}).catch(() => {});
+  refreshReviewBadge().catch(()=>{});
 });
 chrome.runtime.onStartup.addListener(() => {
+  refreshReviewBadge().catch(()=>{});
   recoverCaptures().catch(()=>{});
   chrome.sidePanel.setPanelBehavior({openPanelOnActionClick:true}).catch(() => {});
   ffRecoverBindings().catch(()=>{});
   consumeAllPendingProjections().catch(()=>{});
+});
+chrome.storage.onChanged?.addListener((changes,area)=>{
+  if(area==="local" && Object.prototype.hasOwnProperty.call(changes,STORE_KEY))
+    refreshReviewBadge().catch(()=>{});
 });
 chrome.tabs.onUpdated.addListener(async(tabId,change)=>{
   if(change.status!=="complete")return;
@@ -954,7 +993,7 @@ async function loadEvidenceAuthorityLocked() {
 }
 async function projectEvidenceLocked(authority) {
   const {db,state,local,topic,taken} = authority;
-  const next = structuredClone(topic), updates = {}, completed = [];
+  const next = structuredClone(topic), updates = {}, completed = [], pending = [];
   let topicChanged = false;
   for (const id of taken) {
     const p = state.projects[id];
@@ -988,13 +1027,17 @@ async function projectEvidenceLocked(authority) {
     // Topic projection, monotonic revision marker and summary become visible together.
     await writeState(topic,next,"evidenceProjection",updates);
   } else if (Object.keys(updates).length) await chrome.storage.local.set(updates);
-  for (const [id,revision] of completed) await ThreadLineEvidenceDB.clearProjectionTodo(db,id,revision);
-  return {ok:true};
+  for (const [id,revision] of completed) {
+    // A stale CAS means a newer revision landed while this one was projected.
+    // Keep the todo flag and report pending instead of claiming the summary is current.
+    const cleared=await ThreadLineEvidenceDB.clearProjectionTodo(db,id,revision);
+    if(!cleared?.cleared)pending.push(id);
+  }
+  return {ok:true,pending};
 }
 async function reconcileEvidenceLocked() {
   const authority = await loadEvidenceAuthorityLocked();
-  await projectEvidenceLocked(authority);
-  return authority;
+  return projectEvidenceLocked(authority);
 }
 async function readFreshState() {
   return serialize(async () => { await reconcileEvidenceLocked(); return readState(); });
@@ -1051,7 +1094,10 @@ async function handleEvidence(payload, sender) {
     return serialize(async () => {
     const authority = await loadEvidenceAuthorityLocked();
     let projectionError = null;
-    try { await projectEvidenceLocked(authority); } catch (e) { projectionError = String(e.message || e); }
+    try {
+      const projection = await projectEvidenceLocked(authority);
+      if (projection.pending.length) projectionError = "共享摘要待更新";
+    } catch (e) { projectionError = String(e.message || e); }
     const state = await ThreadLineEvidenceDB.snapshot(authority.db);
     const rows = Object.values(state.conclusions)
       .filter(c => c.projectId === payload.projectId)
@@ -1073,9 +1119,18 @@ async function handleEvidence(payload, sender) {
   if (payload.type === "EV_SUMMARY") {
     return serialize(async () => {
       const authority = await loadEvidenceAuthorityLocked();
-      let projectionPending = false;
-      try { await projectEvidenceLocked(authority); } catch { projectionPending = true; }
-      return {summary:Core.projectSummary(authority.state,payload.projectId),projectionPending};
+      let projectionPending = false, projectionError;
+      try {
+        const projection = await projectEvidenceLocked(authority);
+        if (projection.pending.length) {
+          projectionPending = true;
+          projectionError = "共享摘要待更新";
+        }
+      } catch (e) {
+        projectionPending = true;
+        projectionError = String(e.message || e);
+      }
+      return {summary:Core.projectSummary(authority.state,payload.projectId),projectionPending,projectionError};
     });
   }
   if (payload.type === "EV_ADOPT" || payload.type === "EV_WITHDRAW" || payload.type === "EV_IMPORT" || payload.type === "EV_AMEND") {
@@ -1090,6 +1145,10 @@ async function handleEvidence(payload, sender) {
           if (Object.prototype.hasOwnProperty.call(payload,field)) input[field] = payload[field];
         plan = await Core.planAmendment(state,payload.conclusionId,input,payload.operationId);
       } else if (payload.type === "EV_ADOPT") {
+        // Reject invalid input before creating a project row, so a denied adopt
+        // never leaves an orphan evidence project behind.
+        Core.validateAdoption({projectId:payload.projectId,text:payload.text,
+          conditions:payload.conditions,fragments:payload.fragments});
         // Topic-store projects adopt without a prior EV_ENSURE call.
         await ThreadLineEvidenceDB.ensureProject(db, payload.projectId, Core);
         // Refresh after ensureProject so planning sees the project row.
@@ -1110,7 +1169,11 @@ async function handleEvidence(payload, sender) {
       await evidenceBudget(state,plan);
       const result = await ThreadLineEvidenceDB.applyPlan(db,plan);
       // Once authority committed, projection failure must never report the write as failed.
-      try { await reconcileEvidenceLocked(); return {...result,projectionPending:false}; }
+      try {
+        const projection = await reconcileEvidenceLocked();
+        return {...result,projectionPending:projection.pending.length>0,
+          ...(projection.pending.length?{projectionError:"共享摘要待更新"}:{})};
+      }
       catch (e) { return {...result,projectionPending:true,projectionError:String(e.message || e)}; }
     });
   }
@@ -1202,6 +1265,23 @@ chrome.runtime.onMessage.addListener((payload,sender,reply) => {
     if(payload.type === "NEW_CHAT"){
       await requirePanelSender(sender,"只有研线面板可接续研究");
       return openChatWithDraft(payload.handoff,payload.windowId,payload.projectId);
+    }
+    if(payload.type==="HANDOFF_PEEK"){
+      // Pure presence check for existing chat/Project pages. Do not expose
+      // draft text, reserve an attempt, ACK or mutate the pending handoff.
+      const allowed = input => {
+        try {
+          const u = new URL(input);
+          return u.protocol==="https:" &&
+            ["chatgpt.com","chat.openai.com"].includes(u.hostname);
+        } catch{return false;}
+      };
+      if(!Number.isInteger(sender.tab?.id) ||
+          !allowed(sender.tab.url) || !allowed(sender.url))
+        throw new Error("only a ChatGPT tab can check its own handoff status");
+      const key="tl_handoff_"+sender.tab.id;
+      const found=await chrome.storage.session.get(key);
+      return {pending:typeof found[key]?.text==="string" && found[key].text.length>0};
     }
     if(["HANDOFF_GET","HANDOFF_BEGIN","HANDOFF_ACK"].includes(payload.type)){
       // A stale tab, Project/Temporary redirect or background page cannot
