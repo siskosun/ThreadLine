@@ -7,6 +7,7 @@
 - `probe.cjs` 增加弹窗动作测量、半透明颜色保守跳过、样张可复跑检查、`sourceDirty` 及非空输出目录拒绝保护；样张结果不再只有无来源的布尔 JSON。未改生产 JS/CSS、数据协议或 PLAN 机器状态。
 - 本地实测：`npm run verify` exit 0，285/285；增强探针 exit 0，17 状态、扩展及样张零页面错误、19 个输出文件；49 条本地 Markdown 链接零失效；非空输出目录负例 exit 1 且旧测量哈希不变。文档增量未重跑完整 Python E2E，真实登录、读屏器、真人任务及完整 WCAG 验收仍 NOT_EXECUTED。
 - 最终证据在干净提交 `80f4524668b42ac36cdd65dd13ff5c44726cb71e` 采集，`sourceDirty=false`，生产指纹不变。12 张图像字节不变，另 5 张因焦点/渲染状态或随机实验 ID 变化，已重新打开检查，未据此宣称视觉通过或回归。生产修复位于独立 Draft [PR #60](https://github.com/siskosun/ThreadLine/pull/60)，不混入本文档 PR，也不代表已合入 main。
+- 基线提交 `9e099909b89b99d2fb198d1d329447c7cdc0818c` 的 [Linux verify](https://github.com/siskosun/ThreadLine/actions/runs/40304481247) 与 [Windows baseline](https://github.com/siskosun/ThreadLine/actions/runs/40304481143) 均 success；本条只追加证据链接，最终 PR HEAD 以 GitHub 为准。
 
 ## 2026-10-26 UI 评估、体验基线与美学标准（文档候选）
 
