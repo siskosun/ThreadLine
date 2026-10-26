@@ -17,7 +17,17 @@
           "receiptId": null,
           "modelVersion": null,
           "sourceCorpusSha256": null,
-          "learningMs": null
+          "learningMs": null,
+          "reviewLogComplete": null,
+          "reviewSegments": [
+            {
+              "targetConclusionId": null,
+              "elapsedMs": null,
+              "learningMs": null,
+              "receiptId": null
+            }
+          ],
+          "handoffCorrectSubstantiveIds": null
         },
         "B": {
           "correctContinuation": null,
@@ -28,7 +38,18 @@
           "receiptId": null,
           "modelVersion": null,
           "sourceCorpusSha256": null,
-          "learningMs": null
+          "learningMs": null,
+          "reviewLogComplete": null,
+          "reviewSegments": [
+            {
+              "targetConclusionId": null,
+              "elapsedMs": null,
+              "learningMs": null,
+              "receiptId": null
+            }
+          ],
+          "handoffCorrectSubstantiveIds": null,
+          "deferrals": []
         },
         "C": {
           "correctContinuation": null,
@@ -39,7 +60,17 @@
           "receiptId": null,
           "modelVersion": null,
           "sourceCorpusSha256": null,
-          "learningMs": null
+          "learningMs": null,
+          "reviewLogComplete": null,
+          "reviewSegments": [
+            {
+              "targetConclusionId": null,
+              "elapsedMs": null,
+              "learningMs": null,
+              "receiptId": null
+            }
+          ],
+          "handoffCorrectSubstantiveIds": null
         }
       }
     }
