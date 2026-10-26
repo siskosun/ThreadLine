@@ -81,9 +81,14 @@ jobs:
       - name: Compare main to the most recent published Release
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_REQUESTED: ${{ inputs.publish_release || false }}
         run: |
           LATEST_TAG="$(gh release view --json tagName --jq '.tagName')"
-          node scripts/check-release-drift.mjs "$LATEST_TAG"
+          if [ "$RELEASE_REQUESTED" = "true" ]; then
+            node scripts/check-release-drift.mjs "$LATEST_TAG" --publish
+          else
+            node scripts/check-release-drift.mjs "$LATEST_TAG"
+          fi
 
   publish:
     name: Publish tested release archive (owner opt-in only)
