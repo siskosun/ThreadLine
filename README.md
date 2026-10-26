@@ -10,7 +10,7 @@
 
 不需要构建工具。下载 ZIP → 解压 → 打开 `edge://extensions/` 或 `chrome://extensions/` → 启用开发人员模式 →「加载解压缩的扩展程序」→ 选中包含 `manifest.json` 的 `threadline-extension` 文件夹。
 
-正式安装包由 GitHub Actions 在全部测试通过后构建并发布；[下载 SHA256 校验文件](https://github.com/siskosun/ThreadLine/releases/download/v0.8.1/SHA256SUMS.txt)。如 Release 尚未完成，可使用[旧版 v0.6.0 仓库压缩包](dist/ThreadLine-v0.6.0.zip)。侧载扩展不会自动更新。
+正式安装包由 GitHub Actions 在全部测试通过后构建并发布；[下载 SHA256 校验文件](https://github.com/siskosun/ThreadLine/releases/download/v0.8.1/SHA256SUMS.txt)。尚未发布的新提交不能视为可安装版本；请使用上方已发布的安装包，并注意侧载扩展不会自动更新。
 
 **从 v0.5.0 升级：** 使用相同扩展目录覆盖并重新加载，先在新版「全部课题与管理 → 课题备份与恢复」导出一次 JSON。v0.6.0 没有强行添加 `manifest.key`，避免改变旧扩展 ID 导致原状态不可见。以后迁移到其他安装路径，应先从原扩展导出 JSON，安装后导入。备份不包含短期采集全文。
 

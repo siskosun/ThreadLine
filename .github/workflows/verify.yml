@@ -4,6 +4,16 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      publish_release:
+        description: "Owner-authorized immutable GitHub Release from main"
+        type: boolean
+        required: true
+        default: false
+      approved_head_sha:
+        description: "Exact 40-character main commit SHA reviewed by the owner"
+        type: string
+        required: false
 permissions:
   contents: read
   checks: read
@@ -27,17 +37,13 @@ jobs:
         run: |
           set -o pipefail
           npm run verify | tee ../plan-node-test.log
-      - name: Check regression test-count floor
+      - name: Check release-scoped Node regression floor
         run: |
           python - <<'PY'
-          import re
+          import json, re
           from pathlib import Path
           data = Path('plan-node-test.log').read_text(encoding='utf-8', errors='replace')
-          counts = [int(n) for n in re.findall(r'(?m)^# tests (\d+)\s*$', data)]
-          if not counts or counts[-1] < 94:
-              raise SystemExit(f'Regression test count below original baseline 94: {counts}')
-          print(f'Node regression cases: {counts[-1]} (baseline floor: 94)')
-          PY
+          counts = [int(n) for n in re.findall(r'(?m)^# tests (\d+)\s*
       - name: Validate plan evidence against GitHub PRs and checks
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -50,32 +56,69 @@ jobs:
         working-directory: threadline-extension
         run: npm run test:e2e
 
+  release-drift:
+    name: Detect unpublished source/version drift
+    # Distinct from the normal code checks: a pre-existing drift on main
+    # must be visible, but must not release anything or block PR review.
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish_release)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Compare main to the most recent published Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          LATEST_TAG="$(gh release view --json tagName --jq '.tagName')"
+          node scripts/check-release-drift.mjs "$LATEST_TAG"
+
   publish:
-    name: Publish tested release archive
-    needs: verify
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    name: Publish tested release archive (owner opt-in only)
+    needs: [verify, release-drift]
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main' &&
+      github.actor == 'siskosun' &&
+      inputs.publish_release == true
     runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
+      - name: Require owner-approved exact HEAD before publishing
+        env:
+          APPROVED_HEAD_SHA: ${{ inputs.approved_head_sha }}
+        run: |
+          if [ "$APPROVED_HEAD_SHA" != "$GITHUB_SHA" ]; then
+            echo "::error::Owner must enter the exact reviewed main SHA; refusing publication"
+            exit 1
+          fi
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Refuse an already published version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="$(python -c 'import json; print(json.load(open("threadline-extension/manifest.json", encoding="utf-8"))["version"])')"
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "::error::Release v$VERSION already exists; bump version and review again"
+            exit 1
+          fi
       - name: Build versioned install ZIP and SHA256
         run: python scripts/build-release.py
       - name: Verify checksum before publishing
         run: cd dist && sha256sum -c SHA256SUMS.txt
-      - name: Publish immutable GitHub Release if missing
+      - name: Publish immutable GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION=$(python -c 'import json; print(json.load(open("threadline-extension/manifest.json", encoding="utf-8"))["version"])')
+          VERSION="$(python -c 'import json; print(json.load(open("threadline-extension/manifest.json", encoding="utf-8"))["version"])')"
           TAG="v${VERSION}"
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Release $TAG already exists: not replacing previously published assets"
-          else
-            gh release create "$TAG" "dist/ThreadLine-${TAG}.zip" "dist/SHA256SUMS.txt" \
-              --title "ThreadLine ${TAG}" \
-              --notes "Validated ThreadLine ${TAG} installer. The MV3 test uses a synthetic ChatGPT page; real authenticated ChatGPT flows still require manual acceptance testing."
-          fi
+          gh release create "$TAG" "dist/ThreadLine-${TAG}.zip" "dist/SHA256SUMS.txt" \
+            --title "ThreadLine ${TAG}" \
+            --notes "Owner-authorized ThreadLine ${TAG} installer from commit ${GITHUB_SHA}. Synthetic MV3 checks passed; real authenticated ChatGPT remains subject to separate human acceptance."
