@@ -29,7 +29,7 @@ function fixture(){
   for(let j=0;j<kinds.length;j++){
    const kind=kinds[j],sourceCorpusSha256=digest("shared synthetic source "+i+"/"+j),carryForwardConfirmed=kind==="wording_only",
       rootConclusionId=kind==="unrelated"?unrelated:root,goldAffectedIds=j<3?[dependent]:[];
-   c.events.push({id:"event_"+j,kind,rootConclusionId,critical:j===0,sourceCorpusSha256,carryForwardConfirmed,
+   c.events.push({id:"event_"+j,kind,observedChangeKind:"amend",rootConclusionId,critical:j===0,sourceCorpusSha256,carryForwardConfirmed,
      goldAffectedIds,goldMateriality:Object.fromEntries(goldAffectedIds.map(id=>[id,"substantive"])),
      goldCriticalIds:j===0?[dependent]:[],sourceSnapshotStatus:"verified",
      sourceSnapshotEvidenceSha256:digest("source-snapshot-"+i+"-"+j),
@@ -141,6 +141,12 @@ test("tier rule is byte-pinned and does not use materiality gold as priority inp
  good.observations.records[0].arms.B.handoffCorrectSubstantiveIds=[];
  const result=evaluateData(good.protocol,good.observations,good.hash);
  assert.equal(result.events[0].tiered.mustReviewCount,1,"gold label cannot rewrite frozen graph prediction");
+ const oracle=fixture();
+ oracle.protocol.cases[0].events[0].kind="wording_only";
+ oracle.protocol.cases[0].events[0].carryForwardConfirmed=false;
+ const noPeek=evaluateData(oracle.protocol,oracle.observations,oracle.hash);
+ assert.equal(noPeek.events[0].tiered.mustReviewCount,1,
+   "a different gold scenario label must not alter priority when observed change is the same");
  assert.equal(result.events[0].tiered.substantiveGoldCount,0);
 });
 test("two-hop substantive critical miss falls back to flat while keeping all impact paths",()=>{
