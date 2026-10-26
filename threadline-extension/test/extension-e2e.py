@@ -111,6 +111,40 @@ def run():
       assert isinstance(state,dict) and state.get('schema')==2, f'v2 schema not persisted: {verified!r}'
       assert verified['background']['revision']==state['revision'], 'worker and persistent revision differ'
       pid=state['projects'][0]['id']
+      # Hold the successful create acknowledgement after the write commits.
+      # Selecting another topic before releasing it must remain the user's choice.
+      panel.locator('[data-action="select-project"][data-id="' + pid + '"]').click()
+      panel.evaluate("""() => {
+        const original=chrome.runtime.sendMessage.bind(chrome.runtime);
+        window.__releaseCreate=null;
+        window.__createdCreateResponse=null;
+        chrome.runtime.sendMessage=(payload,callback)=>{
+          if(payload?.type==='MUTATE'&&payload.action?.type==='createProject'){
+            return original(payload,response=>{
+              window.__createdCreateResponse=response;
+              window.__releaseCreate=()=>callback(response);
+            });
+          }
+          return original(payload,callback);
+        };
+      }""")
+      panel.locator('#topic-name').fill('延迟回包课题')
+      panel.locator('#create-form button[type=submit]').click()
+      panel.wait_for_function("() => typeof window.__releaseCreate === 'function'")
+      panel.wait_for_function("() => document.querySelectorAll('#topic-list .topic-card').length === 2")
+      panel.locator('[data-action="select-project"][data-id="' + pid + '"]').click()
+      panel.evaluate("() => window.__releaseCreate()")
+      panel.wait_for_function("id => document.querySelector('#topic-list [data-id=\\\\\"' + id + '\\\\\"]')?.getAttribute('aria-pressed') === 'true'",
+        pid)
+      delayed_result=panel.evaluate("() => window.__createdCreateResponse")
+      assert delayed_result['ok'],delayed_result
+      delayed_id=delayed_result['data']['result']['projectId']
+      assert panel.locator('#topic-list [data-id="' + pid + '"]').get_attribute('aria-pressed')=='true'
+      assert panel.locator('#topic-list [data-id="' + delayed_id + '"]').get_attribute('aria-pressed')=='false'
+      panel.evaluate("""() => {
+        if(window.__createdCreateResponse) delete window.__createdCreateResponse;
+        if(window.__releaseCreate) delete window.__releaseCreate;
+      }""")
       panel.get_by_role('tab',name='证据与交接').click()
       panel.get_by_role('button',name='打开研究整理',exact=True).click()
       assert panel.locator('#workspace-research').is_visible()
@@ -206,7 +240,7 @@ def run():
       temporary_health=health_for('https://chatgpt.com/?temporary-chat=true')
       assert temporary_health['pageType']=='temporary_chat' and temporary_health['forkAllowed'] is False,temporary_health
       backup=panel.evaluate('''async () => chrome.runtime.sendMessage({type:'BACKUP_EXPORT'})''')
-      assert backup['ok'] and backup['data']['state']['projects'][0]['knowledgeVersion']==1
+      assert backup['ok'] and next(p for p in backup['data']['state']['projects'] if p['id']==pid)['knowledgeVersion']==1
       assert chat.evaluate('window.submitCount')==0
       panel.evaluate('''async () => {const db=await ThreadLineCaptureDB.getRun('not-exist');return db;}''')
       ctx.close()
@@ -214,7 +248,7 @@ def run():
       assert eid==eid2,'Extension ID must remain stable in a given browser profile'
       panel2=ctx2.new_page();panel2.goto(f'chrome-extension://{eid2}/panel.html')
       state2=panel2.evaluate("async () => (await chrome.storage.local.get('threadline_state_v1')).threadline_state_v1")
-      assert state2['projects'][0]['decision']=='已经核验的测试结论'
+      assert next(p for p in state2['projects'] if p['id']==pid)['decision']=='已经核验的测试结论'
       # persistent IndexedDB: real extension origin with transaction support
       panel2.evaluate('''async ()=>ThreadLineCaptureDB.putRun({id:'e2e-run',tabId:1,conversationId:'demo-alpha',status:'done',createdAt:Date.now()})''')
       saved=panel2.evaluate('''async ()=>ThreadLineCaptureDB.getRun('e2e-run')''')
