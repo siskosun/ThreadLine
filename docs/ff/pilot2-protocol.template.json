@@ -1,0 +1,66 @@
+{
+  "format": "threadline-pilot2-protocol/1",
+  "status": "NOT_EXECUTED",
+  "freeze": {
+    "at": null,
+    "commitSha": null,
+    "reviewedBy": null,
+    "ruleFrozenBeforeScoring": false
+  },
+  "explanation": "Only a schema template. No research cases have been frozen or executed.",
+  "cases": [
+    {
+      "id": "case-id",
+      "projectId": "project-id",
+      "order": [
+        "A",
+        "B",
+        "C"
+      ],
+      "independentAnnotations": [
+        {
+          "annotatorId": "rater-id",
+          "independent": false,
+          "submittedAt": null,
+          "annotationSha256": null
+        }
+      ],
+      "goldNecessaryEdgePairs": [
+        [
+          "con-up",
+          "con-down"
+        ]
+      ],
+      "events": [
+        {
+          "id": "event-id",
+          "kind": "premise_error",
+          "rootConclusionId": "con-root",
+          "goldAffectedIds": [],
+          "critical": false,
+          "frozenState": {
+            "projects": {},
+            "conclusions": {},
+            "versions": {}
+          },
+          "sourceCorpusSha256": null,
+          "goldMateriality": {},
+          "goldCriticalIds": [],
+          "sourceSnapshotStatus": "unknown",
+          "sourceSnapshotEvidenceSha256": null,
+          "handoffIncludedIds": null,
+          "handoffScopeSha256": null,
+          "observedChangeKind": null
+        }
+      ],
+      "adjudication": {
+        "reviewedBy": null,
+        "resolvedAt": null,
+        "disagreementsResolved": false,
+        "resolutionSha256": null
+      }
+    }
+  ],
+  "tierRuleId": "threadline-s2-tier/1",
+  "tierRuleSha256": null
+}
