@@ -1,4 +1,12 @@
-# v0.8.1 验收范围及限制
+# v0.8.2 验收范围及限制
+
+## 2026-10-26 S1 数据安全修复与工作台整合（v0.8.2）
+
+- 自动化范围：Node 285/285；合成 Chromium MV3 E2E 7/7（extension、handoff、ff-core、review-badge、evidence、adoption、s1-handoff），Linux 与 Windows 以 PR 的准确 HEAD 为准。
+- 本轮修复：接续前校验证据权威；投影 CAS 过期显式返回待更新；采纳校验先于建项目；证据生命周期、维护入口与逐条采纳流程。
+- 发布治理：Release 标签固定到所有者批准的提交，拒绝复用已有标签。
+- **NOT EXECUTED**：真实登录 ChatGPT 的 K=4 复测（F3 暂缓验收）；真实用户旧数据迁移（所有者决定不迁移，直接使用新版本）；真人交互与无障碍验收。
+- 发布须由仓库所有者在 GitHub Actions 手动输入准确 SHA 触发，CI 绿灯不等于已发布。
 
 ## 2026-10-24 真人 K=4 实测修复（v0.8.1）
 
