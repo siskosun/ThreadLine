@@ -11,9 +11,11 @@ import {createHash} from "node:crypto";
 import {fileURLToPath} from "node:url";
 import {resolve} from "node:path";
 import {createRequire} from "node:module";
+import {classifyImpacts,TIER_RULE_ID} from "./pilot2-tier-rule.mjs";
 const require=createRequire(import.meta.url);
 const Research=require("../threadline-extension/research-core.js");
 const sha256=raw=>createHash("sha256").update(raw).digest("hex");
+const TIER_RULE_SHA=sha256(readFileSync(fileURLToPath(new URL("./pilot2-tier-rule.mjs",import.meta.url))));
 const fail=reason=>{throw Error(reason);};
 const unique=x=>Array.isArray(x)&&new Set(x).size===x.length;
 const set=x=>new Set(x||[]);
@@ -31,6 +33,9 @@ function validateProtocol(p) {
   fail("协议必须在执行前冻结，包含至少 6 个研究案例");
  if(typeof p.freeze?.at!=="string"||!p.freeze?.commitSha||!p.freeze?.reviewedBy)
   fail("冻结缺少时间、Git commit 和预审人员；不能以结果反向更改真值");
+ if(p.freeze.ruleFrozenBeforeScoring!==true || p.tierRuleId!==TIER_RULE_ID ||
+    p.tierRuleSha256!==TIER_RULE_SHA)
+  fail("分层规则版本或 SHA 不匹配，必须在真值评分之前冻结准确规则字节");
  const seenCases=new Set(),seenEvents=new Set();
  let total=0,dual=0,critical=0;
  for(const c of p.cases) {
@@ -46,10 +51,29 @@ function validateProtocol(p) {
    const k=c.id+"/"+e.id;
    if(!validId(e.id)||seenEvents.has(k)||!validId(e.rootConclusionId)||!unique(e.goldAffectedIds)||!Array.isArray(e.goldAffectedIds))fail("变化事件/影响真值无效");
    seenEvents.add(k);
-   if(!["premise_error","definition_change","source_lost","wording_only","unrelated"].includes(e.kind))fail("变化类型无效");
+   if(!["premise_error","definition_change","source_lost","withdraw","wording_only","unrelated"].includes(e.kind))fail("变化类型无效");
    if(!e.frozenState?.projects?.[c.projectId]||!e.frozenState?.conclusions?.[e.rootConclusionId])fail("B 臂缺少事先冻结的真实图状态");
    if(typeof e.sourceCorpusSha256!=="string"||!/^[a-f0-9]{64}$/.test(e.sourceCorpusSha256))fail("每次变化必须预先冻结原始资料 SHA-256");
    if(e.goldAffectedIds.includes(e.rootConclusionId))fail("下游真值不能把变化根结论自身算作依赖影响");
+   if(!e.goldMateriality||typeof e.goldMateriality!=="object"||Array.isArray(e.goldMateriality)||
+      Object.keys(e.goldMateriality).length!==e.goldAffectedIds.length||
+      e.goldAffectedIds.some(id=>!["substantive","non_substantive"].includes(e.goldMateriality[id]))||
+      Object.keys(e.goldMateriality).some(id=>!e.goldAffectedIds.includes(id)))
+      fail("G* 每一项目须在冻结前标注实质或非实质，不能给误报虚构真值标签");
+   if(!Array.isArray(e.goldCriticalIds)||!unique(e.goldCriticalIds)||
+      e.goldCriticalIds.some(id=>e.goldMateriality[id]!=="substantive")||
+      (e.critical===true&&e.goldCriticalIds.length===0))
+      fail("关键目标必须是实质 G* 的子集并在冻结前逐项登记");
+   if(!["verified","missing","hash_mismatch","unknown"].includes(e.sourceSnapshotStatus))
+      fail("缺少冻结的来源核验状态");
+   if(e.sourceSnapshotStatus==="verified"&&
+      !/^[a-f0-9]{64}$/.test(e.sourceSnapshotEvidenceSha256||""))
+      fail("已验证来源须绑定独立快照哈希");
+   if(e.handoffIncludedIds!==null&&(!Array.isArray(e.handoffIncludedIds)||
+      !unique(e.handoffIncludedIds)||e.handoffIncludedIds.some(id=>e.frozenState.conclusions?.[id]?.projectId!==c.projectId)||
+      !/^[a-f0-9]{64}$/.test(e.handoffScopeSha256||"")))
+      fail("已核实的交接范围必须是带 SHA 的冻结结论 ID 列表");
+   if(e.handoffIncludedIds===undefined)fail("交接范围缺失；未知必须显式记录 null");
    if(e.carryForwardConfirmed===true&&e.kind!=="wording_only")fail("仅措辞承接只能用于 wording_only 事件");
    if(e.critical===true)critical++;
    // Prevent sample construction that accidentally mixes different projects.
