@@ -1,4 +1,4 @@
-/* Small accessible form dialog. Submissions resolve only after the writer replies. */
+/* Small accessible form/confirmation dialogs. Failed submissions stay open for review. */
 (() => {
   "use strict";
   const element=(tag,attrs={},text="")=>{const n=document.createElement(tag);Object.assign(n,attrs);n.textContent=text;return n;};
@@ -37,11 +37,36 @@
         const values=Object.fromEntries(fields.map(f=>[f.name,f.type==="checkbox"?controls[f.name].checked:controls[f.name].value]));
         busy=true;dialog.setAttribute("aria-busy","true");[...Object.values(controls),cancel,save].forEach(c=>c.disabled=true);status.textContent="正在保存，请稍候…";
         try{const result=await onSubmit(values);close(result??values);}
-        catch(error){status.textContent="未保存："+error.message;status.dataset.error="true";}
+        catch(error){status.textContent="提交失败或结果未确认："+error.message;status.dataset.error="true";}
         finally{busy=false;if(!finished){dialog.removeAttribute("aria-busy");[...Object.values(controls),cancel,save].forEach(c=>c.disabled=false);}}
       };
       dialog.showModal();(Object.values(controls).find(c=>!c.readOnly)||cancel).focus();
     });
   }
-  globalThis.ThreadLineDialogs={form};
+  function confirm({title,description="",confirmLabel="确认",cancelLabel="取消",danger=false}) {
+    return new Promise(resolve=>{
+      const opener=document.activeElement,dialog=element("dialog",{className:"tl-dialog tl-confirm-dialog"});
+      const heading=element("h2",{id:"tl-confirm-title"},title);
+      const content=element("div",{className:"tl-dialog-body",tabIndex:0,role:"region",ariaLabel:title+"说明"});
+      const help=element("p",{className:"subtle"},description);
+      content.append(heading,help);
+      dialog.setAttribute("aria-labelledby",heading.id);
+      const actions=element("div",{className:"tl-actions"});
+      const cancel=element("button",{type:"button",className:"secondary"},cancelLabel);
+      const accept=element("button",{type:"button",className:danger?"primary tl-danger":"primary"},confirmLabel);
+      actions.append(cancel,accept);dialog.append(content,actions);document.body.append(dialog);
+      let finished=false;
+      const close=value=>{
+        if(finished)return;
+        finished=true;dialog.close();dialog.remove();
+        if(opener?.isConnected)opener.focus();
+        resolve(value);
+      };
+      cancel.addEventListener("click",()=>close(false));
+      accept.addEventListener("click",()=>close(true));
+      dialog.addEventListener("cancel",event=>{event.preventDefault();close(false);});
+      dialog.showModal();accept.focus();
+    });
+  }
+  globalThis.ThreadLineDialogs={form,confirm};
 })();
