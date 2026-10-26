@@ -165,10 +165,16 @@ export function evaluateData(protocol,observations,protocolSha256){
   byKey.set(k,item);
  }
  let edgesTP=0,edgesFN=0,edgesFP=0,TP=0,FP=0,FN=0,criticalMisses=0;
+ let flatBurden=0,mustBurden=0,beforeBurden=0,deferredBurden=0;
+ let goldSubstantive=0,mustSubstantive=0,tierCriticalMisses=0;
+ let leakedBeforeUse=0,leakedDeferred=0;
  const events=[],cases=[];
  for(const c of protocol.cases) {
   let cTP=0,cFP=0,cFN=0,criticalCaseMisses=0;
-  const metrics=Object.fromEntries(ARM.map(a=>[a,{correct:[],wrongRevised:[],elapsed:[],learning:[],human:[],calls:[]}]));
+  let cFlat=0,cMust=0,cBefore=0,cDeferred=0,cSubstantive=0,cMustSubstantive=0,cTierCritical=0,cLeakedBefore=0,cLeakedDeferred=0;
+  const metrics=Object.fromEntries(ARM.map(a=>[a,{correct:[],wrongRevised:[],elapsed:[],learning:[],human:[],calls:[],
+    reviewMs:0,reviewWithLearningMs:0,noiseMs:0,noiseWithLearningMs:0,
+    allocatedLearningMs:0,correctedTargets:0,substantiveTargets:0}]));
   const registered=new Set();
   const research=c.events[0]?.frozenState?.projects?.[c.projectId]?.research;
   for(const edge of research?.edges||[])if(edge.active)registered.add(edge.upstreamConclusionId+"=>"+edge.downstreamConclusionId);
@@ -181,33 +187,80 @@ export function evaluateData(protocol,observations,protocolSha256){
    // The extension's actual Research.impacts is the only B prediction source.
    // S3 intentionally emits NO change event for a user-confirmed wording-only
    // carry-forward; other events use the production Research.impacts routine.
-   const computed=e.carryForwardConfirmed===true?[]:
-     Research.impacts(e.frozenState,c.projectId,[e.rootConclusionId]).map(row=>row.conclusionId);
+   const impactRows=e.carryForwardConfirmed===true?[]:
+     Research.impacts(e.frozenState,c.projectId,[e.rootConclusionId]);
+   const computed=impactRows.map(row=>row.conclusionId);
+   const tiered=classifyImpacts(e,impactRows,c.projectId);
+   const mustIds=tiered.filter(x=>x.tier==="must_review").map(x=>x.conclusionId);
+   const beforeIds=tiered.filter(x=>x.tier==="before_use").map(x=>x.conclusionId);
+   const deferredIds=item.arms.B.deferrals.map(x=>x.targetConclusionId);
+   const substantive=e.goldAffectedIds.filter(id=>e.goldMateriality[id]==="substantive");
+   const mustSet=new Set(mustIds);
+   const beforeSet=new Set(beforeIds);
+   const deferredSet=new Set(deferredIds);
+   const criticalLeaks=e.goldCriticalIds.filter(id=>!mustSet.has(id));
+   const substantivelyLeakedBefore=substantive.filter(id=>beforeSet.has(id));
+   const substantivelyLeakedDeferred=substantive.filter(id=>deferredSet.has(id));
    const counts=score(computed,e.goldAffectedIds),missed=counts.fn>0&&e.critical===true;
+   const mustCovered=substantive.filter(id=>mustSet.has(id)).length;
    cTP+=counts.tp;cFP+=counts.fp;cFN+=counts.fn;if(missed)criticalCaseMisses++;
+   cFlat+=computed.length;cMust+=mustIds.length;cBefore+=beforeIds.length;
+   cDeferred+=deferredIds.length;cSubstantive+=substantive.length;
+   cMustSubstantive+=mustCovered;cTierCritical+=criticalLeaks.length;
+   cLeakedBefore+=substantivelyLeakedBefore.length;cLeakedDeferred+=substantivelyLeakedDeferred.length;
    for(const arm of ARM){
     const v=item.arms[arm],m=metrics[arm];
     m.correct.push(Number(v.correctContinuation));m.wrongRevised.push(Number(v.wronglyRevisedTrueClaim));
     m.elapsed.push(v.elapsedMs);m.learning.push(v.learningMs);m.human.push(v.humanInterventions);m.calls.push(v.modelCalls);
+    m.correctedTargets+=v.handoffCorrectSubstantiveIds.length;
+    m.substantiveTargets+=substantive.length;
+    for(const segment of v.reviewSegments){
+     m.reviewMs+=segment.elapsedMs;m.reviewWithLearningMs+=segment.elapsedMs+segment.learningMs;
+     m.allocatedLearningMs+=segment.learningMs;
+     if(e.goldMateriality[segment.targetConclusionId]!=="substantive"){
+      m.noiseMs+=segment.elapsedMs;m.noiseWithLearningMs+=segment.elapsedMs+segment.learningMs;
+     }
+    }
    }
    events.push({caseId:c.id,eventId:e.id,kind:e.kind,critical:e.critical===true,
-     predictedAffectedIds:computed,goldAffectedIds:e.goldAffectedIds,
-     ...counts,criticalMiss:missed,arms:item.arms});
+     predictedAffectedIds:computed,goldAffectedIds:e.goldAffectedIds,goldMateriality:e.goldMateriality,
+     ...counts,criticalMiss:missed,
+     tiered:{mustReviewIds:mustIds,beforeUseIds:beforeIds,deferredIds,
+       flatCount:computed.length,mustReviewCount:mustIds.length,beforeUseCount:beforeIds.length,
+       substantiveGoldCount:substantive.length,mustReviewSubstantiveCount:mustCovered,
+       criticalMissedIds:criticalLeaks,substantiveLeakedBeforeUseIds:substantivelyLeakedBefore,
+       substantiveLeakedDeferredIds:substantivelyLeakedDeferred},
+     arms:item.arms});
   }
   TP+=cTP;FP+=cFP;FN+=cFN;criticalMisses+=criticalCaseMisses;
+  flatBurden+=cFlat;mustBurden+=cMust;beforeBurden+=cBefore;deferredBurden+=cDeferred;
+  goldSubstantive+=cSubstantive;mustSubstantive+=cMustSubstantive;tierCriticalMisses+=cTierCritical;
+  leakedBeforeUse+=cLeakedBefore;leakedDeferred+=cLeakedDeferred;
   const outcome=Object.fromEntries(ARM.map(a=>{
    const m=metrics[a];return [a,{correctRate:mean(m.correct),wrongRevisionRate:mean(m.wrongRevised),
      medianElapsedMs:median(m.elapsed),totalElapsedMs:m.elapsed.reduce((a,b)=>a+b,0),
       totalLearningMs:m.learning.reduce((a,b)=>a+b,0),
       totalWithLearningMs:m.elapsed.reduce((a,b)=>a+b,0)+m.learning.reduce((a,b)=>a+b,0),
       meanHumanInterventions:mean(m.human),
-     meanModelCalls:mean(m.calls)}];
+      meanModelCalls:mean(m.calls),
+      reviewMs:m.reviewMs,reviewWithLearningMs:m.reviewWithLearningMs,
+      noiseMs:m.noiseMs,noiseWithLearningMs:m.noiseWithLearningMs,
+      unallocatedLearningMs:m.learning.reduce((a,b)=>a+b,0)-m.allocatedLearningMs,
+      noiseShare:ratio(m.noiseMs,m.reviewMs),
+      noiseShareWithLearning:ratio(m.noiseWithLearningMs,m.reviewWithLearningMs),
+      substantiveHandoffCorrectRate:ratio(m.correctedTargets,m.substantiveTargets),
+      substantiveHandoffCorrectCount:m.correctedTargets,
+      substantiveGoldCount:m.substantiveTargets}];
   }));
   const gainA=ratio(outcome.A.totalWithLearningMs-outcome.B.totalWithLearningMs,outcome.A.totalWithLearningMs);
   const gainC=ratio(outcome.C.totalWithLearningMs-outcome.B.totalWithLearningMs,outcome.C.totalWithLearningMs);
   const gainAWithoutLearning=ratio(outcome.A.totalElapsedMs-outcome.B.totalElapsedMs,outcome.A.totalElapsedMs);
   const gainCWithoutLearning=ratio(outcome.C.totalElapsedMs-outcome.B.totalElapsedMs,outcome.C.totalElapsedMs);
   cases.push({id:c.id,events:c.events.length,tp:cTP,fp:cFP,fn:cFN,criticalMisses:criticalCaseMisses,
+   tiered:{flatCount:cFlat,mustReviewCount:cMust,beforeUseCount:cBefore,deferredCount:cDeferred,
+    burdenReduction:ratio(cFlat-cMust,cFlat),
+    substantiveGoldCount:cSubstantive,mustRecall:ratio(cMustSubstantive,cSubstantive),
+    criticalMisses:cTierCritical,leakedBeforeUse:cLeakedBefore,leakedDeferred:cLeakedDeferred},
    arms:outcome,gainBvsA:gainA,gainBvsC:gainC,
    gainBvsAExcludingLearning:gainAWithoutLearning,gainBvsCExcludingLearning:gainCWithoutLearning,
    accuracyDeltaBvsA:outcome.B.correctRate-outcome.A.correctRate,
