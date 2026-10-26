@@ -56,7 +56,9 @@
       rerenderPending = false;
       if (selectedId && !state.projects.some(p=>p.id===selectedId)) selectedId = null;
       render();
-    } catch(error) {notify(error.message,true);}
+    } catch(error) {
+      notifyCritical("读取课题状态失败或结果未确认："+error.message+"。当前显示可能过期；请刷新后再执行破坏性操作。");
+    }
   }
   function notify(value,isError=false) {
     const node = $("#toast");
@@ -66,6 +68,16 @@
     clearTimeout(toastTimer);
     toastTimer = setTimeout(()=>node.classList.remove("show"),3100);
   }
+  function notifyCritical(value) {
+    const region=$("#critical-notice"),text=$("#critical-notice-text");
+    if(!region||!text){notify(value,true);return;}
+    text.textContent=value;
+    region.hidden=false;
+  }
+  $("#critical-notice-dismiss")?.addEventListener("click",()=>{
+    $("#critical-notice").hidden=true;
+    $("#critical-notice-text").textContent="";
+  });
   async function change(action,success) {
     if (busy) {notify("上一项更改正在保存，请稍后再试");return;}
     busy=true;
@@ -74,7 +86,10 @@
       if (res?.result?.projectId) selectedId = res.result.projectId;
       await refresh(true);
       if (success) notify(success);
-    } catch(error) {notify(error.message,true);}
+    } catch(error) {
+      await refresh(true);
+      notifyCritical("操作失败或结果未确认："+error.message+"。已请求刷新当前状态；请核对课题与分支是否已变化，再决定是否重试。研线未自动重放操作。");
+    }
     finally{busy=false;}
   }
   function getKey(tab) {return tab && ThreadLineCore.getChatKey(tab.url,tab.id);}
@@ -397,13 +412,39 @@
     const c=state.chats[key];
     if (!c) return;
     if (action==="go-chat") return openChat(c);
-    if (action==="label-chat") {
-      const value=prompt("给这个分支命名（例如：A · 回测、B · 质疑）",c.label||c.title);
-      if (value!==null) return change({type:"updateChat",key,patch:{label:value}},"分支名称已更新");
-    }
-    if (action==="note-chat") {
-      const value=prompt("这个分支的进展或等待事项（最多300字）",c.note||"");
-      if (value!==null) return change({type:"updateChat",key,patch:{note:value}},"分支进度已更新");
+    if (action==="label-chat" || action==="note-chat") {
+      const isLabel=action==="label-chat",field=isLabel?"label":"note";
+      const title=isLabel?"编辑分支名称":"编辑分支进度";
+      const baseRevision=state.revision;
+      const current=String(isLabel?(c.label||c.title||""):(c.note||""));
+      const value=Array.from(current).slice(0,isLabel?80:300).join("");
+      return ThreadLineDialogs.form({
+        title,
+        description:isLabel
+          ?"最多 80 个字符。留空会清除自定义名称；保存失败时输入会保留。"
+          :"记录当前进展或等待事项，最多 300 个字符。保存失败时输入会保留。",
+        submitLabel:isLabel?"保存名称":"保存进度",
+        fields:[{name:field,label:isLabel?"分支名称":"进展或等待事项",
+          type:isLabel?"text":"textarea",rows:4,value,
+          maxLength:isLabel?80:300,maxPoints:isLabel?80:300,
+          hint:isLabel?"示例：A · 回测、B · 质疑":"只记录当前进展，不自动改变分支状态"}],
+        onSubmit:async values=>{
+          try{
+            const result=await message({type:"MUTATE",action:{
+              type:"updateChat",key,expectedRevision:baseRevision,
+              patch:{[field]:values[field]}
+            }});
+            await refresh(true);
+            notify(isLabel?"分支名称已更新":"分支进度已更新");
+            return result;
+          }catch(error){
+            await refresh(true);
+            notifyCritical((isLabel?"分支名称":"分支进度")+"保存失败或结果未确认："+error.message+
+              "。已请求刷新状态；输入仍保留。请先核对当前分支，再决定是否重试。不会自动重放。");
+            throw error;
+          }
+        }
+      });
     }
     if (action==="unlink-chat") {
       if (confirm("从当前课题移除此对话？不会删除原始 ChatGPT 对话。")) return change({type:"unlinkChat",key},"已移除关联");
@@ -471,6 +512,7 @@
     catch (e) {
       if(request!==evidenceRequest)return;
       ev$("evidence-summary").textContent = "证据库不可用：" + e.message;
+      notifyCritical("证据读取失败或结果未确认："+e.message+"。当前证据列表可能不完整，请刷新并核对权威库状态。");
       evidenceListCache=null;renderEvidenceRows();
       // Preserve any manually edited draft, but stop presenting it as current.
       ev$("evidence-handoff-copy").disabled = true;
@@ -566,17 +608,34 @@
           ],onSubmit:async values=>{
             const nextSignature=JSON.stringify(values);
             if(signature!==nextSignature){signature=nextSignature;operationId="op_amend_"+crypto.randomUUID().replace(/-/g,"");}
-            return evSend({type:"EV_AMEND",conclusionId:c.id,...values,expectedVersionId:row.current.id,operationId});
+            try{
+              return await evSend({type:"EV_AMEND",conclusionId:c.id,...values,expectedVersionId:row.current.id,operationId});
+            }catch(error){
+              await renderEvidenceProject();
+              notifyCritical("修订失败或结果未确认："+error.message+
+                "。已请求刷新当前版本；输入仍保留。请核对历史后再决定是否重试，不会自动重放。");
+              throw error;
+            }
           }});
           if(result){await renderEvidenceProject();window.dispatchEvent(new Event("threadline-evidence-changed"));notify(result.projectionPending?"新版本已保存，共享摘要待更新":"新版本已保存，历史已保留");}
         });
         const withdraw=document.createElement("button");withdraw.type="button";withdraw.className="secondary";withdraw.textContent="撤回";
         withdraw.addEventListener("click",async()=>{
-          if(!confirm("撤回该结论？历史与片段保留。"))return;
+          const accepted=await ThreadLineDialogs.confirm({
+            title:"撤回这条结论？",
+            description:"撤回后它不再作为当前有效结论展示，但历史版本、适用条件和来源片段会保留。",
+            confirmLabel:"撤回结论",cancelLabel:"取消",danger:true
+          });
+          if(!accepted)return;
           try{
             await evSend({type:"EV_WITHDRAW",conclusionId:c.id,reason:"面板撤回",expectedVersionId:row.current.id,operationId:"op_wd_"+crypto.randomUUID().replace(/-/g,"").slice(0,12)});
             await renderEvidenceProject();
-          }catch(error){alert("撤回失败："+error.message);}
+            notify("结论已撤回，历史与来源片段已保留");
+          }catch(error){
+            await renderEvidenceProject();
+            notifyCritical("撤回失败或结果未确认："+error.message+
+              "。已请求刷新当前结论；请核对状态与历史后再决定是否重试。研线未自动重放撤回操作。");
+          }
         });
         row2.append(amend,withdraw);content.appendChild(row2);
       }
@@ -616,7 +675,7 @@
       evidenceHandoffStamp={projectId,handoffId:result.handoff.id};handoffDrafts.set(projectId,{text:view.value,stamp:evidenceHandoffStamp});
       for(const id of ["evidence-handoff-copy","evidence-handoff-read"]){ev$(id).hidden=false;ev$(id).disabled=false;}
       window.dispatchEvent(new Event("threadline-evidence-changed"));
-    }catch(error){if(generation===handoffGeneration)notify("交接生成未确认："+error.message+"。原草稿仍保留。",true);}
+    }catch(error){if(generation===handoffGeneration)notifyCritical("交接生成结果未确认："+error.message+"。原草稿仍保留；请核对该课题的交接历史后再决定是否重试。研线未自动重放。");}
     finally{if(handoffPending?.generation===generation){handoffPending=null;ev$("evidence-handoff").disabled=!evidenceHasRows;}}
   });
   ev$("evidence-handoff-copy").addEventListener("click", async () => {
@@ -632,7 +691,7 @@
       await evSend({type:"EV_HANDOFF_RECORD",projectId:stamp.projectId,handoffId:stamp.handoffId,text,event:"copied",
         expectedRevision:data.project.evidenceRevision,operationId:"op_copied_"+crypto.randomUUID().replace(/-/g,"")});
       notify("已复制编辑后的交接材料");
-    } catch (e) { notify((copied?"文本已复制，但复制记录未保存：":"复制未完成：")+(e.message||"请核对当前状态"), true); }
+    } catch (e) { notifyCritical((copied?"文本已复制，但复制记录未保存：":"复制未完成：")+(e.message||"请核对当前状态")+"。请刷新并核对交接记录；不会自动重放。"); }
   });
   ev$("evidence-handoff-read").addEventListener("click",async()=>{
     try {
@@ -642,10 +701,10 @@
       await evSend({type:"EV_HANDOFF_RECORD",projectId:stamp.projectId,handoffId:stamp.handoffId,text,
         event:"human-read",expectedRevision:data.project.evidenceRevision,operationId:"op_read_"+crypto.randomUUID().replace(/-/g,"")});
       notify("已记录你看过此份材料；这不表示模型已理解。");
-    } catch(e){notify(e.message,true);}
+    } catch(e){notifyCritical("交接已读记录失败或结果未确认："+e.message+"。请核对当前课题的交接历史后再决定是否重试。");}
   });
-  window.addEventListener("threadline-evidence-changed",()=>{renderEvidence().catch(e=>notify(e.message,true));refresh(true);});
-  renderEvidence().catch(() => {});
+  window.addEventListener("threadline-evidence-changed",()=>{renderEvidence().catch(e=>notifyCritical("证据课题列表读取失败："+e.message));refresh(true);});
+  renderEvidence().catch(error=>notifyCritical("证据课题列表读取失败："+error.message));
   document.querySelector(".workspace-tabs").addEventListener("keydown", e => {
     if (!["ArrowLeft","ArrowRight","Home","End"].includes(e.key)) return;
     e.preventDefault();
