@@ -280,10 +280,10 @@
       const text=JSON.stringify(data,null,2);
       const url=URL.createObjectURL(new Blob([text],{type:'application/json;charset=utf-8'}));
       const anchor=document.createElement('a');
-      anchor.href=url;anchor.download=`ThreadLine-课题备份-${new Date().toISOString().slice(0,10)}.json`;
+      anchor.href=url;anchor.download=`ThreadLine-课题与对话关联-${new Date().toISOString().slice(0,10)}.json`;
       document.body.append(anchor);anchor.click();anchor.remove();
       setTimeout(()=>URL.revokeObjectURL(url),2500);
-      $('#backup-status').textContent=`已下载 ${data.state.projects.length} 个课题、${Object.keys(data.state.chats).length} 条关联。临时采集原文未包含。`;
+      $('#backup-status').textContent=`已下载 ${data.state.projects.length} 个课题、${Object.keys(data.state.chats).length} 条关联。不包含证据库、Fork 实验或临时采集全文。`;
     } catch(e){$('#backup-status').textContent='导出失败：'+e.message;}
   }
   async function importBackup(){
@@ -291,7 +291,7 @@
     try {
       if(file.size>ThreadLineBackup.MAX_BYTES)throw new Error('备份文件超过 2MB');
       const json=await file.text();const state=ThreadLineBackup.parse(json);
-      if(!confirm(`确认用备份中的 ${state.projects.length} 个课题、${Object.keys(state.chats).length} 条关联覆盖当前数据吗？当前状态会先保留为本地快照。`))return;
+      if(!confirm(`确认用备份中的 ${state.projects.length} 个课题、${Object.keys(state.chats).length} 条关联替换当前所有本地课题与对话关联吗？此操作不包含证据库或 Fork 实验；当前课题状态会先保留为本地快照。`))return;
       const info=await message({type:'BACKUP_IMPORT',json});
       selectedId=null;await refresh(true);
       $('#backup-status').textContent=`恢复成功：${info.projects} 个课题、${info.chats} 条关联。`;
@@ -351,6 +351,7 @@
     const action=btn.dataset.action,key=btn.dataset.key,id=btn.dataset.id;
     if (action==="open-research") {setWorkspace("research",true);return;}
     if (action==="start-new-topic") {
+      setWorkspace("switch");
       $("#manage-accordion").open = true;
       $("#topic-name").focus();
       $("#topic-name").scrollIntoView({block:"center",behavior:"smooth"});
@@ -456,9 +457,15 @@
     else await renderEvidenceProject();
   }
 
+  function createEvidenceNext(action,label) {
+    const next=document.createElement("button");
+    next.type="button";next.className="secondary evidence-next";next.dataset.action=action;next.textContent=label;
+    return next;
+  }
+
   async function renderEvidenceProject() {
     const request=++evidenceRequest,projectId = ev$("evidence-project").value;
-    if (!projectId) { evidenceListCache=null;evidenceHasRows=false;ev$("evidence-handoff").disabled=true;ev$("evidence-summary").textContent="暂无课题。先在“对话切换 → 全部课题与管理”创建课题，再从整理结果逐条采纳。";renderEvidenceRows();return; }
+    if (!projectId) { evidenceListCache=null;evidenceHasRows=false;ev$("evidence-handoff").disabled=true;ev$("evidence-summary").textContent="暂无课题。先创建课题，再从整理结果逐条采纳。";ev$("evidence-list-count").textContent="";ev$("evidence-more").hidden=true;ev$("evidence-list").replaceChildren(createEvidenceNext("start-new-topic","创建课题"));return; }
     let data;
     try { data = await evSend({ type: "EV_LIST", projectId }); }
     catch (e) {
@@ -476,7 +483,6 @@
     evidenceHasRows=!!data.rows.length;ev$("evidence-handoff").disabled=!evidenceHasRows||!!handoffPending;
     const adopted=data.rows.filter(r=>r.conclusion.status!=="withdrawn").length,withdrawn=data.rows.length-adopted;
     ev$("evidence-summary").textContent=data.rows.length?`已采纳 ${adopted} 条 · 已撤回 ${withdrawn} 条 · 共 ${data.rows.reduce((n,r)=>n+r.versions.length,0)} 个版本`+(data.projectionPending?"\n证据已保存，共享摘要待更新。":"\n点击依据查看原文；修订和撤回均保留历史。") : "尚无采纳结论。先在“研究整理”或 Fork 对照结果中逐条采纳。";
-
     evidenceListCache={projectId,rows:data.rows,legacyNote:data.project?.legacyNote?.text||""};
     renderEvidenceRows();
   }
@@ -502,9 +508,12 @@
     more.hidden=!view.hasMore;
     more.textContent=`再显示 ${Math.min(ThreadLineEvidenceList.PAGE_SIZE,view.matched-view.rows.length)} 条结论`;
     if(!view.rows.length){
-      const empty=document.createElement("p");empty.className="subtle";
-      empty.textContent=view.total?"没有符合搜索或状态筛选的结论，可清除条件重新查找。":"尚未采纳结论。请从研究整理逐条确认。";
-      holder.appendChild(empty);
+      if(!view.total)holder.appendChild(createEvidenceNext("open-research","打开研究整理"));
+      else {
+        const empty=document.createElement("p");empty.className="subtle";
+        empty.textContent="没有符合搜索或状态筛选的结论，可清除条件重新查找。";
+        holder.appendChild(empty);
+      }
     }
     for(const row of view.rows){
       const c=row.conclusion,item=document.createElement("details"),summary=document.createElement("summary"),content=document.createElement("div");
@@ -518,81 +527,62 @@
       const head=document.createElement("p");
       head.textContent=(c.status==="withdrawn"?"[已撤回] ":"")+(row.current?.text||c.id);
       content.appendChild(head);item.append(summary,content);
-      if (row.current?.conditions) {
-        const conditions = document.createElement("p");
-        conditions.textContent = "适用条件：" + row.current.conditions;
+      if(row.current?.conditions){
+        const conditions=document.createElement("p");conditions.textContent="适用条件："+row.current.conditions;
         content.appendChild(conditions);
       }
-      for (const fragment of row.fragments || []) {
-        const box = document.createElement("details");
-        const summary = document.createElement("summary");
-        summary.textContent = "依据片段 · " + ({cites:"引用",supports:"支持",opposes:"反对",background:"背景"}[fragment.relation] || "引用") +
-          (fragment.conversationId ? " · 会话 " + String(fragment.conversationId).slice(0, 8) + "…" : " · 仅片段（来源不可定位）");
-        const pre = document.createElement("pre");
-        pre.style.whiteSpace = "pre-wrap";
-        pre.textContent = (fragment.before || "") + "【" + fragment.selection + "】" + (fragment.after || "");
-        box.appendChild(summary); box.appendChild(pre);
-        if (fragment.conversationId) {
-          const locateRow = document.createElement("div");
-          locateRow.className = "line";
-          const btn = document.createElement("button");
-          btn.type = "button"; btn.className = "secondary"; btn.textContent = "在对话中定位";
-          const note = document.createElement("span");
-          note.className = "subtle";
-          btn.addEventListener("click", async () => {
-            note.textContent = "定位中…";
-            try {
-              const r = await evSend({ type: "EV_LOCATE",
-                conversationId: fragment.conversationId,
-                messageId: fragment.messageId || null,
-                role: null, contentPrefix: fragment.selection.slice(0, 40) });
-              note.textContent = r.located && r.verified
-                ? "已定位到原消息"
-                : (r.reason === "conversation-not-open"
-                    ? "对话未打开（仅片段）：https://chatgpt.com/c/" + fragment.conversationId
-                    : "定位不可靠，仅显示片段");
-            } catch (e) { note.textContent = "定位失败（仅片段）"; }
+      for(const fragment of row.fragments||[]){
+        const box=document.createElement("details"),sourceSummary=document.createElement("summary");
+        sourceSummary.textContent="依据片段 · "+({cites:"引用",supports:"支持",opposes:"反对",background:"背景"}[fragment.relation]||"引用")+
+          (fragment.conversationId?" · 会话 "+String(fragment.conversationId).slice(0,8)+"…":" · 仅片段（来源不可定位）");
+        const pre=document.createElement("pre");pre.style.whiteSpace="pre-wrap";
+        pre.textContent=(fragment.before||"")+"【"+fragment.selection+"】"+(fragment.after||"");
+        box.append(sourceSummary,pre);
+        if(fragment.conversationId){
+          const locateRow=document.createElement("div");locateRow.className="line";
+          const btn=document.createElement("button");btn.type="button";btn.className="secondary";btn.textContent="在对话中定位";
+          const note=document.createElement("span");note.className="subtle";
+          btn.addEventListener("click",async()=>{
+            note.textContent="定位中…";
+            try{
+              const result=await evSend({type:"EV_LOCATE",conversationId:fragment.conversationId,messageId:fragment.messageId||null,role:null,contentPrefix:fragment.selection.slice(0,40)});
+              note.textContent=result.located&&result.verified?"已定位到原消息":
+                (result.reason==="conversation-not-open"?"对话未打开（仅片段）：https://chatgpt.com/c/"+fragment.conversationId:"定位不可靠，仅显示片段");
+            }catch(error){note.textContent="定位失败（仅片段）";}
           });
-          locateRow.appendChild(btn); locateRow.appendChild(note);
-          box.appendChild(locateRow);
+          locateRow.append(btn,note);box.appendChild(locateRow);
         }
         content.appendChild(box);
       }
-      if (c.status !== "withdrawn") {
-        const row2 = document.createElement("div");
-        row2.className = "line";
-        const amend = document.createElement("button");
-        amend.type = "button"; amend.className = "secondary"; amend.textContent = "修订";
-        amend.addEventListener("click", async () => {
+      if(c.status!=="withdrawn"){
+        const row2=document.createElement("div");row2.className="line";
+        const amend=document.createElement("button");amend.type="button";amend.className="secondary";amend.textContent="修订";
+        amend.addEventListener("click",async()=>{
           let signature=null,operationId=null;
           const result=await ThreadLineDialogs.form({title:"修订结论",description:"保存后生成新版本，原有正文和依据保留。",submitLabel:"保存新版本",fields:[
             {name:"text",label:"结论正文",type:"textarea",value:row.current.text,required:true,maxPoints:4000},
             {name:"conditions",label:"适用条件",type:"textarea",rows:2,value:row.current.conditions||""},
             {name:"changeImpact",label:"变更类型",type:"select",value:"substantive",options:[{value:"substantive",label:"实质修改"},{value:"wording",label:"仅调整措辞"},{value:"conditions",label:"适用条件变化"}]}
-                  ],onSubmit:async values=>{
-            const nextSignature=JSON.stringify(values);if(signature!==nextSignature){signature=nextSignature;operationId="op_amend_"+crypto.randomUUID().replace(/-/g,"");}
+          ],onSubmit:async values=>{
+            const nextSignature=JSON.stringify(values);
+            if(signature!==nextSignature){signature=nextSignature;operationId="op_amend_"+crypto.randomUUID().replace(/-/g,"");}
             return evSend({type:"EV_AMEND",conclusionId:c.id,...values,expectedVersionId:row.current.id,operationId});
           }});
           if(result){await renderEvidenceProject();window.dispatchEvent(new Event("threadline-evidence-changed"));notify(result.projectionPending?"新版本已保存，共享摘要待更新":"新版本已保存，历史已保留");}
         });
-        const withdraw = document.createElement("button");
-        withdraw.type = "button"; withdraw.className = "secondary"; withdraw.textContent = "撤回";
-        withdraw.addEventListener("click", async () => {
-          if (!confirm("撤回该结论？历史与片段保留。")) return;
-          try {
-            await evSend({ type: "EV_WITHDRAW", conclusionId: c.id, reason: "面板撤回",
-              expectedVersionId: row.current.id,
-              operationId: "op_wd_" + crypto.randomUUID().replace(/-/g, "").slice(0, 12) });
+        const withdraw=document.createElement("button");withdraw.type="button";withdraw.className="secondary";withdraw.textContent="撤回";
+        withdraw.addEventListener("click",async()=>{
+          if(!confirm("撤回该结论？历史与片段保留。"))return;
+          try{
+            await evSend({type:"EV_WITHDRAW",conclusionId:c.id,reason:"面板撤回",expectedVersionId:row.current.id,operationId:"op_wd_"+crypto.randomUUID().replace(/-/g,"").slice(0,12)});
             await renderEvidenceProject();
-          } catch (e) { alert("撤回失败：" + e.message); }
+          }catch(error){alert("撤回失败："+error.message);}
         });
-        row2.appendChild(amend); row2.appendChild(withdraw);
-        content.appendChild(row2);
+        row2.append(amend,withdraw);content.appendChild(row2);
       }
       holder.appendChild(item);
     }
   }
-
 
   ev$("evidence-refresh").addEventListener("click", () => renderEvidenceProject());
   ev$("evidence-query").addEventListener("input",()=>{evidenceVisibleLimit=ThreadLineEvidenceList.PAGE_SIZE;renderEvidenceRows();});
