@@ -21,7 +21,8 @@
         {
           "annotatorId": "rater-id",
           "independent": false,
-          "submittedAt": null
+          "submittedAt": null,
+          "annotationSha256": null
         }
       ],
       "goldNecessaryEdgePairs": [
@@ -51,7 +52,13 @@
           "handoffScopeSha256": null,
           "observedChangeKind": null
         }
-      ]
+      ],
+      "adjudication": {
+        "reviewedBy": null,
+        "resolvedAt": null,
+        "disagreementsResolved": false,
+        "resolutionSha256": null
+      }
     }
   ],
   "tierRuleId": "threadline-s2-tier/1",
