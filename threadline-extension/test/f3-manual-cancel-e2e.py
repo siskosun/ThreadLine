@@ -57,6 +57,9 @@ def run():
             }""",{"id":run_id,"tabId":tab_id})
             assert seed is True
             panel.reload(wait_until="domcontentloaded")
+            # The panel defaults to conversation switching; open the research
+            # workspace before judging visibility of its capture controls.
+            panel.locator("#nav-research").click()
             cancel=panel.locator("#capture-cancel")
             expect(cancel).to_be_visible(timeout=12000)
             expect(panel.locator("#capture-progress")).to_contain_text("无进度",timeout=12000)
