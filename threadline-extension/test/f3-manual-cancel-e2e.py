@@ -69,6 +69,8 @@ def run():
             panel.once("dialog",lambda dialog:dialog.accept())
             cancel.click()
             expect(cancel).to_be_hidden(timeout=10000)
+            expect(panel.locator("#capture-error")).to_contain_text(
+                "未能确认源页面收到停止信号",timeout=10000)
             row=worker.evaluate("id=>ThreadLineCaptureDB.getRun(id)",run_id)
             assert row["status"]=="error" and row["phase"]=="user-cancelled",row
             assert row["complete"] is False,row
