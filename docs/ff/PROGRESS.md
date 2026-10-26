@@ -2,6 +2,8 @@
 
 ## 2026-10-26 UX P0：普通对话接续横幅误报修复候选
 
+- **代码候选准确 HEAD** `dc8f683b664e0a7349598e5815d623da89cbebd1`：[Linux verify](https://github.com/siskosun/ThreadLine/actions/runs/40255902588) **success**；[Windows baseline](https://github.com/siskosun/ThreadLine/actions/runs/40255902576) **success**。均为自动化与合成 Chromium 场景；真实登录 ChatGPT、既有数据、真人交互/无障碍验收 **NOT_EXECUTED**。本条文档更新后的准确 HEAD 仍需单独检查，保持 Draft / Open、未合并/发布。
+
 - 新独立 Draft PR（基于 main `bf2c2c2`）修复 `handoff.js` 在无接续意图时，仅因已有对话或 Project URL 而显示“已停止预填”的误报。添加仅返回布尔值的 `HANDOFF_PEEK`：仅 ChatGPT 来源标签可查询自己标签 ID 的待接续状态，既不返回提示文本，也不预占、重试、ACK 或发送消息。
 - 有效的新聊天接续流程保持旧 GET/BEGIN/ACK 与逐字回读逻辑；**确有待接续意图**却导航到旧聊天/Project 页时，仍显示可解释的终止警告，不把意图泄漏到已有对话。
 - 新增 Node 单元、后台来源权限/不消耗意图回归，以及合成 Chromium MV3 既有对话与 Project 无误报和受控错误跳转用例。准确 HEAD 的 Linux/Windows CI 另行登记；真实已登录 ChatGPT 仍 NOT_EXECUTED。此修复不改变 S1 风险状态、唯一 PLAN 任务表、不合并不发布。
