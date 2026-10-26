@@ -248,14 +248,16 @@ def run():
             assert changed["fragments"] == original["fragments"], "text edits preserve source IDs, times and provenance"
             panel.locator("#evidence-list button", has_text="查看版本历史（2）").click()
             panel.wait_for_function("() => document.querySelectorAll('#evidence-list .evidence-history-version').length === 2")
+            version_one = panel.locator("#evidence-list .evidence-history-version").first
+            version_two = panel.locator("#evidence-list .evidence-history-version").nth(1)
+            version_one.locator(":scope > summary").click()
+            version_two.locator(":scope > summary").click()
+            assert version_one.locator(".evidence-history-fulltext").first.inner_text() == "封口课题的第一条结论"
             history_text = panel.locator("#evidence-list .evidence-history").inner_text()
-            assert "封口课题的第一条结论" in history_text
             assert "面板修订后的结论" in history_text
             assert "仅适用合成样本 A" in history_text
-            assert "https://example.invalid/source" in history_text
-            version_one = panel.locator("#evidence-list .evidence-history-version").first
-            version_one.locator(":scope > summary").click()
-            assert version_one.locator(".evidence-history-fulltext").first.inner_text() == "封口课题的第一条结论"
+            version_one.locator(".evidence-history-source > summary").first.click()
+            assert "https://example.invalid/source" in version_one.inner_text()
             retry_request = {"type": "EV_AMEND", "conclusionId": adopted2["data"]["conclusionId"],
                              "text": "可重试修订", "operationId": "op_native_retry001"}
             retry_first = send(panel, retry_request)
