@@ -52,6 +52,7 @@ function validateProtocol(p) {
    if(!validId(e.id)||seenEvents.has(k)||!validId(e.rootConclusionId)||!unique(e.goldAffectedIds)||!Array.isArray(e.goldAffectedIds))fail("变化事件/影响真值无效");
    seenEvents.add(k);
    if(!["premise_error","definition_change","source_lost","withdraw","wording_only","unrelated"].includes(e.kind))fail("变化类型无效");
+   if(!["amend","withdraw"].includes(e.observedChangeKind))fail("分层只能使用冻结前可观察的 amend/withdraw 操作类型，不能读取真值情景");
    if(!e.frozenState?.projects?.[c.projectId]||!e.frozenState?.conclusions?.[e.rootConclusionId])fail("B 臂缺少事先冻结的真实图状态");
    if(typeof e.sourceCorpusSha256!=="string"||!/^[a-f0-9]{64}$/.test(e.sourceCorpusSha256))fail("每次变化必须预先冻结原始资料 SHA-256");
    if(e.goldAffectedIds.includes(e.rootConclusionId))fail("下游真值不能把变化根结论自身算作依赖影响");
