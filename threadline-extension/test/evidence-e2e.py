@@ -153,17 +153,30 @@ def run():
             assert adopted2["ok"], adopted2
             # History is a panel-only, read-only query scoped to the owning project.
             proto_rows = rows
+            history_project_id = "ux05-history"
+            ensured_history = send(page, {"type":"EV_ENSURE","projectId":history_project_id})
+            assert ensured_history["ok"], ensured_history
+            adopted_history = send(page, {"type":"EV_ADOPT","projectId":history_project_id,
+                "text":"单版本历史验收","conditions":"只用于合成测试",
+                "fragments":[{"selection":"历史来源片段","before":"前","after":"后",
+                    "conversationId":"synthetic-history-conversation","messageId":"synthetic-history-message"}],
+                "operationId":"op_ux05history001"})
+            assert adopted_history["ok"], adopted_history
             single_before = raw_evidence(page)
-            single_history = send(panel, {"type":"EV_HISTORY","projectId":"proto-p1",
-                "conclusionId":proto_rows[0]["conclusion"]["id"]})
+            single_history = send(panel, {"type":"EV_HISTORY","projectId":history_project_id,
+                "conclusionId":adopted_history["data"]["conclusionId"]})
             assert single_history["ok"], single_history
             assert len(single_history["data"]["versions"]) == 1
-            withdrawn_proto = next(r for r in proto_rows if r["conclusion"]["status"] == "withdrawn")
-            withdrawn_history = send(panel, {"type":"EV_HISTORY","projectId":"proto-p1",
-                "conclusionId":withdrawn_proto["conclusion"]["id"]})
+            assert raw_evidence(page) == single_before, "history query must be read-only"
+            withdraw_history = send(page, {"type":"EV_WITHDRAW",
+                "conclusionId":adopted_history["data"]["conclusionId"],
+                "reason":"UX-05 单版本撤回历史", "expectedVersionId":single_history["data"]["versions"][0]["id"],
+                "operationId":"op_ux05withdraw001"})
+            assert withdraw_history["ok"], withdraw_history
+            withdrawn_history = send(panel, {"type":"EV_HISTORY","projectId":history_project_id,
+                "conclusionId":adopted_history["data"]["conclusionId"]})
             assert withdrawn_history["ok"] and withdrawn_history["data"]["status"] == "withdrawn"
             assert len(withdrawn_history["data"]["versions"]) == 1
-            assert raw_evidence(page) == single_before, "history query must be read-only"
             foreign_history = send(panel, {"type":"EV_HISTORY","projectId":project_id,
                 "conclusionId":proto_rows[0]["conclusion"]["id"]})
             unknown_history = send(panel, {"type":"EV_HISTORY","projectId":project_id,
