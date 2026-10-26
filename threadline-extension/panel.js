@@ -652,8 +652,12 @@
           try{
             await evSend({type:"EV_WITHDRAW",conclusionId:c.id,reason:"面板撤回",expectedVersionId:row.current.id,operationId:"op_wd_"+crypto.randomUUID().replace(/-/g,"").slice(0,12)});
             const refreshed=await renderEvidenceProject();
-            if(refreshed)notify("结论已撤回，历史与来源片段已保留");
-            else notifyCritical("撤回成功回执已收到，但当前证据列表刷新失败。请刷新核对，不要重复撤回。");
+            if(refreshed){
+              const current=[...ev$("evidence-list").querySelectorAll(".evidence-item")]
+                .find(node=>node.dataset.conclusionId===c.id);
+              current?.querySelector(":scope > summary")?.focus();
+              notify("结论已撤回，历史与来源片段已保留");
+            }else notifyCritical("撤回成功回执已收到，但当前证据列表刷新失败。请刷新核对，不要重复撤回。");
           }catch(error){
             const refreshed=await renderEvidenceProject();
             notifyCritical("撤回失败或结果未确认："+error.message+
