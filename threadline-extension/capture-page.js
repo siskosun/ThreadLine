@@ -76,6 +76,13 @@
       // injection does not prove that the MAIN-world bridge received "start".
       return true;
     }
-    if(msg?.type==="TL_CAPTURE_CANCEL"&&active?.requestId===msg.id){window.postMessage({channel:CHANNEL,direction:"extension-to-main",kind:"cancel",requestId:msg.id},location.origin);respond({ok:true});return;}
+    if(msg?.type==="TL_CAPTURE_CANCEL"&&active?.requestId===msg.id){
+      // Ignore future MAIN receipts and prevent a cancellation from falling
+      // back to visible DOM. Abort the source request; no send or replay.
+      if(active.waiting)clearTimeout(active.waiting.timer);
+      active=null;
+      window.postMessage({channel:CHANNEL,direction:"extension-to-main",kind:"cancel",requestId:msg.id},location.origin);
+      respond({ok:true});return;
+    }
   });
 })();
