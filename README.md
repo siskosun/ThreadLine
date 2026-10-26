@@ -44,6 +44,8 @@ GitHub Actions 会执行计划状态、实际 PR 合并/检查结果核验，以
 
 ## 验证与开发
 
+界面开发先读 [UI 与体验标准](DESIGN.md)、[v0.8.2 现状基线](docs/ui/BASELINE_20261026.md)及[验收清单](docs/ui/CHECKLIST.md)。[视觉参考样张](docs/ui/reference.html)可下载后在浏览器打开；它展示建议方向，尚未应用到生产界面。任务状态仍以正式计划为准。
+
 源码位于 [`threadline-extension/`](threadline-extension/)，不需要 Node 才能安装；Node 22+ 用于开发和测试：
 
 ```bash
