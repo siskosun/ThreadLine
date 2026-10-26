@@ -134,7 +134,7 @@ def run():
       panel.wait_for_function("() => document.querySelectorAll('#topic-list .topic-card').length === 2")
       panel.locator('[data-action="select-project"][data-id="' + pid + '"]').click()
       panel.evaluate("() => window.__releaseCreate()")
-      panel.wait_for_function("id => document.querySelector('#topic-list [data-id=\\\\\"' + id + '\\\\\"]')?.getAttribute('aria-pressed') === 'true'",
+      panel.wait_for_function("id => [...document.querySelectorAll('#topic-list .topic-card')].some(n=>n.dataset.id===id&&n.getAttribute('aria-pressed')==='true')",
         pid)
       delayed_result=panel.evaluate("() => window.__createdCreateResponse")
       assert delayed_result['ok'],delayed_result
