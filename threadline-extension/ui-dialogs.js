@@ -17,6 +17,7 @@
         else control.type=field.type||"text";
         if(field.type==="checkbox")control.checked=!!field.value;else control.value=field.value??"";
         if(field.required){control.required=true;control.setAttribute("aria-required","true");}
+        if(Number.isSafeInteger(field.maxLength)&&field.maxLength>0)control.maxLength=field.maxLength;
         if(field.readOnly)control.readOnly=true;
         label.append(control);
         if(field.hint)label.append(element("small",{className:"subtle"},field.hint));
