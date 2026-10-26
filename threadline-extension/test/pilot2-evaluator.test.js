@@ -22,8 +22,14 @@ function fixture(){
   const conclusions=Object.fromEntries([root,dependent,unrelated].map(id=>[id,{id,projectId,currentVersionId:"ver_"+id,status:"adopted"}]));
   const frozenState={projects:{[projectId]:{research}},conclusions,versions:{}};
   const c={id:"case_"+i,projectId,order:i%2?["C","B","A"]:["A","B","C"],
-    independentAnnotations:i<2?[{annotatorId:"rater_alpha",independent:true,submittedAt:"2026-10-25T01:00:00Z"},
-      {annotatorId:"rater_beta",independent:true,submittedAt:"2026-10-25T02:00:00Z"}]:[],
+    independentAnnotations:[
+      {annotatorId:"rater_alpha",independent:true,submittedAt:"2026-10-25T01:00:00Z",
+        annotationSha256:digest("rater-alpha-independent-original-"+i)},
+      ...(i<2?[{annotatorId:"rater_beta",independent:true,submittedAt:"2026-10-25T02:00:00Z",
+        annotationSha256:digest("rater-beta-independent-original-"+i)}]:[])
+    ],
+    adjudication:i<2?{reviewedBy:"rater_adjudicator",disagreementsResolved:true,
+      resolvedAt:"2026-10-25T03:00:00Z",resolutionSha256:digest("blind-resolution-"+i)}:undefined,
     goldNecessaryEdgePairs:[[root,dependent]],events:[]};
   const kinds=["premise_error","definition_change","source_lost","wording_only","unrelated"];
   for(let j=0;j<kinds.length;j++){
@@ -129,6 +135,41 @@ test("learning overhead is included in screening and separately disclosed",()=>{
  assert.throws(()=>evaluateData(protocol,observations,hash),/学习成本/);
 });
 
+test("independent annotation receipts and adjudication must precede freeze",()=>{
+ const missing=fixture();
+ delete missing.protocol.cases[0].independentAnnotations[0].annotationSha256;
+ assert.throws(()=>evaluateData(missing.protocol,missing.observations,missing.hash),/原始收据哈希/);
+ const unresolved=fixture();
+ delete unresolved.protocol.cases[0].adjudication.resolutionSha256;
+ assert.throws(()=>evaluateData(unresolved.protocol,unresolved.observations,unresolved.hash),/分歧裁定哈希/);
+ const late=fixture();
+ late.protocol.cases[0].adjudication.resolvedAt="2026-10-25T09:00:00Z";
+ assert.throws(()=>evaluateData(late.protocol,late.observations,late.hash),/分歧裁定哈希/);
+ const duplicate=fixture();
+ duplicate.protocol.cases[0].independentAnnotations[1].annotationSha256=
+  duplicate.protocol.cases[0].independentAnnotations[0].annotationSha256;
+ assert.throws(()=>evaluateData(duplicate.protocol,duplicate.observations,duplicate.hash),/原始收据哈希/);
+});
+test("alternative impact path must not mask a direct necessary-edge review",()=>{
+ const {protocol,observations,hash}=fixture();
+ const c=protocol.cases[0],e=c.events[0],mid="con_aa00000001",target=e.goldAffectedIds[0];
+ e.frozenState=structuredClone(e.frozenState);
+ e.frozenState.conclusions[mid]={
+   id:mid,projectId:c.projectId,currentVersionId:"ver_"+mid,status:"adopted"};
+ e.frozenState.projects[c.projectId].research.edges.push(
+   {id:"dep_altfirst0001",active:true,revision:1,projectId:c.projectId,
+    upstreamConclusionId:e.rootConclusionId,downstreamConclusionId:mid,type:"necessary"},
+   {id:"dep_altlast0001",active:true,revision:1,projectId:c.projectId,
+    upstreamConclusionId:mid,downstreamConclusionId:target,type:"necessary"}
+ );
+ const result=evaluateData(protocol,observations,hash);
+ const row=result.events[0];
+ assert.ok(row.predictedAffectedIds.includes(mid));
+ assert.ok(row.predictedAffectedIds.includes(target));
+ assert.ok(row.tiered.mustReviewIds.includes(target),
+   "the alternate indirect route cannot hide the direct necessary dependency");
+ assert.equal(row.tiered.criticalMissedIds.length,0);
+});
 test("tier rule is byte-pinned and does not use materiality gold as priority input",()=>{
  const {protocol,observations,hash}=fixture();
  protocol.tierRuleSha256="f".repeat(64);
