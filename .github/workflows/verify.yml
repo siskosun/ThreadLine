@@ -87,7 +87,9 @@ jobs:
           if [ "$RELEASE_REQUESTED" = "true" ]; then
             node scripts/check-release-drift.mjs "$LATEST_TAG" --publish
           else
-            node scripts/check-release-drift.mjs "$LATEST_TAG"
+            # Ordinary main pushes must surface unpublished source drift without
+            # marking the complete test suite failed before a release is due.
+            node scripts/check-release-drift.mjs "$LATEST_TAG" --advisory
           fi
 
   publish:
