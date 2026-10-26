@@ -43,7 +43,16 @@ jobs:
           import json, re
           from pathlib import Path
           data = Path('plan-node-test.log').read_text(encoding='utf-8', errors='replace')
-          counts = [int(n) for n in re.findall(r'(?m)^# tests (\d+)\s*
+          counts = [int(n) for n in re.findall(r'^# tests ([0-9]+)$', data, flags=re.MULTILINE)]
+          version = json.loads(Path('threadline-extension/manifest.json').read_text())['version']
+          floors = json.loads(Path('scripts/test-floors.json').read_text())
+          floor = floors.get(version)
+          if not isinstance(floor, int) or floor < 220:
+              raise SystemExit(f'Missing release-scoped test floor for {version} (minimum 220)')
+          if not counts or counts[-1] < floor:
+              raise SystemExit(f'Node tests below v{version} floor {floor}: {counts}')
+          print(f'Node regression cases: {counts[-1]} (v{version} floor: {floor})')
+          PY
       - name: Validate plan evidence against GitHub PRs and checks
         env:
           GITHUB_TOKEN: ${{ github.token }}
