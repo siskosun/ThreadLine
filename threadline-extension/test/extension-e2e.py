@@ -136,6 +136,12 @@ def run():
       panel.locator('[data-action="select-project"][data-id="' + pid + '"]').click()
       panel.evaluate("() => window.__releaseCreate()")
       panel.wait_for_function("() => document.querySelector('#topic-name').value === ''")
+      panel.evaluate("""() => new Promise(resolve => {
+        const holder=document.querySelector('#topic-list');
+        const observer=new MutationObserver(()=>{observer.disconnect();resolve(true);});
+        observer.observe(holder,{childList:true,subtree:true});
+        window.dispatchEvent(new Event('threadline-evidence-changed'));
+      })""")
       panel.wait_for_function("id => [...document.querySelectorAll('#topic-list .topic-card')].some(n=>n.dataset.id===id&&n.getAttribute('aria-pressed')==='true')",
         arg=pid)
       delayed_result=panel.evaluate("() => window.__createdCreateResponse")
