@@ -4,7 +4,7 @@ const List = require("../evidence-list-core.js");
 
 const data = Array.from({length:200}, (_,i)=>({
   conclusion:{id:"conclusion-"+i,status:i%5===0?"withdrawn":"active"},
-  current:{text:i===15?"独特的核心判断":"本周研究结论 "+i,conditions:i===15?"特定范围":""}
+  current:{text:i===16?"独特的核心判断":"本周研究结论 "+i,conditions:i===16?"特定范围":""}
 }));
 
 test("long evidence list renders only a bounded first page and loads more deterministically",()=>{
@@ -21,8 +21,8 @@ test("long evidence list renders only a bounded first page and loads more determ
 });
 
 test("query and status operate over all records including initially hidden rows",()=>{
-  assert.deepEqual(List.select(data,{query:"核心判断"}).rows.map(r=>r.conclusion.id),["conclusion-15"]);
-  assert.deepEqual(List.select(data,{query:"特定范围"}).rows.map(r=>r.conclusion.id),["conclusion-15"]);
+  assert.deepEqual(List.select(data,{query:"核心判断"}).rows.map(r=>r.conclusion.id),["conclusion-16"]);
+  assert.deepEqual(List.select(data,{query:"特定范围"}).rows.map(r=>r.conclusion.id),["conclusion-16"]);
   assert.equal(List.select(data,{status:"withdrawn",limit:300}).matched,40);
   assert.equal(List.select(data,{status:"active",limit:300}).matched,160);
   assert.equal(List.select(data,{status:"withdrawn",query:"核心判断"}).matched,0);
