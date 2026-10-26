@@ -89,7 +89,7 @@ def run():
                 {"history": [{"version": 999999, "field": "decision", "after": "FORGED"}]},
                 {"knowledgeVersion": 99999999, "decision": "FORGED"},
                 {"evidenceTakeover": False, "evidenceProjectionRevision": 99999},
-                {"__proto__": {"polluted": True}}
+                {"constructor": {"polluted": True}}
             ]:
                 tampered = deepcopy(backup)
                 tampered["topic"].update(poison)
@@ -97,7 +97,7 @@ def run():
                     "type": "EV_RESTORE_PREVIEW", "backup": tampered,
                     "replace": True
                 })
-                assert rejected and not rejected["ok"], rejected
+                assert rejected and not rejected["ok"], (poison, rejected)
                 assert "备份课题" in rejected["error"], rejected
             topic_after = send({"type": "SNAPSHOT"})["state"]["projects"][0]
             evidence_after = send({"type": "EV_LIST", "projectId": project_id})
