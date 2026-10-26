@@ -297,6 +297,7 @@ const ThreadLineFFCore = (() => {
     return Object.freeze({preference:verdict.preference, criteria:verdict.criteria.trim(),
       confidence:verdict.confidence, notes, decidedAt:Date.now()});
   }
+  const SAME_SOURCE_NOTE = "同源采样：同一模型多分支一致不等于独立事实证据；偏好裁决不等于事实核验。";
   function exportSnapshot(exp) {
     plain(exp);
     // Self-contained and credential-free by construction: only experiment
@@ -312,7 +313,8 @@ const ThreadLineFFCore = (() => {
       branches:Object.fromEntries(Object.keys(exp.branches).map(label => [label,
         structuredClone(exp.branches[label])])),
       branchCount:exp.branchCount || Object.keys(exp.branches).length,
-      decision:exp.decision ? {...exp.decision} : null};
+      decision:exp.decision ? {...exp.decision} : null,
+      sampling:{classification:"same-source-sampling",independentFactualEvidence:false,note:SAME_SOURCE_NOTE}};
   }
   // ---------- P4: hidden judge calibration and validated JSON import ----------
   // Expected answers live in this private map and are never exposed through
@@ -350,6 +352,16 @@ const ThreadLineFFCore = (() => {
     plain(snapshot);
     assert(snapshot.schema === 1 && snapshot.kind === "threadline-fork-experiment",
       "unknown snapshot kind");
+    // Legacy archives omit this display-only field. If present it cannot claim
+    // multi-branch consistency is independent evidence; re-export always seals
+    // the canonical caveat without trusting imported presentation metadata.
+    if(Object.prototype.hasOwnProperty.call(snapshot,"sampling")) {
+      plain(snapshot.sampling);
+      assert(snapshot.sampling.classification==="same-source-sampling" &&
+        snapshot.sampling.independentFactualEvidence===false &&
+        snapshot.sampling.note===SAME_SOURCE_NOTE,
+        "invalid same-source sampling annotation");
+    }
     const frozen = snapshot.frozen;
     assert(frozen && typeof frozen === "object", "missing frozen input");
     await verifyFrozen(frozen);
