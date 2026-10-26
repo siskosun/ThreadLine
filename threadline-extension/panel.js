@@ -98,8 +98,10 @@
       const refreshed=await refresh(true);
       if (success && refreshed) notify(success);
     } catch(error) {
-      await refresh(true);
-      notifyCritical("操作失败或结果未确认："+error.message+"。已请求刷新当前状态；请核对课题与分支是否已变化，再决定是否重试。研线未自动重放操作。");
+      const refreshed=await refresh(true);
+      notifyCritical("操作失败或结果未确认："+error.message+"。"+
+        (refreshed?"已刷新当前状态；请核对课题与分支是否已变化，再决定是否重试。":"状态刷新也失败，当前显示可能过期；请重新打开面板核对。")+
+        "研线未自动重放操作。");
     }
     finally{busy=false;}
   }
@@ -450,9 +452,10 @@
             else notifyCritical("已收到保存成功回执，但当前状态刷新失败。请刷新面板核对结果，不要重复提交。");
             return result;
           }catch(error){
-            await refresh(true);
+            const refreshed=await refresh(true);
             notifyCritical((isLabel?"分支名称":"分支进度")+"保存失败或结果未确认："+error.message+
-              "。已请求刷新状态；输入仍保留。请先核对当前分支，再决定是否重试。不会自动重放。");
+              "。"+(refreshed?"已刷新状态；":"状态刷新也失败，当前显示可能过期；")+
+              "输入仍保留。请先核对当前分支，再决定是否重试。不会自动重放。");
             throw error;
           }
         }
@@ -624,9 +627,10 @@
             try{
               return await evSend({type:"EV_AMEND",conclusionId:c.id,...values,expectedVersionId:row.current.id,operationId});
             }catch(error){
-              await renderEvidenceProject();
+              const refreshed=await renderEvidenceProject();
               notifyCritical("修订失败或结果未确认："+error.message+
-                "。已请求刷新当前版本；输入仍保留。请核对历史后再决定是否重试，不会自动重放。");
+                "。"+(refreshed?"已刷新当前版本；":"当前版本刷新也失败；")+
+                "输入仍保留。请核对历史后再决定是否重试，不会自动重放。");
               throw error;
             }
           }});
@@ -651,9 +655,10 @@
             if(refreshed)notify("结论已撤回，历史与来源片段已保留");
             else notifyCritical("撤回成功回执已收到，但当前证据列表刷新失败。请刷新核对，不要重复撤回。");
           }catch(error){
-            await renderEvidenceProject();
+            const refreshed=await renderEvidenceProject();
             notifyCritical("撤回失败或结果未确认："+error.message+
-              "。已请求刷新当前结论；请核对状态与历史后再决定是否重试。研线未自动重放撤回操作。");
+              "。"+(refreshed?"已刷新当前结论；":"当前结论刷新也失败；")+
+              "请核对状态与历史后再决定是否重试。研线未自动重放撤回操作。");
           }
         });
         row2.append(amend,withdraw);content.appendChild(row2);
