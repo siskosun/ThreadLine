@@ -291,8 +291,11 @@ export function evaluateData(protocol,observations,protocolSha256){
    substantiveHandoffCorrectRate:ratio(correct,material),
    substantiveHandoffCorrectCount:correct,substantiveGoldCount:material}];
  }));
+ // A/B noise comparison is not fully attributable if learning overhead was
+ // not tied to inspected targets. Missing attribution is unknown, never zero.
  const noiseShareReference=reviewNoise.A.noiseShareWithLearning!==null&&
-  reviewNoise.B.noiseShareWithLearning!==null?
+  reviewNoise.B.noiseShareWithLearning!==null&&
+  reviewNoise.A.unallocatedLearningMs===0&&reviewNoise.B.unallocatedLearningMs===0?
   reviewNoise.B.noiseShareWithLearning<=reviewNoise.A.noiseShareWithLearning:null;
  const thresholds={
   dependencyCoverage:dependencyCoverage!==null&&dependencyCoverage>=0.9,
@@ -301,6 +304,7 @@ export function evaluateData(protocol,observations,protocolSha256){
   zeroCriticalMisses:criticalMisses===0,
   gainAtLeast15Percent:gain!==null&&gain>=0.15,
   nonSlowerAtLeastFourCases:nonSlower>=4,
+  bCorrectContinuationBetterThanA:mean(cases.map(c=>c.accuracyDeltaBvsA))>0,
   tierNoCriticalMisses:tiers.criticalMisses===0,
   tierMustRecallAtLeast90Percent:tiers.substantiveRecall!==null&&tiers.substantiveRecall>=0.9,
   nonSubstantiveReviewShareNotHigherThanA:noiseShareReference===true
