@@ -135,6 +135,13 @@ jobs:
         run: |
           VERSION="$(python -c 'import json; print(json.load(open("threadline-extension/manifest.json", encoding="utf-8"))["version"])')"
           TAG="v${VERSION}"
+          # A pre-existing tag would silently override --target and attach the
+          # release to a commit the owner did not review.
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "::error::Tag $TAG already exists; refusing to attach a release to an unreviewed commit"
+            exit 1
+          fi
           gh release create "$TAG" "dist/ThreadLine-${TAG}.zip" "dist/SHA256SUMS.txt" \
+            --target "$GITHUB_SHA" \
             --title "ThreadLine ${TAG}" \
             --notes "Owner-authorized ThreadLine ${TAG} installer from commit ${GITHUB_SHA}. Synthetic MV3 checks passed; real authenticated ChatGPT remains subject to separate human acceptance."

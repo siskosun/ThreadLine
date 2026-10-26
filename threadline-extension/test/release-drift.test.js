@@ -95,6 +95,16 @@ test('release guard uses an explicit published tag, not an arbitrary branch clai
   assert.throws(()=>evaluateReleaseDrift({latestTag:'v0.8.1',previousVersion:'0.8.1',
     currentVersion:'0.8.2',changedFiles:['docs/PLAN.md']}),/Unscoped path/);
 });
+test('owner publish pins the release tag to the approved commit',()=>{
+  const workflow=fs.readFileSync(path.join(ROOT,'.github/workflows/verify.yml'),'utf8');
+  const publish=workflow.slice(workflow.indexOf('Publish immutable GitHub Release'));
+  assert.match(publish,/gh release create[\s\S]*--target "\$GITHUB_SHA"/,
+    'tag creation must target the approved SHA, not the current default-branch tip');
+  const guard=publish.indexOf('git ls-remote --exit-code --tags origin');
+  assert.ok(guard>0,'a pre-existing tag must be refused before release creation');
+  assert.ok(guard<publish.indexOf('gh release create'),
+    'the existing-tag guard must run before the release is created');
+});
 test('test-count floor is tied to manifest version and above deprecated 94 baseline',()=>{
   const floors=JSON.parse(fs.readFileSync(path.join(ROOT,'scripts/test-floors.json'),'utf8'));
   const current=JSON.parse(fs.readFileSync(path.join(ROOT,'threadline-extension/manifest.json'),'utf8')).version;
