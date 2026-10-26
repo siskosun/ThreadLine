@@ -27,12 +27,15 @@ const score=(predict,gold)=>{
 };
 const ratio=(a,b)=>b>0?a/b:null;
 const validId=x=>typeof x==="string"&&/^[a-zA-Z0-9_-]{1,128}$/.test(x);
+const validSha=x=>typeof x==="string"&&/^[a-f0-9]{64}$/.test(x);
+const instant=x=>typeof x==="string"&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(x)&&Number.isFinite(Date.parse(x))?Date.parse(x):null;
 const ARM=["A","B","C"];
 function validateProtocol(p) {
  if(p?.format!=="threadline-pilot2-protocol/1"||p.status!=="FROZEN"||!Array.isArray(p.cases)||p.cases.length<6)
   fail("协议必须在执行前冻结，包含至少 6 个研究案例");
- if(typeof p.freeze?.at!=="string"||!p.freeze?.commitSha||!p.freeze?.reviewedBy)
+ if(instant(p.freeze?.at)===null||!p.freeze?.commitSha||!p.freeze?.reviewedBy)
   fail("冻结缺少时间、Git commit 和预审人员；不能以结果反向更改真值");
+ const frozenAt=instant(p.freeze.at);
  if(p.freeze.ruleFrozenBeforeScoring!==true || p.tierRuleId!==TIER_RULE_ID ||
     p.tierRuleSha256!==TIER_RULE_SHA)
   fail("分层规则版本或 SHA 不匹配，必须在真值评分之前冻结准确规则字节");
@@ -46,7 +49,25 @@ function validateProtocol(p) {
   if(!Array.isArray(c.goldNecessaryEdgePairs)||!unique(c.goldNecessaryEdgePairs.map(x=>x.join("=>"))))
    fail("必要边真值必须预先登记且不能重复");
   for(const pair of c.goldNecessaryEdgePairs)if(!Array.isArray(pair)||pair.length!==2||pair.some(x=>!validId(x)))fail("必要边真值格式无效");
-  if(Array.isArray(c.independentAnnotations)&&c.independentAnnotations.length>=2&&c.independentAnnotations.every(a=>a?.independent===true&&validId(a.annotatorId)&&typeof a.submittedAt==="string")&&unique(c.independentAnnotations.map(a=>a.annotatorId))) dual++;
+  // At least one original blind annotation per case. Two cases require two
+  // separately attributable raw files and a signed pre-freeze resolution.
+  const raters=c.independentAnnotations;
+  if(!Array.isArray(raters)||raters.length<1||
+     !raters.every(a=>a?.independent===true&&validId(a.annotatorId)&&
+       validSha(a.annotationSha256)&&instant(a.submittedAt)!==null&&
+       instant(a.submittedAt)<frozenAt)||
+     !unique(raters.map(a=>a.annotatorId))||
+     !unique(raters.map(a=>a.annotationSha256)))
+    fail("每例标注需有独立的原始收据哈希，并早于协议冻结");
+  if(raters.length>=2){
+    const resolution=c.adjudication,settledAt=instant(resolution?.resolvedAt);
+    if(!resolution||resolution.disagreementsResolved!==true||
+       !validId(resolution.reviewedBy)||!validSha(resolution.resolutionSha256)||
+       settledAt===null||settledAt>=frozenAt||
+       raters.some(a=>instant(a.submittedAt)>=settledAt))
+      fail("双人独立标注必须附原始收据和冻结前的分歧裁定哈希");
+    dual++;
+  }
   for(const e of c.events) {
    const k=c.id+"/"+e.id;
    if(!validId(e.id)||seenEvents.has(k)||!validId(e.rootConclusionId)||!unique(e.goldAffectedIds)||!Array.isArray(e.goldAffectedIds))fail("变化事件/影响真值无效");
