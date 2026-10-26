@@ -9,7 +9,7 @@ test.before(async()=>{({evaluateData}=await evaluate);});
 const digest=x=>createHash("sha256").update(x).digest("hex");
 function fixture(){
  const protocol={format:"threadline-pilot2-protocol/1",status:"FROZEN",
-   freeze:{at:"2026-10-25T08:00:00Z",commitSha:"synthetic-commit",reviewedBy:"synthetic-independent-human",
+   freeze:{at:"2026-10-25T08:00:00Z",commitSha:"1".repeat(40),reviewedBy:"synthetic-independent-human",
      ruleFrozenBeforeScoring:true},tierRuleId:"threadline-s2-tier/1",
    tierRuleSha256:digest(readFileSync(resolve(__dirname,"../../scripts/pilot2-tier-rule.mjs"))),
    cases:[]},observations={format:"threadline-pilot2-observations/1",status:"EXECUTED",records:[]};
@@ -135,6 +135,12 @@ test("learning overhead is included in screening and separately disclosed",()=>{
  assert.throws(()=>evaluateData(protocol,observations,hash),/学习成本/);
 });
 
+test("frozen file must reference a prior input commit, not an arbitrary self-SHA",()=>{
+ const a=fixture();a.protocol.freeze.commitSha="synthetic-commit";
+ assert.throws(()=>evaluateData(a.protocol,a.observations,a.hash),/有效的前置输入 Git commit/);
+ const b=fixture();b.protocol.freeze.commitSha=null;
+ assert.throws(()=>evaluateData(b.protocol,b.observations,b.hash),/有效的前置输入 Git commit/);
+});
 test("independent annotation receipts and adjudication must precede freeze",()=>{
  const missing=fixture();
  delete missing.protocol.cases[0].independentAnnotations[0].annotationSha256;
