@@ -31,8 +31,8 @@ function commit(dir,msg){
   git(dir,'add','.');
   git(dir,'-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','-m',msg);
 }
-function check(dir){
-  return spawnSync(process.execPath,[SCRIPT,'v0.8.1'],{cwd:dir,encoding:'utf8'});
+function check(dir,...flags){
+  return spawnSync(process.execPath,[SCRIPT,'v0.8.1',...flags],{cwd:dir,encoding:'utf8'});
 }
 test('release guard rejects same-version source changes and passes a new version',()=>{
   const dir=fixture();
@@ -50,14 +50,17 @@ test('release guard rejects same-version source changes and passes a new version
     assert.match(result.stdout,/v0\.8\.1 -> v0\.8\.2/);
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
-test('release guard rejects absent extension changes or a downgraded manifest',()=>{
+test('docs-only push stays green but publish requires a changed version',()=>{
   const dir=fixture();
   try{
     fs.writeFileSync(path.join(dir,'README.md'),'docs change\n');
     commit(dir,'docs only');
     let result=check(dir);
+    assert.equal(result.status,0,result.stderr);
+    assert.match(result.stdout,/Release audit clean/);
+    result=check(dir,'--publish');
     assert.notEqual(result.status,0);
-    assert.match(result.stderr,/No tracked extension changes/);
+    assert.match(result.stderr,/No extension changes to publish/);
     fs.writeFileSync(path.join(dir,'threadline-extension/manifest.json'),
       JSON.stringify({version:'0.7.9'}));
     commit(dir,'downgrade manifest');
@@ -72,6 +75,14 @@ test('release guard uses an explicit published tag, not an arbitrary branch clai
     currentVersion:'0.8.3',changedFiles:['threadline-extension/x.js']}),/disagree/);
   assert.throws(()=>evaluateReleaseDrift({latestTag:'v0.8.1',previousVersion:'0.8.1',
     currentVersion:'0.8.1',changedFiles:['threadline-extension/x.js']}),/without increasing/);
+  assert.equal(evaluateReleaseDrift({latestTag:'v0.8.1',previousVersion:'0.8.1',
+    currentVersion:'0.8.1',changedFiles:[]}).clean,true);
+  assert.throws(()=>evaluateReleaseDrift({latestTag:'v0.8.1',previousVersion:'0.8.1',
+    currentVersion:'0.8.1',changedFiles:[],forPublish:true}),/No extension changes to publish/);
+  assert.throws(()=>evaluateReleaseDrift({latestTag:'v0.8.1',previousVersion:'0.8.1',
+    currentVersion:'0.8.2',changedFiles:[]}),/Manifest version changed/);
+  assert.throws(()=>evaluateReleaseDrift({latestTag:'v0.8.1',previousVersion:'0.8.1',
+    currentVersion:'0.8.2',changedFiles:['docs/PLAN.md']}),/Unscoped path/);
 });
 test('test-count floor is tied to manifest version and above deprecated 94 baseline',()=>{
   const floors=JSON.parse(fs.readFileSync(path.join(ROOT,'scripts/test-floors.json'),'utf8'));
