@@ -86,3 +86,48 @@ test('missing reservation cannot be acknowledged',async()=>{
  await assert.rejects(s.message({type:'HANDOFF_ACK'},sender),/no reserved/);
  assert.equal(s.session.get('tl_handoff_84').text,'TEST INTENT');
 });
+
+test('manual capture cancellation is panel-only, preserves partial pages and rejects late writes',async()=>{
+  const s=system(),{id}=await s.message({type:'CAPTURE_START',tabId:7});
+  const sender={tab:{id:7,url:'https://chatgpt.com/c/source-123'}};
+  await s.message({type:'CAPTURE_PAGE',id,pageIndex:0,chunkIndex:0,
+    messages:[{id:'1',role:'user',content:'partial synthetic history'}]},sender);
+  const saved=s.pages.get(id+'_0_0');
+  await assert.rejects(s.message({type:'CAPTURE_CANCEL',id},
+    {url:'https://chatgpt.com/c/source-123',tab:{id:7,url:sender.tab.url}}),
+    /只有研线面板可取消采集/);
+  assert.equal(s.runs.get(id).status,'capturing');
+  const cancel=await s.message({type:'CAPTURE_CANCEL',id});
+  assert.equal(cancel.cancelled,true);
+  assert.equal(cancel.stopSignalDelivered,true);
+  assert.equal(s.runs.get(id).status,'error');
+  assert.equal(s.runs.get(id).phase,'user-cancelled');
+  assert.equal(s.runs.get(id).complete,false);
+  assert.ok(!s.session.has('tl_capture_owner_'+id));
+  assert.equal(s.pages.get(id+'_0_0'),saved,'partial pages must remain');
+  assert.equal(s.calls.filter(c=>c[0]==='send' && c[2].type==='TL_CAPTURE_CANCEL').length,1);
+  for(const payload of [
+    {type:'CAPTURE_PAGE',id,pageIndex:0,chunkIndex:1,messages:[]},
+    {type:'CAPTURE_PROGRESS',id,pageCount:2,messageCount:2},
+    {type:'CAPTURE_RESET',id},
+    {type:'CAPTURE_END',id,complete:true,mode:'paginated',pageCount:1,count:1},
+    {type:'CAPTURE_FAIL',id,message:'late failure'}
+  ]){
+    await assert.rejects(s.message(payload,sender),/已结束/);
+  }
+  assert.equal(s.pages.size,1,'late chunks cannot extend or reset stored evidence');
+  assert.equal(s.runs.get(id).status,'error');
+  assert.equal(s.runs.get(id).phase,'user-cancelled');
+  const replay=await s.message({type:'CAPTURE_CANCEL',id});
+  assert.equal(replay.alreadyCancelled,true);
+  assert.equal(s.calls.filter(c=>c[0]==='send' && c[2].type==='TL_CAPTURE_CANCEL').length,1,
+    'replay does not send another cancel signal');
+});
+test('a completed capture cannot be retroactively cancelled',async()=>{
+  const s=system(),{id}=await s.message({type:'CAPTURE_START',tabId:7});
+  const sender={tab:{id:7,url:'https://chatgpt.com/c/source-123'}};
+  await s.message({type:'CAPTURE_END',id,complete:true,mode:'paginated',pageCount:0,count:0},sender);
+  await assert.rejects(s.message({type:'CAPTURE_CANCEL',id}),/采集已结束/);
+  assert.equal(s.runs.get(id).status,'done');
+  assert.equal(s.runs.get(id).complete,true);
+});
