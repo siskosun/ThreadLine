@@ -168,6 +168,13 @@ def run():
                 ".some(option => option.value === id)", arg=project_id)
             panel.select_option("#evidence-project", project_id)
             panel.click("#evidence-refresh")
+            maintenance = panel.locator("#evidence-maintenance")
+            if maintenance.get_attribute("open") is None:
+                maintenance.locator(":scope > summary").click()
+            panel.wait_for_function(
+                "id => document.querySelector('#evidence-maintenance > div > select')?.value === id",
+                arg=project_id)
+            assert "与当前查看课题一致" in maintenance.locator(":scope > div > p[role=status]").first.inner_text()
             try:
                 panel.locator("#evidence-list .evidence-item").wait_for(timeout=5000)
             except Exception as error:
