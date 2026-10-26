@@ -1,5 +1,14 @@
 # ThreadLine 开发进度记录
 
+## 2026-10-26 UX P0：普通对话接续横幅误报修复候选
+
+- **代码候选准确 HEAD** `dc8f683b664e0a7349598e5815d623da89cbebd1`：[Linux verify](https://github.com/siskosun/ThreadLine/actions/runs/40255902588) **success**；[Windows baseline](https://github.com/siskosun/ThreadLine/actions/runs/40255902576) **success**。均为自动化与合成 Chromium 场景；真实登录 ChatGPT、既有数据、真人交互/无障碍验收 **NOT_EXECUTED**。本条文档更新后的准确 HEAD 仍需单独检查，保持 Draft / Open、未合并/发布。
+
+- 新独立 Draft PR（基于 main `bf2c2c2`）修复 `handoff.js` 在无接续意图时，仅因已有对话或 Project URL 而显示“已停止预填”的误报。添加仅返回布尔值的 `HANDOFF_PEEK`：仅 ChatGPT 来源标签可查询自己标签 ID 的待接续状态，既不返回提示文本，也不预占、重试、ACK 或发送消息。
+- 有效的新聊天接续流程保持旧 GET/BEGIN/ACK 与逐字回读逻辑；**确有待接续意图**却导航到旧聊天/Project 页时，仍显示可解释的终止警告，不把意图泄漏到已有对话。
+- 新增 Node 单元、后台来源权限/不消耗意图回归，以及合成 Chromium MV3 既有对话与 Project 无误报和受控错误跳转用例。准确 HEAD 的 Linux/Windows CI 另行登记；真实已登录 ChatGPT 仍 NOT_EXECUTED。此修复不改变 S1 风险状态、唯一 PLAN 任务表、不合并不发布。
+
+
 ## 2026-10-26 UX：默认选择手动 AI 分析（独立候选）
 
 - **代码候选准确 HEAD** `6eef0103c099fd3af4749a764716e614c0d2b719`：[Linux verify](https://github.com/siskosun/ThreadLine/actions/runs/40256481886) **success**；[Windows baseline](https://github.com/siskosun/ThreadLine/actions/runs/40256481867) **success**。均为自动化与合成 Chromium 场景；真实登录 ChatGPT、既有数据、真人交互/无障碍验收 **NOT_EXECUTED**。本条文档更新后的准确 HEAD 仍需单独检查，保持 Draft / Open、未合并/发布。
@@ -9,6 +18,20 @@
 
 
 任务定义和正式状态唯一来源：[docs/PLAN.md](../PLAN.md)。本文件只记录发生过的事件与证据，不自行认定任务完成。
+
+## 2026-10-25 第十二章分拆交付：独立 PR、准确提交 CI 与真人门禁
+
+- **计划基线：** [PR #38](https://github.com/siskosun/ThreadLine/pull/38) 已按用户授权合入，main `bf2c2c2`。本轮继续工作仍全部在 Draft/审阅分支进行，不自动合并/发布/写入用户安装资料。
+- **S1 基础：** [PR #36](https://github.com/siskosun/ThreadLine/pull/36) `a305592` 的数据/导入/源保真修复及 [PR #39](https://github.com/siskosun/ThreadLine/pull/39) `aad7d0d` 的 S1 逐条采纳、备份恢复、研究交接切片已在各自准确 HEAD 的 Linux/Windows CI success；#39 的合成 MV3/IndexedDB 测试覆盖单独 /3 交接、删除和完整恢复。**真实旧用户数据、L3 风险签署、采纳工效未验收**。
+- **F3 诊断：** [PR #40](https://github.com/siskosun/ThreadLine/pull/40) `b5b08e0` 修复注入失败却提示已启动、Fork 结束关联异常静默忽略，新增精确分支/运行身份状态查询；补充模拟脚本注入失败回归，234/234 Node；[Linux run 40183972078](https://github.com/siskosun/ThreadLine/actions/runs/40183972078) 和 [Windows run 40183972079](https://github.com/siskosun/ThreadLine/actions/runs/40183972079) success。**真人 K=4 三天/十二次、服务中断与选择器降级 NOT_EXECUTED，不能宣布 F3 根因已解决**。
+- **S2：** [PR #41](https://github.com/siskosun/ThreadLine/pull/41) `a89721d` 独立版本依赖、人工登记与循环防止；[Linux run 40182249781](https://github.com/siskosun/ThreadLine/actions/runs/40182249781) / [Windows run 40182249827](https://github.com/siskosun/ThreadLine/actions/runs/40182249827) success。
+- **S3：** [PR #42](https://github.com/siskosun/ThreadLine/pull/42) `72bedb0` 变化事件/直接传递影响及用户逐事件确认（不再自动全部确认）；[Linux run 40182380767](https://github.com/siskosun/ThreadLine/actions/runs/40182380767) / [Windows run 40182380780](https://github.com/siskosun/ThreadLine/actions/runs/40182380780) success。
+- **S4：** [PR #43](https://github.com/siskosun/ThreadLine/pull/43) `f41bf42` 冻结祖先来源、过期仅留史、可编辑复核与持久交接；修复成功提示被历史刷新覆盖。准确 HEAD [Linux run 40183510467](https://github.com/siskosun/ThreadLine/actions/runs/40183510467) / [Windows run 40183510460](https://github.com/siskosun/ThreadLine/actions/runs/40183510460) success。
+- **S5：** [PR #44](https://github.com/siskosun/ThreadLine/pull/44) `47b94db` 从 #37 复用官方 Argdown 静态解析器与 MIT 许可、保留可复现构建，改为用户主动懒加载；增加 S2 登记 → S3 核查 → S4 冻结与完成的**实际侧栏控件**合成 E2E。准确 HEAD [Linux run 40183528363](https://github.com/siskosun/ThreadLine/actions/runs/40183528363)（291 Node PASS，E2E 全部 PASS）、[Windows run 40183528362](https://github.com/siskosun/ThreadLine/actions/runs/40183528362)（292 Node PASS，E2E 全部 PASS）。没有自动发送。
+- **三臂筛选：** [PR #45](https://github.com/siskosun/ThreadLine/pull/45) `32c8e59` 新增冻结协议、同一原始资料 SHA/模型版本、独立收据、包含/不包含学习成本的总耗时和 A/B/C 配对评估器；B 必须重算生产 `Research.impacts`；[Linux run 40183881438](https://github.com/siskosun/ThreadLine/actions/runs/40183881438) / [Windows run 40183881474](https://github.com/siskosun/ThreadLine/actions/runs/40183881474) success。**实际 6 例/≥30 变化事件及第二人独立标注 NOT_EXECUTED**，不能填写虚假的总体效果。
+- **人工交接与治理：** [PR #46](https://github.com/siskosun/ThreadLine/pull/46) （本记录所在评审 PR，最终 SHA 以 PR HEAD 为准）补 [详细真人验收清单](NEXT_PHASE_ACCEPTANCE_20261025.md)、已合并计划的 Markdown/状态说明；此前 [Linux run 40183300239](https://github.com/siskosun/ThreadLine/actions/runs/40183300239) / [Windows run 40183300350](https://github.com/siskosun/ThreadLine/actions/runs/40183300350) success；追加本进度记录后须按准确 HEAD 再验证。机器表、历史完成证据及人工签署未更改。
+
+**完整测试命令范围：** 各 PR 的 GitHub Actions `npm run verify`、适用的 `npm run test:e2e` 和 S5 `npm ci`/Argdown bundle 校验。均为 GitHub CI 的合成浏览器/Node 回归，不是假称用户本机原生命令或真实登录 ChatGPT 人工签署。正式 `done` 仍需各 PR 合并、准确合并 HEAD 的 CI、适用 evidence JSON 与拥有者在精确 HEAD 的 `MANUAL_ACCEPT` 留言；原 S0/S1 done/blocked 差异需治理单独裁定。
 
 ## 2026-10-24 外部有条件计划评审采纳
 

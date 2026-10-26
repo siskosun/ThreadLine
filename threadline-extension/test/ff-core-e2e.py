@@ -588,18 +588,36 @@ def run():
             p4id = p4create["data"]["id"]
             p4row = reopened.evaluate("(id) => chrome.runtime.sendMessage({type:'FF_READ',id})", p4id)
             assert len(p4row["data"]["branches"]) == 4
-            tabs_before_p4 = sw_read("async () => (await chrome.tabs.query({url:'https://chatgpt.com/*'})).length")
             launched4 = reopened.evaluate("""id => chrome.runtime.sendMessage(
               {type:'FF_LAUNCH',experimentId:id,operationId:'op_p4e2e0002'})""", p4id)
             assert launched4["ok"] and len(launched4["data"]["tabIds"]) == 4, launched4
+            # Verify the exact four branch tab IDs, not a global tab-count delta:
+            # unrelated ChatGPT tabs can close during this asynchronous launch.
+            launched_tabs = launched4["data"]["tabIds"]
+            ids = list(launched_tabs.values())
+            assert len(set(ids)) == 4, launched_tabs
             deadline = time.time() + 40
-            tabs_now = 0
+            tab_states = []
             while time.time() < deadline:
-                tabs_now = sw_read("async () => (await chrome.tabs.query({url:'https://chatgpt.com/*'})).length")
-                if tabs_now == tabs_before_p4 + 4:
+                tab_states = sw_read("""async ids => Promise.all(ids.map(async id => {
+                    try {
+                        const tab = await chrome.tabs.get(id);
+                        return {id:tab.id,url:tab.url||''};
+                    } catch (error) {
+                        return {id,error:String(error)};
+                    }
+                }))""", ids)
+                if (len(tab_states) == 4 and all(
+                    tab.get("url", "").startswith("https://chatgpt.com/")
+                    and tab["id"] == expected
+                    for tab, expected in zip(tab_states, ids)
+                )):
                     break
                 time.sleep(0.5)
-            assert tabs_now == tabs_before_p4 + 4, "K=4 launch opens four tabs"
+            assert len(tab_states) == 4 and all(
+                tab.get("url", "").startswith("https://chatgpt.com/")
+                and tab["id"] == expected for tab, expected in zip(tab_states, ids)
+            ), ("K=4 launched branch tab identity/URL mismatch", launched_tabs, tab_states)
             deadline = time.time() + 40
             p4row = None
             while time.time() < deadline:
