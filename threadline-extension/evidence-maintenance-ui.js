@@ -28,6 +28,13 @@
     const c = countsOf(counts);
     return `结论 ${c.conclusions}、版本 ${c.versions}、来源片段 ${c.sources}、链接 ${c.links}`;
   };
+  function chooseMaintenanceProject(projects, viewId, previousId, followView = false) {
+    const valid = id => (projects || []).some(p => p.id === id && !p.deleted);
+    if (followView && valid(viewId)) return viewId;
+    if (valid(previousId)) return previousId;
+    if (valid(viewId)) return viewId;
+    return (projects || []).find(p => !p.deleted)?.id || "";
+  }
   const download = (filename, data) => {
     const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json;charset=utf-8" }));
     const link = document.createElement("a");
@@ -42,6 +49,8 @@
     const box=node("details",{id:"evidence-maintenance"}),body=node("div"),status=node("p",{role:"status",className:"subtle"});status.setAttribute("aria-live","polite");
     box.append(node("summary",{},"证据备份、恢复与删除"),body);
     const select=node("select");select.setAttribute("aria-label","选择维护课题");
+    const viewSelect=doc.getElementById("evidence-project");
+    const scope=node("p",{className:"subtle",role:"status"});scope.setAttribute("aria-live","polite");
     const backup=button("导出证据备份"),pick=button("选择备份文件恢复"),diagnostic=button("导出故障原始包"),remove=button("预览删除范围","danger"),refreshButton=button("刷新课题目录");
     const actions=node("div",{className:"tl-actions"});actions.append(backup,pick,remove,refreshButton);
     const input=node("input",{type:"file",accept:"application/json,.json",hidden:true}),restorePanel=node("div",{hidden:true,className:"evidence-restore-preview"});
@@ -50,17 +59,31 @@
     const restore=button("确认恢复","primary"),cancelRestore=button("取消"),retry=button("重试未完成的删除清理");retry.hidden=true;restore.disabled=true;
     restorePanel.append(restoreText,replaceLabel,restore,cancelRestore);
     const advanced=node("details");advanced.append(node("summary",{},"故障恢复工具"),node("p",{className:"subtle"},"普通备份不可用时，导出所有课题的故障原始包供检查；该文件包含原文，不能直接作为恢复备份。"),diagnostic);
-    body.append(node("p",{className:"subtle"},"备份包含结论和原文片段。课题删除会清理其证据、摘要、交接与历史副本；独立采集/Fork 原件、剪贴板及外部文件保留。"),select,actions,input,restorePanel,retry,status,advanced);host.append(box);
+    body.append(node("p",{className:"subtle"},"备份包含结论和原文片段。课题删除会清理其证据、摘要、交接与历史副本；独立采集/Fork 原件、剪贴板及外部文件保留。"),select,scope,actions,input,restorePanel,retry,status,advanced);host.append(box);
     let projects=[],pendingRestore=null,pendingDelete=null,busy=false,previewTicket=0,directoryTicket=0;
     const say=(text,error=false)=>{status.textContent=text;status.dataset.error=String(error);};
     const changed=()=>win.dispatchEvent(new Event("threadline-evidence-changed"));
     const selected=()=>projects.find(p=>p.id===select.value&&!p.deleted);
+    function showScope() {
+      const target=selected(),viewId=viewSelect?.value||"";
+      scope.textContent=!target?"当前没有可维护课题，请刷新目录或恢复备份。":
+        "维护目标："+(target.name||target.id)+(viewId&&viewId!==target.id?"（与当前查看课题不同，请核对范围）":
+        viewId===target.id?"（与当前查看课题一致）":"（未绑定当前查看课题）");
+    }
+    function followCurrentView() {
+      if(busy||pendingRestore||(!retry.hidden&&pendingDelete)){showScope();return;}
+      const id=chooseMaintenanceProject(projects,viewSelect?.value,select.value,true);
+      if(id)select.value=id;
+      showScope();
+    }
     async function refresh({announce=false}={}){
       const ticket=++directoryTicket,prior=select.value;
       try{const data=await send({type:"EV_PROJECTS"});if(ticket!==directoryTicket)return;
         projects=data.projects||[];select.replaceChildren();
         for(const project of projects){const option=node("option",{value:project.id,disabled:!!project.deleted},(project.name||project.id)+(project.deleted?"（已删除）":project.unavailable?"（需恢复）":""));select.append(option);}
-        if([...select.options].some(o=>o.value===prior&&!o.disabled))select.value=prior;
+        const preferred=chooseMaintenanceProject(projects,viewSelect?.value,prior);
+        if(preferred)select.value=preferred;
+        showScope();
         if(announce)say(data.error||(!projects.length?"暂无课题。可以选择备份恢复，或先创建课题。":"请选择要维护的课题。"),!!data.error);
       }catch(error){if(ticket===directoryTicket)say("目录读取失败："+error.message+"。故障原始包仍可导出。",true);}
     }
@@ -103,10 +126,13 @@
       }catch(error){retry.hidden=!pendingDelete;say("删除未能确认："+error.message+"。不会自动重试；可用原预览重试或刷新核对。",true);}
     });};
     retry.onclick=()=>{if(!pendingDelete)return;return exclusive(async()=>{try{await finishDelete();}catch(error){say("清理仍未确认："+error.message,true);}});};
+    select.addEventListener("change",showScope);
+    viewSelect?.addEventListener("change",followCurrentView);
+    box.addEventListener("toggle",()=>{if(box.open)followCurrentView();});
     refreshButton.onclick=()=>refresh({announce:true});win.addEventListener("threadline-evidence-changed",()=>refresh());refresh({announce:true});
     return {refresh,parseBackupFile};
   }
-  const API = { install, parseBackupFile, normalizeBackup, countsOf, MAX_PACKAGE_BYTES };
+  const API = { install, parseBackupFile, normalizeBackup, countsOf, chooseMaintenanceProject, MAX_PACKAGE_BYTES };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   else globalThis.ThreadLineEvidenceMaintenanceUI = API;
   if (typeof window !== "undefined" && typeof document !== "undefined" && typeof chrome !== "undefined") install();
