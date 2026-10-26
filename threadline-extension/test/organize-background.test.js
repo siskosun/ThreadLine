@@ -13,7 +13,7 @@ function setup(options={}){
      if(msg.type==='TL_ORG_ARCHIVE'){tabMap.get(7).url='https://chatgpt.com/';return{ok:true,data:{status:'archived'}};}
      return {ok:true};},async remove(id){records.push(['remove',id]);tabMap.delete(id)}},
   scripting:{async executeScript(arg){records.push(['script',arg.target.tabId]);}},sidePanel:{setPanelBehavior:async()=>{}},storage:{local:{async get(k){return{[k]:local.get(k)}},async set(o){for(const [k,v]of Object.entries(o))local.set(k,v)}},session:{async get(k){return{[k]:session.get(k)}},async set(o){for(const [k,v]of Object.entries(o))session.set(k,v)},async remove(k){for(const key of Array.isArray(k)?k:[k])session.delete(key)}}}};
- vm.runInNewContext(fs.readFileSync(path.join(__dirname,'..','background.js'),'utf8'),{importScripts:()=>{},ThreadLineCore:Core,ThreadLineCaptureCore:CaptureCore,ThreadLineCaptureDB:db,ThreadLineOrganizeCore:OrgCore,chrome,crypto:globalThis.crypto,console,Date,Promise,URL,setTimeout,clearTimeout});
+ vm.runInNewContext(fs.readFileSync(path.join(__dirname,'..','background.js'),'utf8'),{importScripts:()=>{},...require('./helpers/empty-evidence.js')(),ThreadLineCore:Core,ThreadLineCaptureCore:CaptureCore,ThreadLineCaptureDB:db,ThreadLineOrganizeCore:OrgCore,chrome,crypto:globalThis.crypto,console,Date,Promise,URL,setTimeout,clearTimeout});
  const message=(input,sender={id:'organize-test',url:'chrome-extension://organize-test/panel.html'})=>new Promise((resolve,reject)=>{callbacks.message(input,sender,r=>r.ok?resolve(r.data):reject(Error(r.error)))});
  return {message,runs,records,tabMap};
 }

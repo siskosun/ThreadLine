@@ -1,9 +1,9 @@
 # ThreadLine 开发计划
 
 **唯一正式计划：** 本文件 `docs/PLAN.md`。其他 ChatGPT 资料库、对话、PR 说明和 `docs/ff/` 附录仅作为参考或证据，均不能覆盖本文件的任务状态。
-**事实核查日：** 2026-10-24。
-**当前核查基线：** main `a66e9b09f43986c6e2ae1b4219df4a95c2cc317a`，应用 v0.8.0；[v0.8.0 Release](https://github.com/siskosun/ThreadLine/releases/tag/v0.8.0) 已发布。原 v0.6.1 基线仅属历史。
-**范围：** 既有第一、二期按下表登记；第十一节为下一阶段候选路线，待外部计划评审与立项。本次保持机器任务表及证据门禁不变，不将规划提交当作功能完成。
+**事实核查日：** 2026-10-26。
+**当前核查基线：** main `c4e8696f2fe91bd85bb08c3cd9df4959f490cc6a`，应用源码标 v0.8.1；已发布的 v0.8.1 安装包来自更早提交，不包含本轮未发布代码。S0/S1 复验发现阻塞项，见 [复验记录](ff/ACCEPTANCE_20261025.md)。本分支为状态纠偏候选，尚未合并或完成人工风险签署。
+**范围：** 保留历史完成证据；按 S1 复验暂将四项旧 done 重新登记为 blocked 候选，相关任务须经正式治理审核后才能在主分支生效。S2–S5 仍在独立 Draft 分支，真实用户数据与线上采集尚未验收。
 
 ## 执行任务与验收门禁
 
@@ -20,11 +20,15 @@
 | P3-REPORT | 完整结果采集、去标签对照及 JSON 导出 | done | P2-FORK | 双 done 才可对照，用户裁决持久化，不重放未知状态，导出可独立复算 | docs/ff/evidence/P3-REPORT.json | yes |
 | BETA-RELEASE | 安装升级与正式 Beta 验收 | done | P3-REPORT | 真实双分支闭环、同路径旧数据升级、CI 与用户验收均通过 | docs/ff/evidence/BETA-RELEASE.json | yes |
 | P4-AUTO | 第二期：K=4 多会话编排、等预算对照、裁判校准（隐藏校准题）与 JSON 导入；自动 Flush 经一期证据改判不可行，以批量预填+人工批量发送替代 | done | BETA-RELEASE | 等预算对照与裁判校准机制落地，K 可配置 2–4，导入经严格验证；0 自动发送不变 | docs/ff/evidence/P4-AUTO.json | yes |
-| S0A-PROTOTYPE | 第十一章 S0a：证据存储与采纳原型（单事务权威写入、投影、崩溃点/恢复设计、容量探针与工期估算） | done | P4-AUTO | 单事务采纳/撤回+幂等/CAS 经测试；崩溃点表与恢复顺序无待定项；首期默认容量经探针冻结；12 次有效采纳操作至少 11 次无帮助完成、耗时中位 ≤30s、P90 ≤60s（受托代理执行须在证据 scope 声明） | docs/ff/evidence/S0A-PROTOTYPE.json | yes |
-| S0B-LOCATE | 第十一章 S0b：来源定位 spike（限 1 人日/8 小时：现有适配 vs Toolkit vendor 子集 vs 最小实现） | done | S0A-PROTOTYPE | 三方案维护/包体/测试成本结论落档；采纳的代码须通过身份与取消测试并保留许可标注，失败则记录原因并降级“片段+来源链接” | docs/ff/evidence/S0B-LOCATE.json | no |
-| S1A-PERSIST | 第十一章 S1a：结论/证据持久化与恢复（chrome.storage 单向投影、旧 decision 编辑封口、备份恢复与错误处理） | done | S0A-PROTOTYPE | 跨重启/清缓存保存完整；崩溃点与旧数据兼容通过；持久化/删除实施经 L3 审查与人工风险确认 | docs/ff/evidence/S1A-PERSIST.json | yes |
-| S1B-ADOPT | 第十一章 S1b：逐条采纳与可编辑交接（普通整理与 Fork 揭盲共用） | done | S1A-PERSIST,S0B-LOCATE | 主要操作只要求正文与依据确认；重复采纳不重复创建；旧分支可见更正/撤回；定位不可靠时显示“仅片段”不误跳转 | docs/ff/evidence/S1B-ADOPT.json | yes |
+| S0A-PROTOTYPE | 第十一章 S0a：证据存储与采纳原型（单事务权威写入、投影、崩溃点/恢复设计、容量探针与工期估算） | blocked | P4-AUTO | 单事务采纳/撤回+幂等/CAS 经测试；崩溃点表与恢复顺序无待定项；首期默认容量经探针冻结；12 次有效采纳操作至少 11 次无帮助完成、耗时中位 ≤30s、P90 ≤60s（受托代理执行须在证据 scope 声明） | docs/ff/BLOCKED.md | yes |
+| S0B-LOCATE | 第十一章 S0b：来源定位 spike（限 1 人日/8 小时：现有适配 vs Toolkit vendor 子集 vs 最小实现） | blocked | S0A-PROTOTYPE | 三方案维护/包体/测试成本结论落档；采纳的代码须通过身份与取消测试并保留许可标注，失败则记录原因并降级“片段+来源链接” | docs/ff/BLOCKED.md | no |
+| S1A-PERSIST | 第十一章 S1a：结论/证据持久化与恢复（chrome.storage 单向投影、旧 decision 编辑封口、备份恢复与错误处理） | blocked | S0A-PROTOTYPE | 跨重启/清缓存保存完整；崩溃点与旧数据兼容通过；持久化/删除实施经 L3 审查与人工风险确认 | docs/ff/BLOCKED.md | yes |
+| S1B-ADOPT | 第十一章 S1b：逐条采纳与可编辑交接（普通整理与 Fork 揭盲共用） | blocked | S1A-PERSIST,S0B-LOCATE | 主要操作只要求正文与依据确认；重复采纳不重复创建；旧分支可见更正/撤回；定位不可靠时显示“仅片段”不误跳转 | docs/ff/BLOCKED.md | yes |
 <!-- PLAN_TASKS_END -->
+
+2026-10-25 复验：S0A/S1A/S1B 存在可复现的契约缺陷，重新登记 blocked；S0B 仅因前置依赖阻塞。此前合并、测试和签署保留为历史证据。用户授权自行评审后，PR #36 已推进 R01–R10 修复，其中 R05 先拒绝危险删除/旧恢复，不代表完整删除协议交付。新增验证和下一步见 [本轮修复记录](ff/S1_REPAIR_RESULT_20261025.md)；四项状态暂不恢复 done。
+
+
 
 ### 状态与证据契约
 

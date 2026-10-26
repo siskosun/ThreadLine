@@ -1,17 +1,4 @@
-/* ThreadLine evidence core (S0a prototype, plan §十一).
- * Pure logic only: no IndexedDB, no chrome.*, no DOM. The single-writer
- * service worker in background.js owns all persistence; this module builds
- * and validates the records an adoption/withdrawal touches so the whole
- * change commits inside ONE readwrite transaction (evidence-db.js).
- *
- * Frozen first-phase defaults (plan §十一.6; product limits, not browser
- * quota guarantees — verify via probes before S1a, changes need a reason):
- *  - conclusion body: <= 4000 Unicode code points
- *  - per fragment: selection + <=500cp before + <=500cp after, <= 16 KiB UTF-8
- *  - per conclusion: <= 8 fragments, <= 64 KiB total
- *  - per project: <= 200 stable conclusions, <= 50 versions each
- *  - import/export package: <= 20 MiB UTF-8 JSON; visible budget 100 MiB
- */
+/* Pure authority-side evidence planning. No DOM, chrome or network calls. */
 (() => {
   "use strict";
   const encoder = new TextEncoder();
@@ -24,381 +11,682 @@
     conclusionsPerProject: 200,
     versionsPerConclusion: 50,
     packageBytes: 20 * 1024 * 1024,
-    summaryCodePoints: 1000
+    summaryCodePoints: 1000,
   });
-  const codePoints = s => Array.from(s).length;
-  const bytes = s => encoder.encode(s).length;
-  const isId = (s, prefix) => typeof s === "string" &&
-    new RegExp("^" + prefix + "[a-z0-9_-]{8,64}$").test(s);
-  const now = () => Date.now();
-  const uuid = () => (crypto.randomUUID ? crypto.randomUUID()
-    : "0000-0000").replace(/-/g, "").slice(0, 16);
-
-  /* ---------- fragment & conclusion validation (fail loud, never truncate) */
-
-  function validateFragment(fragment) {
-    if (!fragment || typeof fragment !== "object") throw new Error("片段缺失");
-    const { selection, before = "", after = "", relation = "cites", completeness } = fragment;
-    if (typeof selection !== "string" || !selection.trim()) throw new Error("片段选区不能为空");
-    if (codePoints(before) > LIMITS.fragmentContextCodePoints ||
-        codePoints(after) > LIMITS.fragmentContextCodePoints)
-      throw new Error("片段上下文超过 500 code points：请缩小选区或显式调整");
+  const codePoints = (x) => Array.from(String(x)).length,
+    bytes = (x) => encoder.encode(String(x)).length,
+    now = () => Date.now();
+  const isId = (x, p) =>
+    typeof x === "string" && new RegExp("^" + p + "[a-z0-9_-]{8,64}$").test(x);
+  // Project IDs also become own property names in authority snapshots.
+  // A backup must never resolve an inherited Object.prototype key.
+  const validProjectId = x => typeof x === "string" &&
+    /^[a-zA-Z0-9_-]{1,128}$/.test(x) &&
+    x !== "prototype" && !Object.hasOwn(Object.prototype, x);
+  function requireProjectId(x) {
+    if (!validProjectId(x)) throw Error("课题 ID 无效或保留名称");
+    return x;
+  }
+  const uuid = () =>
+    (crypto.randomUUID ? crypto.randomUUID() : "0000000000000000")
+      .replace(/-/g, "")
+      .slice(0, 16);
+  const stable = (x) =>
+    Array.isArray(x)
+      ? "[" + x.map(stable).join(",") + "]"
+      : x && typeof x === "object"
+        ? "{" +
+          Object.keys(x)
+            .sort()
+            .map((k) => JSON.stringify(k) + ":" + stable(x[k]))
+            .join(",") +
+          "}"
+        : JSON.stringify(x);
+  async function hashText(x) {
+    const d = await crypto.subtle.digest("SHA-256", encoder.encode(String(x)));
+    return [...new Uint8Array(d)]
+      .map((x) => x.toString(16).padStart(2, "0"))
+      .join("");
+  }
+  const hashRequest = (x) => hashText(stable(x));
+  function validateFragment(f) {
+    if (!f || typeof f !== "object") throw Error("片段缺失");
+    const {
+      selection,
+      before = "",
+      after = "",
+      relation = "cites",
+      completeness = "unknown",
+    } = f;
+    if (typeof selection !== "string" || !selection.trim())
+      throw Error("片段选区不能为空");
+    if (typeof before !== "string" || typeof after !== "string") throw Error("片段上下文必须是文本");
+    for (const field of ["kind", "captureRunId", "conversationId", "messageId", "url"])
+      if (f[field] != null && (typeof f[field] !== "string" || f[field].length > 2048))
+        throw Error("来源身份字段无效：" + field);
+    for (const field of ["capturedAt", "identityCapturedAt"])
+      if (f[field] != null && (!Number.isSafeInteger(f[field]) || f[field] < 0))
+        throw Error("来源时间无效");
+    if (codePoints(before) > 500 || codePoints(after) > 500)
+      throw Error("片段上下文超过 500 code points");
     if (!["cites", "supports", "opposes", "background"].includes(relation))
-      throw new Error("未知片段关系: " + relation);
-    if (!["complete", "partial", "unknown"].includes(completeness || "unknown"))
-      throw new Error("未知采集完整性");
-    const total = bytes(before + selection + after);
-    if (total > LIMITS.fragmentBytes)
-      throw new Error("单片段超过 16 KiB：请缩小选区或显式调整");
+      throw Error("未知片段关系: " + relation);
+    if (!["complete", "partial", "unknown"].includes(completeness))
+      throw Error("未知采集完整性");
+    if (bytes(before + selection + after) > LIMITS.fragmentBytes)
+      throw Error("单片段超过 16 KiB");
     return true;
   }
-
-  function validateAdoption(input) {
-    if (!input || typeof input !== "object") throw new Error("采纳输入缺失");
-    if (typeof input.projectId !== "string" || !input.projectId)
-      throw new Error("缺少课题 ID");
-    if (typeof input.text !== "string" || !input.text.trim())
-      throw new Error("结论正文不能为空");
-    if (codePoints(input.text) > LIMITS.conclusionCodePoints)
-      throw new Error("结论正文超过 4000 code points");
-    const fragments = input.fragments || [];
-    if (fragments.length === 0) throw new Error("采纳至少需要一个依据片段");
-    if (fragments.length > LIMITS.fragmentsPerConclusion)
-      throw new Error("单条结论最多 8 个片段");
+  function validateFragments(fs, { required = false } = {}) {
+    if (!Array.isArray(fs)) throw Error("片段必须是数组");
+    if (required && !fs.length) throw Error("采纳至少需要一个依据片段");
+    if (fs.length > 8) throw Error("单条结论最多 8 个片段");
     let total = 0;
-    for (const f of fragments) { validateFragment(f); total += bytes(f.selection); }
-    if (total > LIMITS.fragmentsTotalBytes)
-      throw new Error("单条结论片段总量超过 64 KiB");
-    return true;
-  }
-
-  /* ---------- adoption plan: everything ONE transaction must write ----------
-   * Applied by evidence-db.js inside a single readwrite transaction:
-   *  - operations ledger row first (idempotency + request digest)
-   *  - conclusion, version, sources, links
-   *  - project evidenceRevision CAS bump + projection todo
-   * Any failure before oncomplete rolls the whole change back.
-   */
-
-  async function planAdoption(state, input, operationId) {
-    validateAdoption(input);
-    if (!isId(operationId, "op_")) throw new Error("操作 ID 无效");
-    const requestHash = await hashRequest(input);
-    const prior = state.operations[operationId];
-    if (prior) {
-      if (prior.requestHash !== requestHash)
-        throw new Error("操作 ID 已用于不同请求，已拒绝");
-      return { replay: prior.result };
-    }
-    const project = state.projects[input.projectId];
-    if (!project) throw new Error("课题不存在或未初始化");
-    const conclusions = Object.values(state.conclusions)
-      .filter(c => c.projectId === input.projectId && c.status === "adopted");
-    if (conclusions.length >= LIMITS.conclusionsPerProject)
-      throw new Error("课题结论数达上限（200）：请导出或清理后再采纳");
-    // First adoption takes the project over: the legacy decision text is
-    // preserved verbatim as an unverified legacy-note (plan §十一.6-5) and
-    // the legacy edit path is sealed from then on, even after full withdrawal.
-    const firstAdoption = Object.keys(state.conclusions)
-      .every(id => state.conclusions[id].projectId !== input.projectId);
-    const conclusionId = "con_" + uuid();
-    const versionId = "ver_" + uuid();
-    const at = now();
-    const conclusion = {
-      id: conclusionId, projectId: input.projectId,
-      currentVersionId: versionId, status: "adopted",
-      createdAt: at, adoptedAt: at
-    };
-    const version = {
-      id: versionId, conclusionId, text: input.text,
-      conditions: input.conditions || "", changeType: "create",
-      predecessorId: null, createdAt: at, creator: "user"
-    };
-    const sources = [], links = [];
-    // Hash BEFORE building records: hashing is async and must finish before
-    // the transaction opens (plan §十一.6); records must stay structured-cloneable.
-    for (let i = 0; i < (input.fragments || []).length; i++) {
-      const f = input.fragments[i];
-      const sourceId = "src_" + uuid() + "_" + i;
-      const textHash = await hashText((f.before || "") + f.selection + (f.after || ""));
-      sources.push({
-        id: sourceId, kind: f.kind || "capture",
-        captureRunId: f.captureRunId || null, conversationId: f.conversationId || null,
-        messageId: f.messageId || null, url: f.url || null,
-        before: f.before || "", selection: f.selection, after: f.after || "",
-        textHash,
-        capturedAt: f.capturedAt || at,
-        completeness: f.completeness || "unknown"
-      });
-      links.push({ id: "lnk_" + uuid() + "_" + i, versionId, sourceId,
-        relation: f.relation || "cites" });
-    }
-    const result = { conclusionId, versionId, revision: project.evidenceRevision + 1 };
-    return {
-      replay: null, result, writes: {
-        conclusion, version, sources, links,
-          project: {
-          ...project,
-          evidenceRevision: project.evidenceRevision + 1,
-          projectionRevision: project.projectionRevision,
-          projectionTodo: true,
-          ...(firstAdoption ? {
-            takeover: true,
-            ...(typeof input.legacyDecision === "string" && input.legacyDecision.trim() ? {
-              legacyNote: { text: input.legacyDecision, capturedAt: now(), verified: false }
-            } : {})
-          } : {})
-        },
-        ledger: { operationId, requestHash, result, at }
-      }
-    };
-  }
-
-  /* Amendment: a substantive edit creates a NEW immutable version with a
-   * predecessor link; history is never rewritten (plan §十一.5 S1 table).
-   * Version cap (50) applies; adopted-only; withdrawn conclusions must be
-   * re-adopted explicitly instead of amended. */
-  async function planAmendment(state, conclusionId, input, operationId) {
-    if (!isId(conclusionId, "con_")) throw new Error("结论 ID 无效");
-    if (!input || typeof input.text !== "string" || !input.text.trim())
-      throw new Error("修订正文不能为空");
-    if (codePoints(input.text) > LIMITS.conclusionCodePoints)
-      throw new Error("结论正文超过 4000 code points");
-    if ((input.fragments || []).length > LIMITS.fragmentsPerConclusion)
-      throw new Error("单条结论最多 8 个片段");
-    const requestHash = await hashRequest({ conclusionId, ...input });
-    const prior = state.operations[operationId];
-    if (prior) {
-      if (prior.requestHash !== requestHash)
-        throw new Error("操作 ID 已用于不同请求，已拒绝");
-      return { replay: prior.result };
-    }
-    const conclusion = state.conclusions[conclusionId];
-    if (!conclusion) throw new Error("结论不存在");
-    if (conclusion.status === "withdrawn") throw new Error("结论已撤回：请重新采纳而不是修订");
-    const project = state.projects[conclusion.projectId];
-    if (!project) throw new Error("课题记录缺失");
-    const versions = Object.values(state.versions)
-      .filter(v => v.conclusionId === conclusionId);
-    if (versions.length >= LIMITS.versionsPerConclusion)
-      throw new Error("版本数达上限（50）：请导出或清理");
-    const at = now();
-    const versionId = "ver_" + uuid();
-    const version = {
-      id: versionId, conclusionId, text: input.text,
-      conditions: input.conditions || "", changeType: "amend",
-      predecessorId: conclusion.currentVersionId, createdAt: at, creator: "user"
-    };
-    const sources = [], links = [];
-    for (let i = 0; i < (input.fragments || []).length; i++) {
-      const f = input.fragments[i];
+    for (const f of fs) {
       validateFragment(f);
-      const sourceId = "src_" + uuid() + "_a" + i;
-      sources.push({
-        id: sourceId, kind: f.kind || "capture",
-        captureRunId: f.captureRunId || null, conversationId: f.conversationId || null,
-        messageId: f.messageId || null, url: f.url || null,
-        before: f.before || "", selection: f.selection, after: f.after || "",
-        textHash: await hashText((f.before || "") + f.selection + (f.after || "")),
-        capturedAt: f.capturedAt || at,
-        completeness: f.completeness || "unknown"
-      });
-      links.push({ id: "lnk_" + uuid() + "_a" + i, versionId, sourceId,
-        relation: f.relation || "cites" });
+      total += bytes((f.before || "") + f.selection + (f.after || ""));
     }
-    const result = { conclusionId, versionId, revision: project.evidenceRevision + 1 };
+    if (total > LIMITS.fragmentsTotalBytes)
+      throw Error("单条结论片段总量超过 64 KiB");
+  }
+  function validateAdoption(i) {
+    if (!i || !validProjectId(i.projectId))
+      throw Error("课题 ID 无效或缺失");
+    if (typeof i.text !== "string" || !i.text.trim())
+      throw Error("结论正文不能为空");
+    if (codePoints(i.text) > 4000) throw Error("结论正文超过 4000 code points");
+    if (i.conditions !== undefined && typeof i.conditions !== "string") throw Error("适用条件必须是文本");
+    validateFragments(i.fragments || [], { required: true });
+  }
+  function norm(f) {
     return {
-      replay: null, result, writes: {
-        conclusion: { ...conclusion, currentVersionId: versionId },
-        version, sources, links,
-        project: { ...project, evidenceRevision: project.evidenceRevision + 1, projectionTodo: true },
-        ledger: { operationId, requestHash, result, at }
-      }
+      kind: f.kind || "capture",
+      captureRunId: f.captureRunId || null,
+      conversationId: f.conversationId || null,
+      messageId: f.messageId || null,
+      url: f.url || null,
+      capturedAt: Object.hasOwn(f, "identityCapturedAt")
+        ? f.identityCapturedAt
+        : (f.capturedAt ?? null),
+      before: f.before || "",
+      selection: f.selection,
+      after: f.after || "",
+      relation: f.relation || "cites",
+      completeness: f.completeness || "unknown",
     };
   }
-
-  /* Duplicate adoption guard (S1b gate): adopting the exact same body with
-   * the exact same fragment set for the SAME project replays the existing
-   * adopted conclusion instead of creating a twin. Different fragments or a
-   * withdrawn original still create a fresh conclusion. */
-  async function findDuplicateAdoption(state, projectId, input) {
-    const incoming = (input.fragments || []).map(f => ({
-      selection: f.selection, before: f.before || "", after: f.after || "" }));
-    const candidate = await hashRequest({ text: input.text, fragments: incoming });
-    for (const conclusion of Object.values(state.conclusions)) {
-      if (conclusion.projectId !== projectId || conclusion.status !== "adopted") continue;
-      const version = state.versions[conclusion.currentVersionId];
-      if (!version || version.text !== input.text) continue;
-      const links = Object.values(state.links)
-        .filter(l => l.versionId === version.id);
-      const fragments = links.map(l => {
-        const source = state.sources[l.sourceId] || {};
-        return { selection: source.selection, before: source.before || "", after: source.after || "" };
+  async function fingerprint(text, conditions, fragments) {
+    return hashRequest({
+      text,
+      conditions: conditions || "",
+      fragments: fragments
+        .map(norm)
+        .sort((a, b) => stable(a).localeCompare(stable(b))),
+    });
+  }
+  function rows(s, p) {
+    return Object.values(s.conclusions || {}).filter((x) => x.projectId === p);
+  }
+  function repairedProject(s, p, project) {
+    return rows(s, p).length ? { ...project, takeover: true } : project;
+  }
+  function fragments(s, versionId) {
+    return Object.values(s.links || {})
+      .filter((l) => l.versionId === versionId)
+      .map(
+        (l) =>
+          s.sources[l.sourceId] && {
+            ...s.sources[l.sourceId],
+            relation: l.relation,
+          },
+      )
+      .filter(Boolean);
+  }
+  async function prior(s, kind, input, id) {
+    if (!isId(id, "op_")) throw Error("操作 ID 无效");
+    const r = s.operations && s.operations[id];
+    if (!r) return null;
+    if (r.schema !== 2 || typeof r.kind !== "string")
+      throw Error("legacy-operation-check-required");
+    if (
+      r.kind !== kind ||
+      r.requestHash !== (await hashRequest({ schema: 2, kind, input }))
+    )
+      throw Error("操作 ID 已用于不同请求，已拒绝");
+    return r.result;
+  }
+  async function ledger(kind, input, id, result) {
+    if (!isId(id, "op_")) throw Error("操作 ID 无效");
+    return {
+      operationId: id,
+      schema: 2,
+      kind,
+      requestHash: await hashRequest({ schema: 2, kind, input }),
+      result,
+      at: now(),
+    };
+  }
+  async function records(fs, versionId, suffix = "") {
+    const sources = [],
+      links = [],
+      at = now();
+    for (let n = 0; n < fs.length; n++) {
+      const f = norm(fs[n]),
+        id = "src_" + uuid() + suffix + n;
+      sources.push({
+        ...f,
+        id,
+        identityCapturedAt: f.capturedAt,
+        textHash: await hashText(f.before + f.selection + f.after),
+        capturedAt: f.capturedAt ?? at,
       });
-      const existing = await hashRequest({
-        text: version.text,
-        fragments: fragments.map(f => ({ selection: f.selection, before: f.before || "", after: f.after || "" }))
+      links.push({
+        id: "lnk_" + uuid() + suffix + n,
+        versionId,
+        sourceId: id,
+        relation: f.relation,
       });
-      if (existing === candidate)
-        return conclusion;
+    }
+    return { sources, links };
+  }
+  async function findDuplicateAdoption(s, projectId, input) {
+    const wanted = await fingerprint(
+      input.text,
+      input.conditions || "",
+      input.fragments || [],
+    );
+    for (const c of rows(s, projectId)) {
+      if (c.status !== "adopted") continue;
+      const v = s.versions[c.currentVersionId];
+      if (
+        v &&
+        wanted ===
+          (await fingerprint(v.text, v.conditions || "", fragments(s, v.id)))
+      )
+        return c;
     }
     return null;
   }
-
-  async function planWithdrawal(state, conclusionId, reason, operationId) {
-    if (!isId(conclusionId, "con_")) throw new Error("结论 ID 无效");
-    if (!isId(operationId, "op_")) throw new Error("操作 ID 无效");
-    if (typeof reason !== "string") throw new Error("撤回需要理由");
-    const input = { conclusionId, reason };
-    const requestHash = await hashRequest(input);
-    const prior = state.operations[operationId];
-    if (prior) {
-      if (prior.requestHash !== requestHash)
-        throw new Error("操作 ID 已用于不同请求，已拒绝");
-      return { replay: prior.result };
-    }
-    const conclusion = state.conclusions[conclusionId];
-    if (!conclusion) throw new Error("结论不存在");
-    if (conclusion.status === "withdrawn") throw new Error("结论已撤回");
-    const project = state.projects[conclusion.projectId];
-    if (!project) throw new Error("课题记录缺失");
-    const at = now();
-    const withdrawn = { ...conclusion, status: "withdrawn", withdrawnAt: at, withdrawalReason: reason };
-    const result = { conclusionId, status: "withdrawn", revision: project.evidenceRevision + 1 };
-    return {
-      replay: null, result, writes: {
-        conclusion: withdrawn,
-        project: {
-          ...project,
-          evidenceRevision: project.evidenceRevision + 1,
-          projectionTodo: true
+  async function planAdoption(s, i, operationId) {
+    validateAdoption(i);
+    const input = {
+        projectId: i.projectId,
+        text: i.text,
+        conditions: i.conditions || "",
+        fragments: (i.fragments || []).map(norm),
+      },
+      replay = await prior(s, "adopt", input, operationId);
+    if (replay) return { replay };
+    const project = s.projects && s.projects[i.projectId];
+    if (!project) throw Error("课题不存在或未初始化");
+    const dup = await findDuplicateAdoption(s, i.projectId, input);
+    if (dup) {
+      const result = {
+        conclusionId: dup.id,
+        versionId: dup.currentVersionId,
+        revision: project.evidenceRevision,
+        dedupe: true,
+      };
+      return {
+        replay: null,
+        result,
+        expectedRevision: project.evidenceRevision,
+        writes: {
+          project: repairedProject(s, i.projectId, project),
+          ledger: await ledger("adopt", input, operationId, result),
         },
-        ledger: { operationId, requestHash, result, at }
-      }
+      };
+    }
+    if (rows(s, i.projectId).length >= 200)
+      throw Error("课题结论数达上限（200）");
+    const at = now(),
+      conclusionId = "con_" + uuid(),
+      versionId = "ver_" + uuid(),
+      first = !rows(s, i.projectId).length;
+    const version = {
+        id: versionId,
+        conclusionId,
+        text: input.text,
+        conditions: input.conditions,
+        sourceCount: input.fragments.length,
+        changeType: "create",
+        predecessorId: null,
+        createdAt: at,
+        creator: "user",
+        adoptionFingerprint: await fingerprint(
+          input.text,
+          input.conditions,
+          input.fragments,
+        ),
+      },
+      conclusion = {
+        id: conclusionId,
+        projectId: i.projectId,
+        currentVersionId: versionId,
+        status: "adopted",
+        createdAt: at,
+        adoptedAt: at,
+      },
+      next = {
+        ...repairedProject(s, i.projectId, project),
+        evidenceRevision: project.evidenceRevision + 1,
+        projectionTodo: true,
+        ...(first
+          ? {
+              takeover: true,
+              ...(typeof i.legacyDecision === "string" &&
+              i.legacyDecision.trim()
+                ? {
+                    legacyNote: {
+                      text: i.legacyDecision,
+                      capturedAt: at,
+                      verified: false,
+                    },
+                  }
+                : {}),
+            }
+          : {}),
+      },
+      result = { conclusionId, versionId, revision: next.evidenceRevision };
+    return {
+      replay: null,
+      result,
+      expectedRevision: project.evidenceRevision,
+      writes: {
+        conclusion,
+        version,
+        ...(await records(input.fragments, versionId)),
+        project: next,
+        ledger: await ledger("adopt", input, operationId, result),
+      },
     };
   }
-
-  /* ---------- projection: summary derived ONLY from committed records -----
-   * The legacy decision field becomes a read-only, clearly-truncated digest.
-   * Full conclusions are read from the evidence store, never from here.
-   */
-
-  function projectSummary(state, projectId) {
-    const rows = Object.values(state.conclusions)
-      .filter(c => c.projectId === projectId)
-      .sort((a, b) => (b.adoptedAt || 0) - (a.adoptedAt || 0));
-    const lines = [];
-    for (const c of rows) {
-      const version = state.versions[c.currentVersionId];
-      if (!version) continue;
-      const mark = c.status === "withdrawn" ? "[已撤回] " : "";
-      const head = mark + "结论 " + c.id.slice(0, 12) + "：";
-      const chars = Array.from(version.text);
-      const shown = chars.slice(0, 120).join("");
-      lines.push(head + shown + (chars.length > 120 ? "…（见证据库）" : ""));
-    }
-    const adopted = rows.filter(c => c.status === "adopted").length;
-    const prefix = "证据库摘析（只读投影，v" + (state.projects[projectId]?.evidenceRevision ?? 0) +
-      "，采纳 " + adopted + " 条）：\n";
-    let body = lines.join("\n");
-    if (codePoints(prefix + body) > LIMITS.summaryCodePoints) {
-      body = Array.from(body).slice(0, LIMITS.summaryCodePoints - codePoints(prefix) - 20).join("") +
-        "\n…（截断：完整结论见证据库视图）";
-    }
+  async function planAmendment(s, id, i, operationId) {
+    if (!isId(id, "con_") || !i || typeof i.text !== "string" || !i.text.trim())
+      throw Error("修订输入无效");
+    if (codePoints(i.text) > 4000) throw Error("结论正文超过 4000 code points");
+    if (i.conditions !== undefined && typeof i.conditions !== "string") throw Error("适用条件必须是文本");
+    const hasFragments = i.fragments !== undefined,
+      hasConditions = i.conditions !== undefined,
+      raw = {
+        conclusionId: id,
+        text: i.text,
+        conditions: hasConditions ? i.conditions || "" : null,
+        fragments: hasFragments ? (i.fragments || []).map(norm) : null,
+        conditionsOmitted: !hasConditions,
+        fragmentsOmitted: !hasFragments,
+        expectedVersionId: i.expectedVersionId ?? null,
+      },
+      replay = await prior(s, "amend", raw, operationId);
+    if (replay) return { replay };
+    const c = s.conclusions[id],
+      old = c && s.versions[c.currentVersionId],
+      project = c && s.projects[c.projectId];
+    if (!c || !old || !project) throw Error("权威记录缺失");
+    if (i.expectedVersionId != null && i.expectedVersionId !== c.currentVersionId)
+      throw Error("结论已在其他窗口修订，请刷新后核对；未覆盖当前版本");
+    if (c.status === "withdrawn")
+      throw Error("结论已撤回：请重新采纳而不是修订");
+    if (hasFragments) validateFragments(i.fragments || []);
+    const conditions = hasConditions
+      ? i.conditions || ""
+      : old.conditions || "";
+    if (
+      Object.values(s.versions).filter((v) => v.conclusionId === id).length >=
+      50
+    )
+      throw Error("版本数达上限（50）");
+    const versionId = "ver_" + uuid(),
+      version = {
+        id: versionId,
+        conclusionId: id,
+        text: i.text,
+        conditions,
+        sourceCount: hasFragments ? (i.fragments || []).length : fragments(s, old.id).length,
+        changeType: "amend",
+        predecessorId: old.id,
+        createdAt: now(),
+        creator: "user",
+      };
+    const r = hasFragments
+        ? await records(i.fragments || [], versionId, "_a")
+        : {
+            sources: [],
+            links: fragments(s, old.id).map((f, n) => ({
+              id: "lnk_" + uuid() + "_r" + n,
+              versionId,
+              sourceId: f.id,
+              relation: f.relation,
+            })),
+          },
+      next = {
+        ...repairedProject(s, c.projectId, project),
+        evidenceRevision: project.evidenceRevision + 1,
+        projectionTodo: true,
+      },
+      result = { conclusionId: id, versionId, revision: next.evidenceRevision };
+    return {
+      replay: null,
+      result,
+      expectedRevision: project.evidenceRevision,
+      writes: {
+        conclusion: { ...c, currentVersionId: versionId },
+        version,
+        ...r,
+        project: next,
+        ledger: await ledger("amend", raw, operationId, result),
+      },
+    };
+  }
+  async function planWithdrawal(s, id, reason, operationId) {
+    if (!isId(id, "con_") || typeof reason !== "string")
+      throw Error("撤回输入无效");
+    const input = { conclusionId: id, reason },
+      replay = await prior(s, "withdraw", input, operationId);
+    if (replay) return { replay };
+    const c = s.conclusions[id],
+      project = c && s.projects[c.projectId];
+    if (!c || !project) throw Error("结论不存在");
+    if (c.status === "withdrawn") throw Error("结论已撤回");
+    const next = {
+        ...repairedProject(s, c.projectId, project),
+        evidenceRevision: project.evidenceRevision + 1,
+        projectionTodo: true,
+      },
+      result = {
+        conclusionId: id,
+        status: "withdrawn",
+        revision: next.evidenceRevision,
+      };
+    return {
+      replay: null,
+      result,
+      expectedRevision: project.evidenceRevision,
+      writes: {
+        conclusion: {
+          ...c,
+          status: "withdrawn",
+          withdrawnAt: now(),
+          withdrawalReason: reason,
+        },
+        project: next,
+        ledger: await ledger("withdraw", input, operationId, result),
+      },
+    };
+  }
+  function projectSummary(s, p) {
+    const rs = rows(s, p).sort(
+        (a, b) => (b.adoptedAt || 0) - (a.adoptedAt || 0),
+      ),
+      prefix =
+        "证据库摘析（只读投影，v" +
+        (s.projects[p]?.evidenceRevision ?? 0) +
+        "，采纳 " +
+        rs.filter((x) => x.status === "adopted").length +
+        " 条）：\n";
+    let body = rs
+      .map((c) => {
+        const v = s.versions[c.currentVersionId];
+        if (!v) return "";
+        const x = Array.from(v.text);
+        return (
+          (c.status === "withdrawn" ? "[已撤回] " : "") +
+          "结论 " +
+          c.id.slice(0, 12) +
+          "：" +
+          x.slice(0, 120).join("") +
+          (x.length > 120 ? "…（见证据库）" : "")
+        );
+      })
+      .filter(Boolean)
+      .join("\n");
+    if (codePoints(prefix + body) > 1000)
+      body =
+        Array.from(body)
+          .slice(0, 1000 - codePoints(prefix) - 20)
+          .join("") + "\n…（截断：完整结论见证据库）";
     return prefix + body;
   }
-
-  /* ---------- import/export package (byte-capped, self-describing) -------- */
-
-  function exportPackage(state, projectId) {
-    const conclusions = Object.values(state.conclusions)
-      .filter(c => c.projectId === projectId);
-    const versions = [], sources = [], links = [];
-    for (const c of conclusions)
-      for (const v of Object.values(state.versions))
-        if (v.conclusionId === c.id) {
-          versions.push(v);
-          for (const l of Object.values(state.links))
-            if (l.versionId === v.id) {
-              links.push(l);
-              if (!sources.some(s => s.id === l.sourceId)) {
-                const src = state.sources[l.sourceId];
-                if (src) sources.push(src);
-              }
-            }
-        }
+  function exportPackage(s, p) {
+    requireProjectId(p);
+    const conclusions = rows(s, p).map((x) => ({ ...x })),
+      ids = new Set(conclusions.map((x) => x.id)),
+      versions = Object.values(s.versions)
+        .filter((x) => ids.has(x.conclusionId))
+        .map((x) => ({ ...x })),
+      vIds = new Set(versions.map((x) => x.id)),
+      links = Object.values(s.links)
+        .filter((x) => vIds.has(x.versionId))
+        .map((x) => ({ ...x })),
+      srcIds = new Set(links.map((x) => x.sourceId)),
+      sources = Object.values(s.sources)
+        .filter((x) => srcIds.has(x.id))
+        .map((x) => ({ ...x })),
+      project = s.projects[p];
+    if (!project) throw Error("课题不存在");
     const pkg = {
-      format: "threadline-evidence/1", projectId, exportedAt: now(),
+      format: "threadline-evidence/2",
+      projectId: p,
+      exportedAt: now(),
       includesOriginalExcerpts: true,
-      counts: { conclusions: conclusions.length, versions: versions.length, sources: sources.length },
-      conclusions, versions, sources, links
+      project: {
+        takeover: !!project.takeover || conclusions.length > 0,
+        legacyNote: project.legacyNote ? { ...project.legacyNote } : null,
+        legacyNoteUnavailable: !!project.legacyNoteUnavailable,
+      },
+      counts: {
+        conclusions: conclusions.length,
+        versions: versions.length,
+        sources: sources.length,
+        links: links.length,
+      },
+      conclusions,
+      versions,
+      sources,
+      links,
     };
-    const size = bytes(JSON.stringify(pkg));
-    if (size > LIMITS.packageBytes)
-      throw new Error("导出包超过 20 MiB：请按课题拆分导出（当前 " + size + " 字节）");
+    if (bytes(JSON.stringify(pkg)) > LIMITS.packageBytes)
+      throw Error("导出包超过 20 MiB");
     return pkg;
   }
-
-  async function importPackage(state, pkg, operationId) {
-    if (!pkg || pkg.format !== "threadline-evidence/1")
-      throw new Error("未知导出包格式");
+  function unique(rows, name) {
+    const got = new Set();
+    for (const x of rows) {
+      if (!x || typeof x.id !== "string" || got.has(x.id))
+        throw Error(name + " ID 无效或重复");
+      got.add(x.id);
+    }
+  }
+  async function validateExportPackage(pkg) {
+    if (
+      !pkg ||
+      !["threadline-evidence/1", "threadline-evidence/2"].includes(pkg.format)
+    )
+      throw Error("未知导出包格式");
     if (bytes(JSON.stringify(pkg)) > LIMITS.packageBytes)
-      throw new Error("导入包超过 20 MiB");
-    if (!state.projects[pkg.projectId]) throw new Error("目标课题不存在");
-    const collisions = (pkg.conclusions || []).filter(c => state.conclusions[c.id]);
-    if (collisions.length) throw new Error("结论 ID 冲突：" + collisions.map(c => c.id).join(", "));
-    const foreign = (pkg.conclusions || []).filter(c => c.projectId !== pkg.projectId);
-    if (foreign.length) throw new Error("包内结论归属课题与目标课题不一致：" + foreign.map(c => c.id).join(", "));
-    for (const v of pkg.versions || []) {
-      const owned = state.conclusions[v.conclusionId];
-      if (owned && owned.projectId !== pkg.projectId)
-        throw new Error("跨课题引用拒绝：" + v.conclusionId);
-      const count = Object.values(state.versions)
-        .filter(x => x.conclusionId === v.conclusionId).length;
-      if (count >= LIMITS.versionsPerConclusion)
-        throw new Error("版本数达上限：" + v.conclusionId);
+      throw Error("导入包超过 20 MiB");
+    for (const n of ["conclusions", "versions", "sources", "links"]) {
+      if (!Array.isArray(pkg[n])) throw Error("导入包缺少 " + n);
+      unique(pkg[n], n);
     }
-    const requestHash = await hashRequest({ import: pkg.projectId, at: pkg.exportedAt });
-    const prior = state.operations[operationId];
-    const result = { imported: pkg.conclusions.length };
-    if (prior) {
-      if (prior.requestHash !== requestHash)
-        throw new Error("操作 ID 已用于不同请求，已拒绝");
-      return { replay: prior.result };
+    requireProjectId(pkg.projectId);
+    if (
+      pkg.format.endsWith("/2") &&
+      (!pkg.project ||
+        (pkg.conclusions.length && pkg.project.takeover !== true) ||
+        (pkg.project.legacyNote &&
+          (!pkg.project.legacyNote ||
+            typeof pkg.project.legacyNote.text !== "string" ||
+            pkg.project.legacyNote.verified !== false)))
+    )
+      throw Error("课题元数据无效");
+    const cs = new Map(pkg.conclusions.map((x) => [x.id, x])),
+      vs = new Map(pkg.versions.map((x) => [x.id, x])),
+      ss = new Map(pkg.sources.map((x) => [x.id, x]));
+    if (pkg.conclusions.length > 200) throw Error("课题结论数达上限");
+    for (const c of pkg.conclusions) {
+      if (
+        c.projectId !== pkg.projectId ||
+        !isId(c.id, "con_") ||
+        !["adopted", "withdrawn"].includes(c.status) ||
+        !vs.has(c.currentVersionId) ||
+        vs.get(c.currentVersionId).conclusionId !== c.id
+      )
+        throw Error("结论版本归属或状态无效");
     }
-    return {
-      replay: null, result,
-      writes: {
-        bulkConclusions: pkg.conclusions || [], bulkVersions: pkg.versions || [],
-        bulkSources: pkg.sources || [], bulkLinks: pkg.links || [],
-        project: {
-          ...state.projects[pkg.projectId],
-          evidenceRevision: state.projects[pkg.projectId].evidenceRevision + 1,
-          projectionTodo: true
-        },
-        ledger: { operationId, requestHash, result, at: now() }
+    for (const v of pkg.versions) {
+      if (
+        !isId(v.id, "ver_") ||
+        !cs.has(v.conclusionId) ||
+        typeof v.text !== "string" ||
+        !v.text.trim() ||
+        codePoints(v.text) > 4000 ||
+        typeof v.conditions !== "string" ||
+        !["create", "amend"].includes(v.changeType) ||
+        typeof v.creator !== "string"
+      )
+        throw Error("版本无效");
+      if (
+        v.predecessorId &&
+        (!vs.has(v.predecessorId) ||
+          vs.get(v.predecessorId).conclusionId !== v.conclusionId)
+      )
+        throw Error("版本前驱无效");
+    }
+    for (const c of pkg.conclusions) {
+      let n = c.currentVersionId,
+        seen = new Set();
+      while (n) {
+        if (seen.has(n)) throw Error("版本前驱环");
+        seen.add(n);
+        n = vs.get(n).predecessorId || null;
       }
+      const own = [...vs.values()].filter((v) => v.conclusionId === c.id);
+      if (own.length > 50) throw Error("版本数达上限");
+      if (seen.size !== own.length) throw Error("孤立版本拒绝");
+    }
+    for (const s of pkg.sources) {
+      if (!isId(s.id, "src_")) throw Error("来源 ID 无效");
+      validateFragment(s);
+      if (
+        s.textHash !==
+        (await hashText((s.before || "") + s.selection + (s.after || "")))
+      )
+        throw Error("来源哈希无效");
+    }
+    const linkedSources = new Set();
+    for (const l of pkg.links) {
+      if (
+        !isId(l.id, "lnk_") ||
+        !vs.has(l.versionId) ||
+        !ss.has(l.sourceId) ||
+        !["cites", "supports", "opposes", "background"].includes(l.relation)
+      )
+        throw Error("来源链接无效");
+      linkedSources.add(l.sourceId);
+    }
+    if (linkedSources.size !== ss.size) throw Error("孤立来源拒绝");
+    for (const v of pkg.versions) {
+      const fs = pkg.links
+        .filter((l) => l.versionId === v.id)
+        .map((l) => ss.get(l.sourceId));
+      validateFragments(fs, { required: v.changeType === "create" });
+      if (v.sourceCount !== undefined && (!Number.isSafeInteger(v.sourceCount) || v.sourceCount !== fs.length))
+        throw Error("版本依据数量与快照不一致");
+    }
+    return true;
+  }
+  async function importPackage(s, pkg, id) {
+    await validateExportPackage(pkg);
+    const cleanPkg = {
+        ...pkg,
+        versions: pkg.versions.map(({ adoptionFingerprint, ...v }) => v),
+      },
+      // The operation identity seals the complete user-supplied package.
+      // Only the persisted records discard this untrusted derived cache.
+      input = { pkg },
+      replay = await prior(s, "import", input, id);
+    if (replay) return { replay };
+    if (!cleanPkg.conclusions.length) throw Error("空证据包没有可恢复的结论，未修改课题");
+    const project = s.projects[cleanPkg.projectId];
+    if (!project) throw Error("目标课题不存在");
+    if (
+      rows(s, cleanPkg.projectId).length + cleanPkg.conclusions.length >
+      LIMITS.conclusionsPerProject
+    )
+      throw Error("课题结论数达上限（200）");
+    for (const [n, xs] of Object.entries({
+      conclusions: cleanPkg.conclusions,
+      versions: cleanPkg.versions,
+      sources: cleanPkg.sources,
+      links: cleanPkg.links,
+    }))
+      for (const x of xs) if (s[n][x.id]) throw Error(n + " ID 冲突：" + x.id);
+    const meta = cleanPkg.format.endsWith("/2")
+      ? cleanPkg.project || {}
+      : { takeover: true, legacyNoteUnavailable: true };
+    if (
+      meta.legacyNote &&
+      project.legacyNote &&
+      stable(meta.legacyNote) !== stable(project.legacyNote)
+    )
+      throw Error("legacy-note 冲突");
+    const next = {
+        ...project,
+        evidenceRevision: project.evidenceRevision + 1,
+        projectionTodo: true,
+        takeover: true,
+        legacyNote: project.legacyNote || meta.legacyNote || null,
+        ...(!project.legacyNote && !meta.legacyNote
+          ? { legacyNoteUnavailable: true }
+          : {}),
+      },
+      result = {
+        imported: cleanPkg.conclusions.length,
+        revision: next.evidenceRevision,
+      };
+    return {
+      replay: null,
+      result,
+      expectedRevision: project.evidenceRevision,
+      writes: {
+        bulkConclusions: cleanPkg.conclusions,
+        bulkVersions: cleanPkg.versions,
+        bulkSources: cleanPkg.sources,
+        bulkLinks: cleanPkg.links,
+        project: next,
+        ledger: await ledger("import", input, id, result),
+      },
     };
   }
-
-  function hashRequest(input) {
-    return hashText(JSON.stringify(input));
-  }
-  async function hashText(text) {
-    const digest = await crypto.subtle.digest("SHA-256", encoder.encode(text));
-    return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, "0")).join("");
-  }
-
   const Core = {
-    LIMITS, codePoints, bytes,
-    validateFragment, validateAdoption, validateWithdrawalInput: () => {},
-    planAdoption, planAmendment, planWithdrawal, findDuplicateAdoption, projectSummary,
-    exportPackage, importPackage, hashText, hashRequest, uuid,
-    newProjectRecord: projectId => ({
-      projectId, evidenceRevision: 0, projectionRevision: 0, projectionTodo: false,
-      takeover: false, legacyNote: null
-    })
+    LIMITS,
+    validProjectId,
+    requireProjectId,
+    codePoints,
+    bytes,
+    validateFragment,
+    validateAdoption,
+    planAdoption,
+    planAmendment,
+    planWithdrawal,
+    findDuplicateAdoption,
+    projectSummary,
+    exportPackage,
+    importPackage,
+    validateExportPackage,
+    hashText,
+    hashRequest,
+    uuid,
+    newProjectRecord: (projectId) => ({
+      projectId: requireProjectId(projectId),
+      evidenceRevision: 0,
+      projectionRevision: 0,
+      projectionTodo: false,
+      takeover: false,
+      legacyNote: null,
+    }),
   };
   if (typeof module !== "undefined" && module.exports) module.exports = Core;
-  else (globalThis.ThreadLineEvidenceCore = Core);
+  else globalThis.ThreadLineEvidenceCore = Core;
 })();

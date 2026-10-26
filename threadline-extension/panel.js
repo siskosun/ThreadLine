@@ -231,7 +231,7 @@
       <div id="edit-form">
         <div class="field"><label for="edit-name">课题名称</label><input id="edit-name" maxlength="80" value="${escape(p.name)}" /></div>
         <div class="field"><label for="edit-goal">当前研究目标 <span class="hint">（可选）</span></label><textarea id="edit-goal" maxlength="600" placeholder="这次研究究竟在回答什么问题？">${escape(p.goal)}</textarea></div>
-        <div class="field"><label for="edit-decision">当前有效结论 / 收口依据 <span class="hint">（跨窗口共享）</span></label><textarea class="big" id="edit-decision" maxlength="1000" placeholder="填写一两句话，所有旧窗口都可看到。">${escape(p.decision)}</textarea></div>
+        <div class="field"><label for="edit-decision">当前有效结论 / 收口依据 <span class="hint">${p.evidenceTakeover?'（证据库只读摘要，请在证据结论中修订）':'（跨窗口共享）'}</span></label><textarea class="big" id="edit-decision" ${p.evidenceTakeover?'readonly':''} maxlength="1000" placeholder="填写一两句话，所有旧窗口都可看到。">${escape(p.decision)}</textarea></div>
         <div class="detail-controls"><button class="primary" data-action="save-details">保存课题状态</button>
         <button class="${p.stage==='closed'?'soft':'danger'}" data-action="toggle-close">${p.stage==='closed'?'重新开启课题':'收口整个课题'}</button></div>
       </div>
@@ -245,7 +245,9 @@
   }
   function render() {renderStats();renderCurrent();renderQuickBranches();renderTopics();renderDetails();}
   function updatePayload(extra={}) {
-    return {name:$("#edit-name")?.value || "",goal:$("#edit-goal")?.value || "",decision:$("#edit-decision")?.value || "",...extra};
+    const patch = {name:$("#edit-name")?.value || "",goal:$("#edit-goal")?.value || "",...extra};
+    if (!$("#edit-decision")?.readOnly) patch.decision = $("#edit-decision")?.value || "";
+    return patch;
   }
   async function openChat(c) {
     if (!c) return;
@@ -430,6 +432,7 @@
     });
   });
   const ev$ = id => document.getElementById(id);
+  let evidenceHandoffStamp = null;
 
   async function renderEvidence() {
     const snapshot = await evSend({ type: "SNAPSHOT" });
@@ -452,11 +455,16 @@
     if (!projectId) { ev$("evidence-summary").textContent = "暂无课题。"; ev$("evidence-list").replaceChildren(); return; }
     let data;
     try { data = await evSend({ type: "EV_LIST", projectId }); }
-    catch (e) { ev$("evidence-summary").textContent = "证据库不可用：" + e.message; return; }
-    const projection = await chrome.storage.local.get("tl_evidence_summary_" + projectId);
-    const entry = projection["tl_evidence_summary_" + projectId];
-    ev$("evidence-summary").textContent = entry
-      ? entry.summary + "\n（只读投影 v" + entry.projectionRevision + "；完整内容见下方列表）"
+    catch (e) {
+      ev$("evidence-summary").textContent = "证据库不可用：" + e.message;
+      ev$("evidence-list").replaceChildren();
+      // Preserve any manually edited draft, but stop presenting it as current.
+      ev$("evidence-handoff-copy").disabled = true;
+      evidenceHandoffStamp = null;
+      return;
+    }
+    ev$("evidence-summary").textContent = data.rows.length
+      ? data.summary + (data.projectionPending ? "\n已保存；共享摘要待更新。" : "\n（来源：证据库当前修订；完整内容见下方列表）")
       : "尚无采纳结论。首次采纳后，旧“有效结论”字段将封口为只读投影。";
     const holder = ev$("evidence-list");
     holder.replaceChildren();
@@ -469,6 +477,11 @@
         (row.current ? row.current.text.slice(0, 90) : c.id) +
         (row.versions && row.versions.length > 1 ? "（修订 " + (row.versions.length - 1) + " 次）" : "");
       item.appendChild(head);
+      if (row.current?.conditions) {
+        const conditions = document.createElement("p");
+        conditions.textContent = "适用条件：" + row.current.conditions;
+        item.appendChild(conditions);
+      }
       for (const fragment of row.fragments || []) {
         const box = document.createElement("details");
         const summary = document.createElement("summary");
@@ -479,22 +492,22 @@
         pre.textContent = (fragment.before || "") + "【" + fragment.selection + "】" + (fragment.after || "");
         box.appendChild(summary); box.appendChild(pre);
         if (fragment.conversationId) {
-          const locateRow = document.createElement(div);
-          locateRow.className = line;
-          const btn = document.createElement(button);
-          btn.type = button; btn.className = secondary; btn.textContent = 在对话中定位;
-          const note = document.createElement(span);
-          note.className = subtle;
-          btn.addEventListener(click, async () => {
+          const locateRow = document.createElement("div");
+          locateRow.className = "line";
+          const btn = document.createElement("button");
+          btn.type = "button"; btn.className = "secondary"; btn.textContent = "在对话中定位";
+          const note = document.createElement("span");
+          note.className = "subtle";
+          btn.addEventListener("click", async () => {
             note.textContent = "定位中…";
             try {
-              const r = await evSend({ type: EV_LOCATE,
+              const r = await evSend({ type: "EV_LOCATE",
                 conversationId: fragment.conversationId,
                 messageId: fragment.messageId || null,
                 role: null, contentPrefix: fragment.selection.slice(0, 40) });
               note.textContent = r.located && r.verified
-                ? 已定位到原消息
-                : (r.reason === conversation-not-open
+                ? "已定位到原消息"
+                : (r.reason === "conversation-not-open"
                     ? "对话未打开（仅片段）：https://chatgpt.com/c/" + fragment.conversationId
                     : "定位不可靠，仅显示片段");
             } catch (e) { note.textContent = "定位失败（仅片段）"; }
@@ -513,11 +526,7 @@
           const text = prompt("修订结论正文（生成新版本，历史保留）：", row.current ? row.current.text : "");
           if (text === null) return;
           try {
-            await evSend({ type: "EV_AMEND", conclusionId: c.id, text,
-              fragments: (row.fragments || []).map(f => ({
-                selection: f.selection, before: f.before, after: f.after,
-                conversationId: f.conversationId, messageId: f.messageId,
-                relation: f.relation, completeness: f.completeness })),
+            await evSend({ type: "EV_AMEND", conclusionId: c.id, text, expectedVersionId:row.current.id,
               operationId: "op_amend_" + crypto.randomUUID().replace(/-/g, "").slice(0, 12) });
             await renderEvidenceProject();
           } catch (e) { alert("修订失败：" + e.message); }
@@ -554,21 +563,37 @@
         else active.push(row);
       }
       const lines = ["【交接材料 · " + (ev$("evidence-project").selectedOptions[0]?.textContent || projectId) + "】", ""];
+      const append = r => {
+        lines.push("- " + r.current.text + "（版本 " + r.current.id + "）");
+        if (r.current.conditions) lines.push("  适用条件：" + r.current.conditions);
+        for (const f of r.fragments) lines.push("  依据（" + f.relation + "，" + f.completeness + "）：" +
+          f.selection + (f.conversationId ? "；会话 " + f.conversationId : "；仅片段") +
+          (f.messageId ? "；消息 " + f.messageId : ""));
+      };
       lines.push("■ 已采纳结论（" + active.length + "）");
-      for (const r of active) lines.push("- " + (r.current?.text || ""));
+      for (const r of active) append(r);
       lines.push("", "■ 更正过的结论（" + corrected.length + "，以最新为准）");
-      for (const r of corrected) lines.push("- " + (r.current?.text || "") + "（原：" +
-        (data.rows.find(x => x === r) ? "" : "") + "历史版本保留）");
+      for (const r of corrected) append(r);
       lines.push("", "■ 已撤回（" + withdrawn.length + "，请勿继续引用）");
       for (const r of withdrawn) lines.push("- " + (r.current?.text || "").slice(0, 80));
       lines.push("", "■ 已知未知项：未逐条核验外部资料；来源定位失败时仅有片段。");
       const view = ev$("evidence-handoff-view");
       view.hidden = false;
-      view.textContent = lines.join("\n");
-      try { await navigator.clipboard.writeText(view.textContent); ev$("evidence-handoff").textContent = "已复制到剪贴板（可再编辑）"; }
-      catch { ev$("evidence-handoff").textContent = "预览已生成（请手动复制）"; }
-      setTimeout(() => { ev$("evidence-handoff").textContent = "生成交接材料（预览并复制）"; }, 2500);
+      view.value = lines.join("\n");
+      evidenceHandoffStamp = {projectId,revision:data.project?.evidenceRevision || 0};
+      ev$("evidence-handoff-copy").hidden = false;
+      ev$("evidence-handoff-copy").disabled = false;
     } catch (e) { alert("交接生成失败：" + e.message); }
+  });
+  ev$("evidence-handoff-copy").addEventListener("click", async () => {
+    try {
+      const stamp = evidenceHandoffStamp;
+      if (!stamp || stamp.projectId !== ev$("evidence-project").value) throw new Error("课题已变化，请重新生成预览；当前草稿仍保留");
+      const data = await evSend({type:"EV_LIST",projectId:stamp.projectId});
+      if ((data.project?.evidenceRevision || 0) !== stamp.revision) throw new Error("证据已变化，请重新核对预览；当前草稿仍保留");
+      await navigator.clipboard.writeText(ev$("evidence-handoff-view").value);
+      notify("已复制编辑后的交接材料");
+    } catch (e) { notify(e.message || "复制失败，请核对后手动复制", true); }
   });
   renderEvidence().catch(() => {});
   document.querySelector(".workspace-tabs").addEventListener("keydown", e => {

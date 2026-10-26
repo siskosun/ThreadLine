@@ -72,7 +72,7 @@ function system() {
     }
   };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../background.js'),'utf8'),{
-    importScripts(){},ThreadLineCore:TopicCore,ThreadLineCaptureCore:CaptureCore,
+    ...require('./helpers/empty-evidence.js')(),importScripts(){},ThreadLineCore:TopicCore,ThreadLineCaptureCore:CaptureCore,
     ThreadLineCaptureDB:captureDB,ThreadLineFFCore:Core,ThreadLineFFDB:ffdb,
     chrome,crypto:webcrypto,console,Date,Promise,URL,TextEncoder,structuredClone
   });

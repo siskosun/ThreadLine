@@ -92,7 +92,8 @@
       return {
         before: part("before"), selection: part("selection"), after: part("after"),
         relation: part("relation"), completeness: part("completeness"),
-        kind: "capture", capturedAt: Date.now()
+        // Commit time is assigned by the authority, not a new source identity per click.
+        kind: "manual"
       };
     });
   }

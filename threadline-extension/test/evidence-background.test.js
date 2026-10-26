@@ -17,6 +17,7 @@ const FFCore = require('../ff-core.js');
  * exercise the service-worker paths: projection, sealing, recovery). */
 function system() {
   const session = new Map(), local = new Map(), events = {}, calls = [];
+  let createdTabs = 0, staleClears = false;
   const evidence = { conclusions: new Map(), versions: new Map(), sources: new Map(),
     links: new Map(), projects: new Map(), operations: new Map() };
   const state = () => ({ conclusions: Object.fromEntries(evidence.conclusions),
@@ -35,7 +36,7 @@ function system() {
       if (plan.replay) return plan.replay;
       const w = plan.writes;
       const project = evidence.projects.get(w.project.projectId);
-      if (!project || project.evidenceRevision !== w.project.evidenceRevision - 1)
+      if (!project || project.evidenceRevision !== plan.expectedRevision)
         throw new Error('证据版本冲突（CAS）：请刷新后重试');
       if (w.conclusion) evidence.conclusions.set(w.conclusion.id, w.conclusion);
       if (w.version) evidence.versions.set(w.version.id, w.version);
@@ -50,11 +51,12 @@ function system() {
       return plan.result;
     },
     async clearProjectionTodo(_db, projectId, expectedRevision) {
+      if (staleClears) return { cleared: false, stale: true };
       const project = evidence.projects.get(projectId);
       if (!project || project.evidenceRevision !== expectedRevision)
         return { cleared: false, stale: true };
       evidence.projects.set(projectId, { ...project,
-        projectionRevision: project.projectionRevision + 1, projectionTodo: false });
+        projectionRevision: expectedRevision, projectionTodo: false });
       return { cleared: true };
     }
   };
@@ -74,7 +76,7 @@ function system() {
       onMessage: { addListener(fn) { events.message = fn; } } },
     tabs: { onUpdated: { addListener() {} }, onRemoved: { addListener() {} },
       async get() { throw new Error('no tab'); }, async query() { return []; },
-      async create() { return { id: 1 }; }, async update() { return {}; }, async sendMessage() { return { ok: true }; } },
+      async create() { createdTabs += 1; return { id: 1 }; }, async update() { return {}; }, async sendMessage() { return { ok: true }; } },
     scripting: { async executeScript() {} },
     sidePanel: { setPanelBehavior: async () => {} },
     storage: {
@@ -112,6 +114,8 @@ function system() {
   }
   return { message, panelSender, evSender, local, evidence, events, calls,
     failNextStorageWrites(n) { storageSetShouldFail = n; },
+    forceStaleProjectionClears() { staleClears = true; },
+    createdTabs: () => createdTabs,
     readTopicState: () => local.get('threadline_state_v1'),
     storageSetShouldFailRef: () => storageSetShouldFail };
 }
@@ -205,7 +209,7 @@ test('S1b: duplicate adoption replays instead of creating a twin; amendment work
   const first = await s.message(adoption('p-taken', '逐条采纳的正文'));
   const twin = await s.message(adoption('p-taken', '逐条采纳的正文'));
   assert.equal(twin.dedupe, true, 'duplicate flagged');
-  assert.equal(twin.id, first.conclusionId, 'same conclusion replayed');
+  assert.equal(twin.conclusionId, first.conclusionId, 'same conclusion replayed');
   const project = s.evidence.projects.get('p-taken');
   const count = [...s.evidence.conclusions.values()].filter(c => c.projectId === 'p-taken').length;
   assert.equal(count, 1, 'no twin created');
@@ -228,4 +232,145 @@ test('EV_LOCATE degrades to fragment-only when the conversation tab is not open'
   assert.equal(result.reason, 'conversation-not-open');
   assert.equal(result.url, 'https://chatgpt.com/c/conv-1234');
   await assert.rejects(s.message({ type: 'EV_LOCATE' }), /缺少会话 ID/);
+});
+
+test('authority revisions notify old branches exactly once, including identical summary text', async () => {
+  const s = system();
+  await s.message({type:'MUTATE',action:{type:'linkChat',projectId:'p-taken',key:'chat:old-branch',title:'Old',url:'https://chatgpt.com/c/old-branch'}},s.panelSender);
+  const first = await s.message(adoption('p-taken','原结论'));
+  let topic=s.readTopicState().projects.find(p=>p.id==='p-taken');
+  assert.equal(topic.knowledgeVersion,1);
+  assert.match(topic.decision,/原结论/);
+  assert.equal(s.readTopicState().chats['chat:old-branch'].seenVersion,0);
+  const request={type:'EV_AMEND',conclusionId:first.conclusionId,text:'更正结论',operationId:'op_replay_amend001'};
+  const once=await s.message(request),twice=await s.message(request);
+  assert.equal(twice.versionId,once.versionId);
+  await s.message({type:'EV_SUMMARY',projectId:'p-taken'});
+  s.evidence.projects.get('p-taken').projectionTodo=true; // crash after storage set, before clearing IDB todo
+  await s.message({type:'EV_LIST',projectId:'p-taken'});
+  topic=s.readTopicState().projects.find(p=>p.id==='p-taken');
+  assert.equal(topic.knowledgeVersion,2);
+  assert.equal(topic.evidenceProjectionRevision,2);
+  assert.equal(topic.history.length,2);
+  assert.equal(s.evidence.projects.get('p-taken').projectionRevision,2);
+  await s.message({type:'EV_AMEND',conclusionId:first.conclusionId,text:'更正结论',conditions:'新适用条件',operationId:'op_condition001'});
+  assert.equal(s.readTopicState().projects.find(p=>p.id==='p-taken').knowledgeVersion,3);
+});
+
+test('delete, clearClosed and old restore omitting a taken project refuse without changing data', async () => {
+  const s=system(); await s.message(adoption('p-taken','保留证据'));
+  await s.message({type:'MUTATE',action:{type:'updateProject',projectId:'p-taken',patch:{stage:'closed'}}},s.panelSender);
+  const before=structuredClone(s.readTopicState());
+  for(const action of [{type:'deleteProject',projectId:'p-taken'},{type:'clearClosed'}])
+    await assert.rejects(s.message({type:'MUTATE',action},s.panelSender),/证据库接管/);
+  const empty=BackupCore.create(TopicCore.emptyState());
+  await assert.rejects(s.message({type:'BACKUP_IMPORT',json:JSON.stringify(empty)},s.panelSender),/证据库接管/);
+  assert.deepEqual(JSON.parse(JSON.stringify(s.readTopicState())),before);
+  assert.equal(s.evidence.sources.size,1);
+});
+
+test('authority loss never becomes a successful empty result or unseals legacy editing', async () => {
+  const s=system(); await s.message(adoption('p-taken','不能消失'));
+  const before=structuredClone(s.readTopicState());
+  for(const map of Object.values(s.evidence)) map.clear();
+  for(const type of ['EV_LIST','EV_SUMMARY','EV_ENSURE','EV_EXPORT'])
+    await assert.rejects(s.message({type,projectId:'p-taken'}),/权威库缺失/);
+  await assert.rejects(s.message({type:'MUTATE',action:{type:'updateProject',projectId:'p-taken',patch:{decision:'伪造新结论'}}},s.panelSender),/权威库缺失/);
+  await assert.rejects(s.message({type:'SNAPSHOT'},s.panelSender),/权威库缺失/);
+  assert.deepEqual(JSON.parse(JSON.stringify(s.readTopicState())),before);
+});
+
+test('list uses the current version pointer and text-only amendments retain original source metadata', async () => {
+  const s=system();
+  const first=await s.message({...adoption('p-taken','原文'),conditions:'仅 A 样本',fragments:[{selection:'原始依据',kind:'manual',capturedAt:123,captureRunId:'run-original',url:'https://example.invalid/original',conversationId:'original',messageId:'message-original'}]});
+  const source=structuredClone([...s.evidence.sources.values()][0]);
+  const amended=await s.message({type:'EV_AMEND',conclusionId:first.conclusionId,text:'修订正文',operationId:'op_metadata_amend1'});
+  s.evidence.versions.get(first.versionId).createdAt=Date.now()+100000;
+  const listing=await s.message({type:'EV_LIST',projectId:'p-taken'});
+  assert.equal(listing.rows[0].current.id,amended.versionId);
+  assert.equal(listing.rows[0].current.conditions,'仅 A 样本');
+  assert.equal(listing.rows[0].fragments[0].id,source.id);
+  assert.deepEqual([...s.evidence.sources.values()][0],source);
+});
+
+test('empty evidence restore is refused before takeover or projection changes', async () => {
+  const s=system();
+  await s.message({type:'EV_ENSURE',projectId:'p-free'});
+  const pkg=await s.message({type:'EV_EXPORT',projectId:'p-free'});
+  const before=structuredClone(s.readTopicState());
+  for (const type of ['EV_IMPORT_PREVIEW','EV_IMPORT'])
+    await assert.rejects(s.message({type,pkg,operationId:'op_emptyimport001'}),/空证据包/);
+  assert.equal(s.evidence.projects.get('p-free').takeover,false);
+  assert.equal(s.evidence.projects.get('p-free').evidenceRevision,0);
+  assert.deepEqual(JSON.parse(JSON.stringify(s.readTopicState())),before);
+  assert.ok(await s.message({type:'SNAPSHOT'},s.panelSender));
+});
+
+test('missing evidence links cannot silently become an evidence-free adopted conclusion', async () => {
+  for(const loss of ['all','current']) {
+    const s=system(); const first=await s.message(adoption('p-taken','有依据的初版'));
+    const amended=await s.message({type:'EV_AMEND',conclusionId:first.conclusionId,text:'有依据的修订',operationId:'op_linkloss0001'});
+    for(const [id,link] of s.evidence.links)
+      if(loss==='all' || link.versionId===amended.versionId) s.evidence.links.delete(id);
+    for(const type of ['EV_LIST','EV_EXPORT','EV_SUMMARY'])
+      await assert.rejects(s.message({type,projectId:'p-taken'}),/版本依据链接/);
+  }
+});
+
+test('EV_ requires the actual extension document, not a lookalike pathname', async () => {
+  const s=system();
+  const request={type:'EV_ENSURE',projectId:'p-free'};
+  const otherURL=[
+    {id:'ev-bg-test',url:'https://chatgpt.com/panel.html'},
+    {id:'ev-bg-test',url:'https://chatgpt.com/evidence-prototype.html'},
+    {id:'external-id',url:'chrome-extension://ev-bg-test/evidence-prototype.html'},
+    {id:'ev-bg-test',url:'chrome-extension://ev-bg-test/ff.html',origin:'https://chatgpt.com'},
+    {id:'ev-bg-test',url:'chrome-extension://ev-bg-test/panel.html',frameId:1},
+    {id:'ev-bg-test',url:'chrome-extension://ev-bg-test/ff.html',tab:{id:2,url:'https://chatgpt.com/'}}
+  ];
+  for(const sender of otherURL)
+    await assert.rejects(s.message(request,sender),/证据消息仅限扩展页面|研线面板|来源标签/,
+      JSON.stringify(sender));
+  assert.ok(await s.message(request,s.evSender),'valid same-extension prototype still works');
+  assert.ok(await s.message({type:'EV_LIST',projectId:'p-free'},s.panelSender),
+    'native panel remains authorized');
+});
+
+test('handoff refuses a sealed project when the evidence library is missing', async () => {
+  const s = system();
+  const topic = structuredClone(s.local.get('threadline_state_v1'));
+  const taken = topic.projects.find(p => p.id === 'p-taken');
+  taken.evidenceTakeover = true;
+  taken.evidenceProjectionRevision = 1;
+  s.local.set('threadline_state_v1', topic);
+  await assert.rejects(
+    s.message({type:'NEW_CHAT',handoff:'上次看到的旧结论',projectId:'p-taken'}, s.panelSender),
+    /已接管课题与持久标记不一致/);
+  assert.equal(s.createdTabs(), 0, 'no tab may open before the authority check');
+  const healthy = system();
+  const free = await healthy.message({type:'NEW_CHAT',handoff:'自由课题文本',projectId:'p-free'}, healthy.panelSender);
+  assert.equal(free.tabId, 1);
+  assert.equal(healthy.createdTabs(), 1, 'projects without evidence are not blocked');
+});
+
+test('rejected adoption leaves no orphan evidence project', async () => {
+  const s = system();
+  await assert.rejects(
+    s.message({type:'EV_ADOPT',projectId:'p-orphan',text:'   ',
+      fragments:[{selection:'依据',before:'前',after:'后'}],operationId:'op_bad_empty'}),
+    /结论正文不能为空/);
+  assert.equal(s.evidence.projects.has('p-orphan'), false,
+    'validation must run before ensureProject');
+});
+
+test('stale projection CAS is reported as pending, never as current', async () => {
+  const s = system();
+  s.forceStaleProjectionClears();
+  const adopted = await s.message(adoption('p-free','待更新结论'));
+  assert.equal(adopted.projectionPending, true);
+  const summary = await s.message({type:'EV_SUMMARY',projectId:'p-free'}, s.panelSender);
+  assert.equal(summary.projectionPending, true);
+  assert.equal(summary.projectionError, '共享摘要待更新');
+  assert.equal(s.evidence.projects.get('p-free').projectionTodo, true,
+    'todo stays set so the next reconcile retries');
 });

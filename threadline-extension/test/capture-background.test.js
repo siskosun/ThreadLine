@@ -12,7 +12,7 @@ function system(){
     sidePanel:{setPanelBehavior:async()=>{},async close(args){calls.push(['close',args])}},
     storage:{local:{async get(k){return{[k]:local.get(k)}},async set(values){for(const [k,v]of Object.entries(values))local.set(k,v)}},session:{async get(k){if(k==null)return Object.fromEntries(session);return{[k]:session.get(k)}},async set(items){for(const[k,v]of Object.entries(items))session.set(k,v)},async remove(keys){for(const k of [keys].flat())session.delete(k)}}}
   };
-  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'..','background.js'),'utf8'),{importScripts:()=>{},ThreadLineCore:Core,ThreadLineCaptureCore:CaptureCore,ThreadLineCaptureDB:db,chrome,crypto:globalThis.crypto,console,Date,Promise,URL});
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'..','background.js'),'utf8'),{importScripts:()=>{},...require('./helpers/empty-evidence.js')(),ThreadLineCore:Core,ThreadLineCaptureCore:CaptureCore,ThreadLineCaptureDB:db,chrome,crypto:globalThis.crypto,console,Date,Promise,URL});
   function message(payload,sender={id:'capture-test',url:'chrome-extension://capture-test/panel.html'}){return new Promise((resolve,reject)=>{events.message(payload,sender,reply=>{if(reply.ok)resolve(reply.data);else reject(new Error(reply.error));});});}
   return{message,runs,pages,calls,session,local};
 }
