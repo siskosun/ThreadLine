@@ -1094,6 +1094,23 @@ chrome.runtime.onMessage.addListener((payload,sender,reply) => {
       await requirePanelSender(sender,"只有研线面板可接续研究");
       return openChatWithDraft(payload.handoff,payload.windowId,payload.projectId);
     }
+    if(payload.type==="HANDOFF_PEEK"){
+      // Pure presence check for existing chat/Project pages. Do not expose
+      // draft text, reserve an attempt, ACK or mutate the pending handoff.
+      const allowed = input => {
+        try {
+          const u = new URL(input);
+          return u.protocol==="https:" &&
+            ["chatgpt.com","chat.openai.com"].includes(u.hostname);
+        } catch{return false;}
+      };
+      if(!Number.isInteger(sender.tab?.id) ||
+          !allowed(sender.tab.url) || !allowed(sender.url))
+        throw new Error("only a ChatGPT tab can check its own handoff status");
+      const key="tl_handoff_"+sender.tab.id;
+      const found=await chrome.storage.session.get(key);
+      return {pending:typeof found[key]?.text==="string" && found[key].text.length>0};
+    }
     if(["HANDOFF_GET","HANDOFF_BEGIN","HANDOFF_ACK"].includes(payload.type)){
       // A stale tab, Project/Temporary redirect or background page cannot
       // consume a draft reservation from another ChatGPT document.
