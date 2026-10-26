@@ -202,7 +202,7 @@ export function evaluateData(protocol,observations,protocolSha256){
    const criticalLeaks=e.goldCriticalIds.filter(id=>!mustSet.has(id));
    const substantivelyLeakedBefore=substantive.filter(id=>beforeSet.has(id));
    const substantivelyLeakedDeferred=substantive.filter(id=>deferredSet.has(id));
-   const counts=score(computed,e.goldAffectedIds),missed=counts.fn>0&&e.critical===true;
+   const counts=score(computed,e.goldAffectedIds),missed=e.goldCriticalIds.some(id=>!computed.includes(id));
    const mustCovered=substantive.filter(id=>mustSet.has(id)).length;
    cTP+=counts.tp;cFP+=counts.fp;cFN+=counts.fn;if(missed)criticalCaseMisses++;
    cFlat+=computed.length;cMust+=mustIds.length;cBefore+=beforeIds.length;
