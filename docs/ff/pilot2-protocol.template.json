@@ -48,7 +48,8 @@
           "sourceSnapshotStatus": "unknown",
           "sourceSnapshotEvidenceSha256": null,
           "handoffIncludedIds": null,
-          "handoffScopeSha256": null
+          "handoffScopeSha256": null,
+          "observedChangeKind": null
         }
       ]
     }
