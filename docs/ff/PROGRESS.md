@@ -2,10 +2,10 @@
 
 ## 2026-10-26 PR #55：F3 采集诊断/取消与 S5 实际联合集成
 
-- 后续独立 Draft [PR #55](https://github.com/siskosun/ThreadLine/pull/55) 基于已通过双平台的 #54 精确文档 HEAD \`22404d8419ed19dae178859bc7f7e7b893227cd1\`；本次**代码 HEAD** \`e9145dd6f87e892261404d2badb82ca79c827143\`。[Linux CI](https://github.com/siskosun/ThreadLine/actions/runs/40265983332) **success**：319 项 Node，318 通过、0 失败、1 项因非 Windows Chrome 环境按旧配置跳过；全部合成 Chromium MV3（含完整 profile 重启、人工取消、停滞提示、分块保留、0 自动发送、身份守卫）通过。
-- [Windows CI](https://github.com/siskosun/ThreadLine/actions/runs/40265983214) 首次合成浏览器测试在 \`s2s4-sidebar-e2e.py\` 等待扩展 Service Worker 启动时超过 15 秒；这是启动超时，**不能冒充验收通过，也不能证明代码故障**，已单独重跑失败的 Windows 作业。最终结论以准确 HEAD 的完整测试结果为准；本登记提交也须另行通过 CI。
-- 保留 S5 原始 S1–S5 研究/Argdown/来源证据格式，按功能段移植 #40 的 F3 注入启动握手、\`FF_CAPTURE_STATUS\`、失联旧运行二步人工解除、\`CAPTURE_*\` 串行终态检查，并移植 #49 的面板人工取消、15 秒无进度提示、消息未送达的明确说明。F3 四个独立 E2E 追加到现有套件，Node 追加严格的同标签异 run、重启 K4 C/D 以及取消后迟到消息拒绝测试。
-- 联合 Node 回归发现 **两个真缺陷**：S5 旧 \`ffCaptureEnded\` 接受相同 tab 的其他采集运行，可能错误标记分支完成；S5 旧 \`ffRecoverBindings\` 只遍历 A/B，重启后未处理 C/D。现在用准确 \`captureRunId\`、源 \`tabId\` 和 \`sessionId\` 三重核验，并按实际分支枚举恢复，同时保留 S5 新增证据来源字段。失败中间提交 \`7530a7fe\` 已留作审计，未撤销测试约束。
+- 后续独立 Draft [PR #55](https://github.com/siskosun/ThreadLine/pull/55) 基于已通过双平台的 #54 精确文档 HEAD `22404d8419ed19dae178859bc7f7e7b893227cd1`；本次**代码 HEAD** `e9145dd6f87e892261404d2badb82ca79c827143`。[Linux CI](https://github.com/siskosun/ThreadLine/actions/runs/40265983332) **success**：319 项 Node，318 通过、0 失败、1 项因非 Windows Chrome 环境按旧配置跳过；全部合成 Chromium MV3（含完整 profile 重启、人工取消、停滞提示、分块保留、0 自动发送、身份守卫）通过。
+- [Windows CI](https://github.com/siskosun/ThreadLine/actions/runs/40265983214) 首次合成浏览器测试在 `s2s4-sidebar-e2e.py` 等待扩展 Service Worker 启动时超过 15 秒；这是启动超时，**不能冒充验收通过，也不能证明代码故障**，已单独重跑失败的 Windows 作业。最终结论以准确 HEAD 的完整测试结果为准；本登记提交也须另行通过 CI。
+- 保留 S5 原始 S1–S5 研究/Argdown/来源证据格式，按功能段移植 #40 的 F3 注入启动握手、`FF_CAPTURE_STATUS`、失联旧运行二步人工解除、`CAPTURE_*` 串行终态检查，并移植 #49 的面板人工取消、15 秒无进度提示、消息未送达的明确说明。F3 四个独立 E2E 追加到现有套件，Node 追加严格的同标签异 run、重启 K4 C/D 以及取消后迟到消息拒绝测试。
+- 联合 Node 回归发现 **两个真缺陷**：S5 旧 `ffCaptureEnded` 接受相同 tab 的其他采集运行，可能错误标记分支完成；S5 旧 `ffRecoverBindings` 只遍历 A/B，重启后未处理 C/D。现在用准确 `captureRunId`、源 `tabId` 和 `sessionId` 三重核验，并按实际分支枚举恢复，同时保留 S5 新增证据来源字段。失败中间提交 `7530a7fe` 已留作审计，未撤销测试约束。
 - **仅工程候选**：真实登录 ChatGPT 的 F3 现场故障尚未证实/复测，3 自然日且 ≥12 次 K=4 实际链路、S1 数据安全旧用户库验收、Pilot/2 真实效果和人工风险签署仍 NOT_EXECUTED。没有合并、发布、自动发送、修改用户数据或调整 PLAN 唯一任务状态。
 
 

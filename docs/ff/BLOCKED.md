@@ -2,9 +2,9 @@
 
 ## 2026-10-26 #55 集成门禁：工程检查与真人验收分开
 
-- 新 [PR #55](https://github.com/siskosun/ThreadLine/pull/55) 将 #40 采集异常诊断与 #49 人工取消集成到 S5 #54 候选；Linux 准确代码 HEAD \`e9145dd6\` 已通过 319 项 Node 和全部合成 Chromium，Windows 同 SHA 首次在 S2–S4 旧 E2E 的 Worker 启动等待超时，已单独复验；需要最终 CI 全通过才可以把本分支标为**工程验证通过**。任一失败须在 PR 记录准确版本和日志，不能以 Linux 成功代替 Windows。
+- 新 [PR #55](https://github.com/siskosun/ThreadLine/pull/55) 将 #40 采集异常诊断与 #49 人工取消集成到 S5 #54 候选；Linux 准确代码 HEAD `e9145dd6` 已通过 319 项 Node 和全部合成 Chromium，Windows 同 SHA 首次在 S2–S4 旧 E2E 的 Worker 启动等待超时，已单独复验；需要最终 CI 全通过才可以把本分支标为**工程验证通过**。任一失败须在 PR 记录准确版本和日志，不能以 Linux 成功代替 Windows。
 - 仍 **NOT_EXECUTED / 不可自动补齐**：已登录真实 ChatGPT 的 K=4 有效操作 ≥12 次、跨至少 3 自然日；F3 原始卡死现场定位/限流/MV3 和四分支结果全闭环；真实用户旧证据库的备份恢复/删除与 L3 风险批准；逐 PR 人工验收、授权合并及发布。不得自动重发未知采集/网页消息、自动绑定不同标签身份、把合成测试写成真人证据。
-- #36/#39 S1 及后续 S2–S5 的治理状态仍与 main 的历史 done 记录存在差异。不得私改 \`docs/PLAN.md\` 或补造 \`MANUAL_ACCEPT\`；#47 发布守卫独立 Draft，main 版本漂移也未解除。保留 Draft/Open。
+- #36/#39 S1 及后续 S2–S5 的治理状态仍与 main 的历史 done 记录存在差异。不得私改 `docs/PLAN.md` 或补造 `MANUAL_ACCEPT`；#47 发布守卫独立 Draft，main 版本漂移也未解除。保留 Draft/Open。
 
 
 ## 2026-10-26 S5 多 PR 集成后仍存在的人为门禁
