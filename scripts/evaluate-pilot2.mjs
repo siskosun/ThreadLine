@@ -120,6 +120,44 @@ export function evaluateData(protocol,observations,protocolSha256){
     fail("三臂均须保留正确性、误改、操作耗时、学习成本、模型信息、原始资料 SHA 与独立收据");
    if(receiptIds.has(v.receiptId))fail("重复使用收据 ID：不同臂/事件必须有独立记录");
    receiptIds.add(v.receiptId);
+   if(v.reviewLogComplete!==true || !Array.isArray(v.reviewSegments) ||
+      v.reviewSegments.length>200 || !Array.isArray(v.handoffCorrectSubstantiveIds) ||
+      !unique(v.handoffCorrectSubstantiveIds))
+      fail("缺少完整复核操作日志或独立核对后的最终交接目标清单");
+   const substantive=new Set(frozenEvent.goldAffectedIds.filter(id=>
+      frozenEvent.goldMateriality[id]==="substantive"));
+   if(v.handoffCorrectSubstantiveIds.some(id=>!substantive.has(id)))
+      fail("交接纠正目标必须属于冻结的实质 G*，不能自行扩展真值");
+   let reviewedMs=0,reviewLearningMs=0;
+   for(const segment of v.reviewSegments){
+    if(!segment||!validId(segment.targetConclusionId)||
+       frozenEvent.frozenState.conclusions?.[segment.targetConclusionId]?.projectId!==
+        protocol.cases.find(c=>c.id===item.caseId).projectId||
+       !Number.isFinite(segment.elapsedMs)||segment.elapsedMs<=0||
+       !Number.isFinite(segment.learningMs)||segment.learningMs<0||
+       !segment.receiptId||typeof segment.receiptId!=="string"||
+       receiptIds.has(segment.receiptId))
+      fail("复核分段必须有可追溯目标、实际耗时、学习时间与独立收据");
+    receiptIds.add(segment.receiptId);
+    reviewedMs+=segment.elapsedMs;reviewLearningMs+=segment.learningMs;
+   }
+   if(reviewedMs>v.elapsedMs||reviewLearningMs>v.learningMs)
+     fail("复核分段时间大于对应臂的实际记录，禁止重复统计");
+   if(arm==="B"){
+    if(!Array.isArray(v.deferrals)||v.deferrals.length>200||
+       !unique(v.deferrals.map(d=>d.targetConclusionId)))
+      fail("暂不处理必须逐事件逐目标登记，不得批量伪造或重复");
+    for(const d of v.deferrals){
+     if(d?.triggerEventId!==frozenEvent.id||
+       frozenEvent.frozenState.conclusions?.[d.targetConclusionId]?.projectId!==
+          protocol.cases.find(c=>c.id===item.caseId).projectId||
+       typeof d.reason!=="string"||!d.reason.trim()||
+       typeof d.receiptId!=="string"||!d.receiptId.trim()||
+       receiptIds.has(d.receiptId))
+       fail("暂不处理必须有事件身份、理由和独立人工操作收据");
+     receiptIds.add(d.receiptId);
+    }
+   }
    if(arm==="B"&&Object.hasOwn(v,"predictedAffectedIds"))fail("B 的预测集合只能由 Research.impacts 实算，不允许填入");
   }
   const versions=ARM.map(arm=>item.arms[arm].modelVersion);
