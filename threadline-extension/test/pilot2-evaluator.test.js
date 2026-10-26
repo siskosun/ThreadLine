@@ -103,6 +103,7 @@ test("actual impacted ids cannot be replaced by gold labels",()=>{
  protocol.cases[0].events[0].goldMateriality={};
  protocol.cases[0].events[0].goldCriticalIds=[];
  protocol.cases[0].events[0].critical=false;
+ observations.records[0].arms.B.handoffCorrectSubstantiveIds=[];
  const result=evaluateData(protocol,observations,hash);
  assert.equal(result.affected.fp,1);
  assert.equal(result.affected.tp,17);
@@ -126,4 +127,64 @@ test("learning overhead is included in screening and separately disclosed",()=>{
  assert.equal(result.caseSummary.medianBvsAGainExcludingLearning,0.3);
  delete observations.records[0].arms.B.learningMs;
  assert.throws(()=>evaluateData(protocol,observations,hash),/学习成本/);
+});
+
+test("tier rule is byte-pinned and does not use materiality gold as priority input",()=>{
+ const {protocol,observations,hash}=fixture();
+ protocol.tierRuleSha256="f".repeat(64);
+ assert.throws(()=>evaluateData(protocol,observations,hash),/分层规则版本或 SHA/);
+ const good=fixture();
+ assert.equal(evaluateData(good.protocol,good.observations,good.hash).tiered.eligibleForPilot,true);
+ good.protocol.cases[0].events[0].goldMateriality[good.protocol.cases[0].events[0].goldAffectedIds[0]]="non_substantive";
+ good.protocol.cases[0].events[0].goldCriticalIds=[];
+ good.protocol.cases[0].events[0].critical=false;
+ good.observations.records[0].arms.B.handoffCorrectSubstantiveIds=[];
+ const result=evaluateData(good.protocol,good.observations,good.hash);
+ assert.equal(result.events[0].tiered.mustReviewCount,1,"gold label cannot rewrite frozen graph prediction");
+ assert.equal(result.events[0].tiered.substantiveGoldCount,0);
+});
+test("two-hop substantive critical miss falls back to flat while keeping all impact paths",()=>{
+ const {protocol,observations,hash}=fixture();
+ const c=protocol.cases[0],e=c.events[0],mid="con_mid00000001",target=e.goldAffectedIds[0];
+ e.frozenState=structuredClone(e.frozenState);
+ e.frozenState.conclusions[mid]={id:mid,projectId:c.projectId,currentVersionId:"ver_"+mid,status:"adopted"};
+ e.frozenState.projects[c.projectId].research.edges=[
+  {id:"dep_parent00001",active:true,revision:1,projectId:c.projectId,upstreamConclusionId:e.rootConclusionId,downstreamConclusionId:mid,type:"necessary"},
+  {id:"dep_child00001",active:true,revision:1,projectId:c.projectId,upstreamConclusionId:mid,downstreamConclusionId:target,type:"necessary"}
+ ];
+ const result=evaluateData(protocol,observations,hash);
+ const event=result.events[0];
+ assert.equal(event.tiered.flatCount,2);
+ assert.equal(event.tiered.mustReviewCount,1);
+ assert.ok(event.tiered.beforeUseIds.includes(target));
+ assert.ok(event.tiered.criticalMissedIds.includes(target));
+ assert.ok(result.tiered.criticalMisses>0);
+ assert.equal(result.tiered.eligibleForPilot,false);
+ assert.equal(result.tierLeakageRequiresFlatFallback,true);
+});
+test("review segment attribution, corrections and deferrals require auditable identities",()=>{
+ const a=fixture();a.observations.records[0].arms.B.reviewSegments[0].elapsedMs=1e9;
+ assert.throws(()=>evaluateData(a.protocol,a.observations,a.hash),/复核分段时间大于/);
+ const b=fixture();b.observations.records[0].arms.B.handoffCorrectSubstantiveIds=["con_fabricated"];
+ assert.throws(()=>evaluateData(b.protocol,b.observations,b.hash),/交接纠正目标必须属于/);
+ const c=fixture();c.observations.records[0].arms.B.deferrals=[{
+  triggerEventId:"event_0",targetConclusionId:c.protocol.cases[0].events[0].goldAffectedIds[0],
+  reason:"下次决策前再核对",receiptId:"synthetic-deferral-001"}];
+ const result=evaluateData(c.protocol,c.observations,c.hash);
+ assert.equal(result.events[0].tiered.deferredIds.length,1);
+ assert.equal(result.events[0].tiered.mustReviewCount,1,"explicit defer must not erase the safety priority");
+ assert.equal(result.tiered.leakedDeferred,1);
+ c.observations.records[0].arms.B.deferrals[0].reason="";
+ assert.throws(()=>evaluateData(c.protocol,c.observations,c.hash),/暂不处理必须有事件身份/);
+});
+test("noise time excludes unknown learning allocation and is compared to A case by case",()=>{
+ const a=fixture();const out=evaluateData(a.protocol,a.observations,a.hash);
+ assert.equal(out.reviewNoise.B.noiseMs,6*2*10000);
+ assert.equal(out.reviewNoise.A.noiseMs,6*2*15000);
+ assert.equal(out.noiseShareReference,true);
+ assert.equal(out.reviewNoise.B.substantiveHandoffCorrectRate,1);
+ const b=fixture();b.observations.records[0].arms.B.learningMs=3000;
+ const unknown=evaluateData(b.protocol,b.observations,b.hash);
+ assert.equal(unknown.noiseShareReference,null,"unallocated learning must remain unknown");
+ assert.equal(unknown.thresholds.nonSubstantiveReviewShareNotHigherThanA,false);
 });
