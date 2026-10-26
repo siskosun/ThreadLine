@@ -72,6 +72,26 @@ async function readState() {
   const record = await chrome.storage.local.get(STORE_KEY);
   return ThreadLineCore.normalizedState(record[STORE_KEY]);
 }
+// Badge counts out-of-date *linked conversations*, not unread notifications.
+// The only input is the existing authoritative topic state; no new permissions.
+let reviewBadgeQueue=Promise.resolve();
+function refreshReviewBadge() {
+  if(typeof chrome.action?.setBadgeText!=="function")return Promise.resolve();
+  const next=reviewBadgeQueue.catch(()=>{}).then(async()=>{
+    const state=await readState();
+    const count=Object.values(state.chats)
+      .filter(chat=>ThreadLineCore.isOutdated(state,chat)).length;
+    await chrome.action.setBadgeText({text:count>99?"99+":count?String(count):""});
+    if(typeof chrome.action.setBadgeBackgroundColor==="function")
+      await chrome.action.setBadgeBackgroundColor({color:"#B36A24"}).catch(()=>{});
+    if(typeof chrome.action.setTitle==="function")
+      await chrome.action.setTitle({title:count
+        ? "研线：有 "+count+" 条关联对话待核对课题更新"
+        : "打开研线课题面板"}).catch(()=>{});
+  });
+  reviewBadgeQueue=next;
+  return next;
+}
 async function writeState(previous,next,reason,extra={}) {
   const preserve = !["observeChat", "acknowledgeProject"].includes(reason);
   if (!preserve) { await chrome.storage.local.set({...extra,[STORE_KEY]:next}); return; }
@@ -835,12 +855,18 @@ async function handleFF(payload, sender) {
 }
 chrome.runtime.onInstalled.addListener(() => {
   chrome.sidePanel.setPanelBehavior({openPanelOnActionClick:true}).catch(() => {});
+  refreshReviewBadge().catch(()=>{});
 });
 chrome.runtime.onStartup.addListener(() => {
+  refreshReviewBadge().catch(()=>{});
   recoverCaptures().catch(()=>{});
   chrome.sidePanel.setPanelBehavior({openPanelOnActionClick:true}).catch(() => {});
   ffRecoverBindings().catch(()=>{});
   consumeAllPendingProjections().catch(()=>{});
+});
+chrome.storage.onChanged?.addListener((changes,area)=>{
+  if(area==="local" && Object.prototype.hasOwnProperty.call(changes,STORE_KEY))
+    refreshReviewBadge().catch(()=>{});
 });
 chrome.tabs.onUpdated.addListener(async(tabId,change)=>{
   if(change.status!=="complete")return;
