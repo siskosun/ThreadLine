@@ -240,7 +240,8 @@ def run():
             panel.wait_for_function("id => [...document.querySelector('#evidence-project').options].some(o=>o.value===id)",
                 arg=success_project_id)
             panel.select_option("#evidence-project",success_project_id)
-            panel.wait_for_function("() => document.querySelectorAll('#evidence-list .evidence-item').length===1")
+            panel.wait_for_function("id => [...document.querySelectorAll('#evidence-list .evidence-item')].some(n=>n.dataset.conclusionId===id)",
+                arg=adopted_success["data"]["conclusionId"])
             panel.locator("#evidence-list button", has_text="撤回").click()
             panel.locator("dialog.tl-confirm-dialog button", has_text="撤回结论").click()
             panel.wait_for_function("id => [...document.querySelectorAll('#evidence-list .evidence-item')].some(n=>n.dataset.conclusionId===id&&n.textContent.includes('已撤回'))",
@@ -252,6 +253,8 @@ def run():
             assert success_history["ok"] and success_history["data"]["status"] == "withdrawn"
             panel.select_option("#evidence-project",project_id)
             panel.wait_for_function("id => document.querySelector('#evidence-project').value===id",arg=project_id)
+            panel.wait_for_function("id => [...document.querySelectorAll('#evidence-list .evidence-item')].some(n=>n.dataset.conclusionId===id)",
+                arg=adopted2["data"]["conclusionId"])
             first = panel.locator("#evidence-list .evidence-item").first
             assert first.get_attribute("open") is not None
             summary = first.locator(":scope > summary")
