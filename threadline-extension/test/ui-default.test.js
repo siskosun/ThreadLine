@@ -4,13 +4,17 @@ const fs=require('node:fs');
 const path=require('node:path');
 const html=fs.readFileSync(path.join(__dirname,'..','panel.html'),'utf8');
 const js=fs.readFileSync(path.join(__dirname,'..','capture-ui.js'),'utf8');
-test('ChatGPT webpage analysis is the visible default and Ollama remains optional',()=>{
+test('manual analysis is the only default; experimental webpage mode requires opt-in',()=>{
   const selector=html.match(/<select id="ai-provider">([\s\S]*?)<\/select>/);
   assert.ok(selector);
-  assert.match(selector[1],/^\s*<option value="webui" selected>/);
+  assert.match(selector[1],/^\s*<option value="manual" selected>/);
+  assert.match(selector[1],/<option value="webui">ChatGPT 网页自动分析/);
+  assert.equal((selector[1].match(/ selected/g)||[]).length,1);
   assert.match(selector[1],/<optgroup label="其他模型方式（可选）">/);
   assert.match(selector[1],/<option value="ollama">/);
   assert.match(selector[1],/<option value="openai">/);
+  assert.match(html,/默认手动分析：复制结构化提示/);
+  assert.match(js,/if\(kind==="manual"\)\{aiStatus\("当前为手动分析/);
   assert.match(js,/\$\("ai-model"\)\.parentElement\.hidden=true/);
   assert.match(js,/\$\("ai-run"\)\.textContent=mode==="webui"/);
 });
