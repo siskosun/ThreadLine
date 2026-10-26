@@ -14,7 +14,7 @@ function system(){
   };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname,'..','background.js'),'utf8'),{importScripts:()=>{},...require('./helpers/empty-evidence.js')(),ThreadLineCore:Core,ThreadLineCaptureCore:CaptureCore,ThreadLineCaptureDB:db,chrome,crypto:globalThis.crypto,console,Date,Promise,URL});
   function message(payload,sender={id:'capture-test',url:'chrome-extension://capture-test/panel.html'}){return new Promise((resolve,reject)=>{events.message(payload,sender,reply=>{if(reply.ok)resolve(reply.data);else reject(new Error(reply.error));});});}
-  return{message,runs,pages,calls,session,local};
+  return{message,runs,pages,calls,session,local,events};
 }
 test('selected-tab capture starts, only original tab can provide chunks, then completes',async()=>{
   const s=system(),{id}=await s.message({type:'CAPTURE_START',tabId:7});
@@ -130,4 +130,30 @@ test('a completed capture cannot be retroactively cancelled',async()=>{
   await assert.rejects(s.message({type:'CAPTURE_CANCEL',id}),/采集已结束/);
   assert.equal(s.runs.get(id).status,'done');
   assert.equal(s.runs.get(id).complete,true);
+});
+
+test('stalled source with live tab is not automatically marked failed during SNAPSHOT',async()=>{
+  const s=system(),{id}=await s.message({type:'CAPTURE_START',tabId:7});
+  const old=Date.now()-16*60*1000;
+  s.runs.set(id,{...s.runs.get(id),createdAt:old,updatedAt:old});
+  await s.message({type:'SNAPSHOT'});
+  assert.equal(s.runs.get(id).status,'capturing');
+  assert.equal(s.session.has('tl_capture_owner_'+id),true);
+  const sender={tab:{id:7,url:'https://chatgpt.com/c/source-123'}};
+  await s.message({type:'CAPTURE_END',id,complete:true,mode:'paginated',pageCount:0,count:0},sender);
+  await s.message({type:'SNAPSHOT'});
+  assert.equal(s.runs.get(id).status,'done','recovery cannot overwrite completion');
+});
+test('closed source is marked incomplete and late completion cannot overwrite it',async()=>{
+  const s=system(),{id}=await s.message({type:'CAPTURE_START',tabId:7});
+  s.events.tabRemoved(7);
+  // The tab-removal callback schedules asynchronous serialized recovery.
+  await s.message({type:'SNAPSHOT'});
+  assert.equal(s.runs.get(id).status,'error');
+  assert.equal(s.runs.get(id).complete,false);
+  assert.equal(s.runs.get(id).phase,'source-closed');
+  assert.equal(s.session.has('tl_capture_owner_'+id),false);
+  await assert.rejects(s.message({type:'CAPTURE_END',id,complete:true},
+    {tab:{id:7,url:'https://chatgpt.com/c/source-123'}}),/已结束/);
+  assert.equal(s.runs.get(id).phase,'source-closed');
 });
