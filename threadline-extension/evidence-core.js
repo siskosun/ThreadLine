@@ -622,9 +622,9 @@
         const state={conclusions:Object.fromEntries(cs),versions:Object.fromEntries(vs),sources:Object.fromEntries(ss),
           links:Object.fromEntries(pkg.links.map(l=>[l.id,l])),projects:{[pkg.projectId]:pkg.project}};
         research.validateResearch(pkg.project.research,state,pkg.projectId);
-        if((pkg.project.research.reviews||[]).length||
-          (pkg.project.research.events||[]).some(e=>e.kind==="reviewCompleted"))
-          throw Error("此备份包含 S4 复核历史；S3 独立版本不会降级覆盖，请使用完整版本恢复");
+        for(const review of pkg.project.research?.reviews||[])
+          if(review.scopeManifest&&await hashRequest(review.scopeManifest)!==review.scopeManifestHash)
+            throw Error("复核范围哈希与冻结材料不一致");
       }
       if(pkg.project.handoffs) {
         if(!Array.isArray(pkg.project.handoffs)||pkg.project.handoffs.length>100)throw Error("交接历史数量无效");
