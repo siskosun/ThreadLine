@@ -4,6 +4,14 @@
   const element=(tag,attrs={},text="")=>{const n=document.createElement(tag);Object.assign(n,attrs);n.textContent=text;return n;};
   function restoreFocus(opener) {
     if(opener?.isConnected){opener.focus();return;}
+    const evidenceItem=opener?.closest?.(".evidence-item");
+    const conclusionId=evidenceItem?.dataset?.conclusionId;
+    if(conclusionId){
+      const current=Array.from(document.querySelectorAll(".evidence-item"))
+        .find(node=>node.dataset.conclusionId===conclusionId);
+      const summary=current?.querySelector(":scope > summary");
+      if(summary){summary.focus();return;}
+    }
     const action=opener?.dataset?.action,key=opener?.dataset?.key;
     if(action&&key){
       const replacement=Array.from(document.querySelectorAll("[data-action]"))
