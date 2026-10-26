@@ -72,6 +72,26 @@ async function readState() {
   const record = await chrome.storage.local.get(STORE_KEY);
   return ThreadLineCore.normalizedState(record[STORE_KEY]);
 }
+// Badge counts out-of-date *linked conversations*, not unread notifications.
+// The only input is the existing authoritative topic state; no new permissions.
+let reviewBadgeQueue=Promise.resolve();
+function refreshReviewBadge() {
+  if(typeof chrome.action?.setBadgeText!=="function")return Promise.resolve();
+  const next=reviewBadgeQueue.catch(()=>{}).then(async()=>{
+    const state=await readState();
+    const count=Object.values(state.chats)
+      .filter(chat=>ThreadLineCore.isOutdated(state,chat)).length;
+    await chrome.action.setBadgeText({text:count>99?"99+":count?String(count):""});
+    if(typeof chrome.action.setBadgeBackgroundColor==="function")
+      await chrome.action.setBadgeBackgroundColor({color:"#B36A24"}).catch(()=>{});
+    if(typeof chrome.action.setTitle==="function")
+      await chrome.action.setTitle({title:count
+        ? "研线：有 "+count+" 条关联对话待核对课题更新"
+        : "打开研线课题面板"}).catch(()=>{});
+  });
+  reviewBadgeQueue=next;
+  return next;
+}
 async function writeState(previous,next,reason,extra={}) {
   const preserve = !["observeChat", "acknowledgeProject"].includes(reason);
   if (!preserve) { await chrome.storage.local.set({...extra,[STORE_KEY]:next}); return; }
@@ -835,12 +855,18 @@ async function handleFF(payload, sender) {
 }
 chrome.runtime.onInstalled.addListener(() => {
   chrome.sidePanel.setPanelBehavior({openPanelOnActionClick:true}).catch(() => {});
+  refreshReviewBadge().catch(()=>{});
 });
 chrome.runtime.onStartup.addListener(() => {
+  refreshReviewBadge().catch(()=>{});
   recoverCaptures().catch(()=>{});
   chrome.sidePanel.setPanelBehavior({openPanelOnActionClick:true}).catch(() => {});
   ffRecoverBindings().catch(()=>{});
   consumeAllPendingProjections().catch(()=>{});
+});
+chrome.storage.onChanged?.addListener((changes,area)=>{
+  if(area==="local" && Object.prototype.hasOwnProperty.call(changes,STORE_KEY))
+    refreshReviewBadge().catch(()=>{});
 });
 chrome.tabs.onUpdated.addListener(async(tabId,change)=>{
   if(change.status!=="complete")return;
@@ -1254,6 +1280,23 @@ chrome.runtime.onMessage.addListener((payload,sender,reply) => {
     if(payload.type === "NEW_CHAT"){
       await requirePanelSender(sender,"只有研线面板可接续研究");
       return openChatWithDraft(payload.handoff,payload.windowId,payload.projectId);
+    }
+    if(payload.type==="HANDOFF_PEEK"){
+      // Pure presence check for existing chat/Project pages. Do not expose
+      // draft text, reserve an attempt, ACK or mutate the pending handoff.
+      const allowed = input => {
+        try {
+          const u = new URL(input);
+          return u.protocol==="https:" &&
+            ["chatgpt.com","chat.openai.com"].includes(u.hostname);
+        } catch{return false;}
+      };
+      if(!Number.isInteger(sender.tab?.id) ||
+          !allowed(sender.tab.url) || !allowed(sender.url))
+        throw new Error("only a ChatGPT tab can check its own handoff status");
+      const key="tl_handoff_"+sender.tab.id;
+      const found=await chrome.storage.session.get(key);
+      return {pending:typeof found[key]?.text==="string" && found[key].text.length>0};
     }
     if(["HANDOFF_GET","HANDOFF_BEGIN","HANDOFF_ACK"].includes(payload.type)){
       // A stale tab, Project/Temporary redirect or background page cannot

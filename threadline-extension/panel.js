@@ -437,6 +437,19 @@
   let evidenceHandoffStamp = null;
   let evidenceRequest = 0,evidenceDirectory=0,handoffGeneration=0,handoffEdits=0,handoffProject=null,handoffPending=null,evidenceHasRows=false;
   const handoffDrafts=new Map();
+  function showEvidenceEmpty(kind) {
+    const host=ev$("evidence-empty");
+    host.hidden=!kind;
+    ev$("evidence-go-create").hidden=kind!=="no-project";
+    ev$("evidence-go-research").hidden=kind!=="no-evidence";
+    if(kind==="no-project"){
+      ev$("evidence-empty-title").textContent="还没有课题";
+      ev$("evidence-empty-help").textContent="先创建课题，再关联对话并采纳第一条结论。";
+    }else if(kind==="no-evidence"){
+      ev$("evidence-empty-title").textContent="还没有采纳的结论";
+      ev$("evidence-empty-help").textContent="从已采集的对话中选择重要结论，核对依据后逐条采纳。";
+    }
+  }
 
   async function renderEvidence() {
     const ticket=++evidenceDirectory,snapshot = await evSend({ type: "EV_PROJECTS" });
@@ -444,7 +457,15 @@
     const select = ev$("evidence-project");
     const current = select.value;
     select.replaceChildren();
-    for (const project of (snapshot.projects || []).filter(p=>!p.deleted)) {
+    const projects=(snapshot.projects || []).filter(p=>!p.deleted);
+    if(!projects.length){
+      const placeholder=document.createElement("option");
+      placeholder.value="";
+      placeholder.textContent="尚无课题";
+      select.appendChild(placeholder);
+    }
+    select.disabled=!projects.length;
+    for (const project of projects) {
       const option = document.createElement("option");
       option.value = project.id;
       option.textContent = (project.name || project.id)+(project.unavailable?"（需恢复）":"");
@@ -457,13 +478,18 @@
 
   async function renderEvidenceProject() {
     const request=++evidenceRequest,projectId = ev$("evidence-project").value;
-    if (!projectId) { evidenceHasRows=false; ev$("evidence-handoff").disabled=true; ev$("evidence-summary").textContent = "暂无课题。先在“对话切换 → 全部课题与管理”创建课题，再从整理结果逐条采纳。"; ev$("evidence-list").replaceChildren(); return; }
+    if (!projectId) {
+      evidenceHasRows=false; ev$("evidence-handoff").disabled=true;
+      ev$("evidence-summary").textContent="先创建课题，再采纳结论。";
+      ev$("evidence-list").replaceChildren(); showEvidenceEmpty("no-project");return;
+    }
     let data;
     try { data = await evSend({ type: "EV_LIST", projectId }); }
     catch (e) {
       if(request!==evidenceRequest)return;
       ev$("evidence-summary").textContent = "证据库不可用：" + e.message;
       ev$("evidence-list").replaceChildren();
+      showEvidenceEmpty(null);
       // Preserve any manually edited draft, but stop presenting it as current.
       ev$("evidence-handoff-copy").disabled = true;
       ev$("evidence-handoff-read").disabled = true;evidenceHasRows=false;
@@ -473,6 +499,7 @@
     }
     if(request!==evidenceRequest||projectId!==ev$("evidence-project").value)return;
     evidenceHasRows=!!data.rows.length;ev$("evidence-handoff").disabled=!evidenceHasRows||!!handoffPending;
+    showEvidenceEmpty(evidenceHasRows?null:"no-evidence");
     const adopted=data.rows.filter(r=>r.conclusion.status!=="withdrawn").length,withdrawn=data.rows.length-adopted;
     ev$("evidence-summary").textContent=data.rows.length?`已采纳 ${adopted} 条 · 已撤回 ${withdrawn} 条 · 共 ${data.rows.reduce((n,r)=>n+r.versions.length,0)} 个版本`+(data.projectionPending?"\n证据已保存，共享摘要待更新。":"\n点击依据查看原文；修订和撤回均保留历史。") : "尚无采纳结论。先在“研究整理”或 Fork 对照结果中逐条采纳。";
     const holder = ev$("evidence-list");
@@ -565,6 +592,16 @@
   }
 
   ev$("evidence-refresh").addEventListener("click", () => renderEvidenceProject());
+  ev$("evidence-go-create").addEventListener("click",()=>{
+    setWorkspace("switch");
+    ev$("manage-accordion").open=true;
+    ev$("topic-name").focus();
+    ev$("topic-name").scrollIntoView({block:"nearest"});
+  });
+  ev$("evidence-go-research").addEventListener("click",()=>{
+    setWorkspace("research",true);
+    ev$("capture-source").focus();
+  });
   ev$("evidence-handoff-view").addEventListener("input",()=>{++handoffEdits;});
   ev$("evidence-project").addEventListener("change",()=>{
     const view=ev$("evidence-handoff-view");
