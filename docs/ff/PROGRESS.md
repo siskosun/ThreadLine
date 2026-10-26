@@ -1,5 +1,13 @@
 # ThreadLine 开发进度记录
 
+## 2026-10-26 PR #47 发布守卫与回归门槛（独立 Draft）
+
+- 基于 main `bf2c2c2878039f6e2b0ca60f10541b90c3f7c075` 创建 [PR #47](https://github.com/siskosun/ThreadLine/pull/47)。代码提交 `e136341747ea20bb1633e469b3a6ee5f7472e35b`：[Linux verify](https://github.com/siskosun/ThreadLine/actions/runs/40254439497) / [Windows baseline](https://github.com/siskosun/ThreadLine/actions/runs/40254439396) 均 success；Node 237/237 通过，合成 Chromium E2E 双平台通过。原有 Windows K4 的总标签页数量差断言受其他标签关闭影响，改为逐个核验返回的四个 tabId 与 URL，保留四支实际存在的强约束。
+- 发布流程禁止 `push main` 自动创建 Release；仅仓库所有者通过 GitHub Actions 手动选择发布并输入与实际 `GITHUB_SHA` 一致的审核提交才会尝试发布。已有标签拒绝覆盖。与最近已发布 Release 比较扩展目录和 manifest，存在代码漂移却未提升版本时，单独的 `release-drift` 在主分支 push/显式发布前失败，阻止发布。
+- Node 测试计数下限由 94 改为 v0.8.1 对应的 220；后续版本须更新 `scripts/test-floors.json`。新增临时 Git 仓库的版本漂移正反测试，移除 README 失效 v0.6.0 回退链接。没有改应用源代码、版本、PLAN 状态、用户数据或生产安装。发布守卫为关键治理文件，仍须人工审阅 PR 才能合并。
+- 经 GitHub 比较，main 相对发布标签 v0.8.1 已有 25 提交、19 个扩展文件变化，而 manifest 仍为 v0.8.1；本治理 PR 若合并，在版本修正前主分支的独立 `release-drift` 作业**预期报告失败**，这是实际待解决的发布漂移，不可把发布门禁改成静默跳过。S1 R01/R02 缺陷还在 main，#36 数据/人工验收门禁未满足，不宣告可发布。
+
+
 任务定义和正式状态唯一来源：[docs/PLAN.md](../PLAN.md)。本文件只记录发生过的事件与证据，不自行认定任务完成。
 
 ## 2026-10-24 外部有条件计划评审采纳
