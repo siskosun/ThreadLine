@@ -166,8 +166,13 @@
     if(done||working)return;working=true;
     try {
       if(!validNewChatPage()){
+        // Most saved chats and project pages have no handoff intent. Never
+        // display a scary "stopped prefill" warning for ordinary navigation.
+        // Peek returns a boolean only: no draft text escapes to saved pages.
+        const status=await send({type:'HANDOFF_PEEK'});
         done=true;
-        banner('当前不是全新的普通 ChatGPT 对话，已停止预填；不会覆盖草稿或自动发送。',true);
+        if(status?.pending)
+          banner('当前不是全新的普通 ChatGPT 对话，已停止预填；不会覆盖草稿或自动发送。',true);
         return;
       }
       if(!data)data=await send({type:'HANDOFF_GET'});

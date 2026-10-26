@@ -73,8 +73,10 @@ async function exercise(initial,insertion,expected='LONG USER CONTINUATION',opti
       sendMessage(payload,callback){
         outgoing.push(payload.type);
         if(payload.type==='HANDOFF_BEGIN')options.onBegin?.(nodes);
-        callback(payload.type==='HANDOFF_GET'
-          ? {ok:true,data:{text:expected,autoAttempted:options.alreadyAttempted===true}} :
+        callback(payload.type==='HANDOFF_PEEK'
+          ? {ok:true,data:{pending:options.pendingHandoff===true}} :
+          payload.type==='HANDOFF_GET'
+          ? {ok:true,data:options.noHandoff?null:{text:expected,autoAttempted:options.alreadyAttempted===true}} :
           payload.type==='HANDOFF_BEGIN'
           ? {ok:true,data:{autoFill:options.beginAllowed!==false}} :
           {ok:true,data:{ok:true}});
@@ -210,7 +212,7 @@ test('structural ProseMirror readback ignores visual blank lines between paragra
  assert.ok(result.outgoing.includes('HANDOFF_ACK'));
 });
 
-test('handoff refuses Project, Temporary, saved chat, unknown query and foreign pages',async()=>{
+test('ordinary saved chats, projects and temporary pages have no false handoff banner',async()=>{
  for(const url of [
   'https://chatgpt.com/?temporary-chat=true',
   'https://chatgpt.com/g/g-p-test-project',
@@ -220,11 +222,25 @@ test('handoff refuses Project, Temporary, saved chat, unknown query and foreign 
  ]){
   const result=await exercise('','exact','NEVER INSERT',{url});
   assert.equal(result.editor.innerText,'',url);
-  assert.ok(!result.outgoing.includes('HANDOFF_GET'),url);
-  assert.ok(!result.outgoing.includes('HANDOFF_ACK'),url);
-  assert.match(result.banner.children[0].textContent,/已停止预填/,url);
+  assert.deepEqual(result.outgoing,['HANDOFF_PEEK'],url);
+  assert.equal(result.banner.isConnected,false,'no spurious banner on '+url);
+  assert.equal(result.bodyAppends,0,url);
+  assert.equal(result.insertions,0,url);
  }
 });
+test('redirected pending handoff still shows a warning but never inserts or reserves',async()=>{
+ for(const url of ['https://chatgpt.com/c/old-123','https://chatgpt.com/g/g-p-project']){
+  const result=await exercise('','exact','PENDING SECRET',{url,pendingHandoff:true});
+  assert.deepEqual(result.outgoing,['HANDOFF_PEEK']);
+  assert.equal(result.banner.isConnected,true);
+  assert.match(result.banner.children[0].textContent,/已停止预填/);
+  assert.ok(!result.banner.children.some(x=>x.textContent==='复制接续提示'),
+    'a read-only peek must never expose the draft text');
+  assert.equal(result.insertions,0);
+  assert.equal(result.editor.innerText,'');
+ }
+});
+
 test('CRLF-only normalization stays unacknowledged and gets a diagnostic',async()=>{
  const original='第一行\r\n第二行\r\n第三行';
  const result=await exercise('','exact',original,{
