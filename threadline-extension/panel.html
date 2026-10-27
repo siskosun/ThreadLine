@@ -130,8 +130,9 @@
             <div class="ai-field" id="ai-key-row" hidden><label for="ai-api-key">API Key（仅当前面板内存，不保存）</label><input id="ai-api-key" type="password" spellcheck="false" autocomplete="off" placeholder="sk-…"/></div>
             <p class="ai-help" id="ai-endpoint-note"></p>
             <div class="ai-actions"><button class="primary" id="ai-run">使用 ChatGPT 网页分析并更新导图</button><button id="ai-stop" hidden>停止分析</button></div>
+            <div class="ai-actions"><button id="ai-open-webtab" hidden>查看专用分析标签页（不会重复发送）</button></div>
           </div>
-          <div class="ai-actions"><button id="ai-copy-prompt">复制 ChatGPT 结构化提示</button><button id="ai-import-clipboard">从剪贴板导入结果</button></div>
+          <div class="ai-actions"><button id="ai-copy-prompt">复制整理提示（需手动发送）</button><button id="ai-import-clipboard">从剪贴板导入结果</button></div>
           <details class="ai-import-details"><summary>或手动粘贴 ChatGPT 返回的 JSON</summary><textarea aria-label="粘贴结构化分析 JSON" id="ai-json" rows="5" placeholder='粘贴包含 version、objective、findings、completed、pending、next、superseded、closure 字段的 JSON'></textarea><button id="ai-import-manual">校验并更新摘要与导图</button></details>
           <p class="ai-status" id="ai-status" role="status" aria-live="polite"></p>
           <div class="ai-actions"><button id="ai-reset" hidden>恢复原始规则提要</button></div>
@@ -157,7 +158,7 @@
           <div class="report-actions"><button id="promote-review-save" class="primary" disabled>发布至共享课题</button><button id="promote-review-cancel">取消</button></div>
         </section>
         <p id="report-promote-hint" class="report-promote-hint" role="status" aria-live="polite"></p>
-        <div class="report-actions"><button id="report-copy">复制提要</button><button id="report-ai">打开 ChatGPT 草稿</button><button id="report-delete">清除本次采集</button></div>
+        <div class="report-actions"><button id="report-copy">复制提要</button><button id="report-ai">预填深度整理草稿（需手动发送）</button><button id="report-delete">清除本次采集</button></div>
         <div class="report-actions"><button class="handoff-primary" id="report-new-chat">关闭侧栏并开启新对话 →</button></div>
         <p class="report-disclaimer">规则提要与 AI 生成内容均需核查原始记录。ChatGPT 草稿不会自动发送；结构化 JSON 导入后自动更新导图，但不会自动改写课题收口状态。</p>
       </section>
