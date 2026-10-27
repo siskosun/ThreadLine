@@ -203,6 +203,32 @@
     try{await ThreadLineCaptureDB.remove(currentId);await chrome.storage.local.set({tl_last_capture_id:""});currentId="";currentRun=null;lastCompleted="";brief=null;rulesBrief=null;linkedProjectId=null;messages=[];$("capture-report").hidden=true;$("capture-progress").hidden=true;showError("");}
     catch(e){showError("无法清除："+e.message);}
   }
+  async function openWideMap(){
+    const run=currentRun;
+    if(!run||run.status!=="done"||!run.id){
+      showError("请先完成这次采集再打开导图。");return;
+    }
+    if(ThreadLineCaptureCore.conversationId(run.url)!==run.conversationId){
+      showError("采集记录的来源身份不一致，已停止打开导图。");return;
+    }
+    try{
+      const win=await chrome.windows.getCurrent();
+      const source=await chrome.tabs.get(run.tabId).catch(()=>null);
+      const validSource=source&&
+        ThreadLineCaptureCore.conversationId(source.url)===run.conversationId;
+      const result=await ThreadLineLibrarySurface.open({
+        workspace:"map",mapRunId:run.id,windowId:win.id,
+        viewProjectId:linkedProjectId,
+        sourceTabId:validSource?source.id:null,
+        sourceChatKey:validSource?"chat:"+run.conversationId:null
+      });
+      showProgress(result.reused?
+        "已在原资料库宽页打开本次思维导图。":
+        "已打开本次采集的宽页思维导图。");
+    }catch(error){
+      showError("打开宽页思维导图失败："+error.message+"；原始采集与提要未改变。");
+    }
+  }
   async function copyDigest(){if(!brief)return;try{await navigator.clipboard.writeText(ThreadLineCaptureCore.handoff(brief));showProgress("提要已复制到剪贴板");}catch(e){showError("复制失败："+e.message);}}
   function aiStatus(value,isError=false){
     const el=$("ai-status");el.textContent=value||"";el.classList.toggle("warn",isError);
@@ -388,6 +414,7 @@
     $("report-new-chat").addEventListener("click",()=>newChat(false));
     $("report-ai").addEventListener("click",()=>newChat(true));
     $("report-copy").addEventListener("click",copyDigest);
+    $("report-open-wide-map").addEventListener("click",openWideMap);
     $("report-delete").addEventListener("click",clearCurrent);
     $("map-details").addEventListener("toggle",()=>{
       // A collapsed map has zero content width; recalculate only after the
