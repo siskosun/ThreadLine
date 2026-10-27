@@ -11,13 +11,14 @@
   <main id="app">
     <header class="topbar">
       <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
-      <div class="brand-text"><h1>研线 <span>ThreadLine</span></h1><p class="preview-build-marker">UI-D1 试用版 · PR #78</p></div>
+      <div class="brand-text"><h1>研线 <span>ThreadLine</span></h1><p class="preview-build-marker">UI-D3 试用版 · PR #80</p></div>
       <div class="top-indicator" title="仅在本地浏览器存储"><i></i> 本地</div>
     </header>
     <nav class="workspace-tabs" aria-label="研线功能" role="tablist">
       <button id="nav-switch" data-workspace="switch" role="tab" aria-selected="true" aria-controls="workspace-switch" class="selected"><span class="nav-icon" aria-hidden="true">⇄</span> 对话切换</button>
       <button id="nav-research" data-workspace="research" role="tab" aria-selected="false" aria-controls="workspace-research"><span class="nav-icon" aria-hidden="true">◎</span> 研究整理</button>
       <button id="nav-evidence" data-workspace="evidence" role="tab" aria-selected="false" aria-controls="workspace-evidence"><span class="nav-icon" aria-hidden="true">◇</span> 证据与交接</button>
+      <button id="nav-map" data-workspace="map" role="tab" aria-selected="false" aria-controls="workspace-map" hidden tabindex="-1"><span class="nav-icon" aria-hidden="true">▤</span> 思维导图</button>
     </nav>
     <div id="library-launch" class="library-launch"><button type="button" id="library-open" class="library-open-button" aria-label="在新标签页打开宽页资料库">在宽页打开资料库 <span aria-hidden="true">↗</span></button></div>
     <section id="library-header" class="library-header" hidden aria-label="资料库浏览上下文">
@@ -141,6 +142,7 @@
           <p class="ai-help">自动模式会将采集到的对话文本发往所选模型服务。官方 ChatGPT 计划 OAuth 授权暂未接入；网页实验模式通过已登录的页面发送提示词，并非官方 Responses API 授权。扩展不读取登录令牌，也不持久保存独立 API Key。</p>
         </section>
         </details>
+        <div class="report-actions"><button id="report-open-wide-map" type="button" class="secondary">在宽页查看本次思维导图 ↗</button></div>
         <details id="map-details" class="research-tool-details">
           <summary>研究思维导图 <span>可视化 · 按需展开</span></summary>
         <section class="map-section" aria-label="思维导图"><div class="map-controls"><h3>研究思维导图</h3><div class="buttons"><button id="map-minus" title="缩小">−</button><button id="map-plus" title="放大">＋</button><button id="map-reset">适配</button></div></div><div class="map-scroll" id="map-scroll"><div class="map-canvas" id="map-canvas"></div></div><div class="map-caption">点击分类节点可展开/收起；左右滚动查看完整导图。</div></section>
@@ -172,6 +174,20 @@
         <p class="report-disclaimer">规则提要与 AI 生成内容均需核查原始记录。ChatGPT 草稿不会自动发送；结构化 JSON 导入后自动更新导图，但不会自动改写课题收口状态。</p>
       </section>
     </section>
+    </section>
+    <section id="workspace-map" class="workspace-pane" role="tabpanel" aria-labelledby="nav-map" hidden>
+      <section class="surface" id="wide-map-reader" aria-label="本次采集的研究思维导图">
+        <h2>本次采集的研究思维导图</h2>
+        <p id="wide-map-status" role="status" aria-live="polite">正在核对本次采集记录…</p>
+        <p id="wide-map-scope" class="caption">只读展示已保存的采集记录，不重新采集、不发送消息、不更改结论。</p>
+        <div id="wide-map-tools" class="map-controls" hidden>
+          <button id="wide-map-minus" type="button" class="secondary">缩小</button>
+          <button id="wide-map-plus" type="button" class="secondary">放大</button>
+          <button id="wide-map-fit" type="button" class="secondary">适配宽度</button>
+        </div>
+        <div class="map-scroll wide-map-scroll" id="wide-map-scroll"><div id="wide-map-canvas" class="map-canvas"></div></div>
+        <p class="caption">导图来自规则提要或未经核验的 AI 分析；请回原对话核实重要结论及其来源。采集缓存通常仅保留三天。</p>
+      </section>
     </section>
     <section id="workspace-evidence" class="workspace-pane" role="tabpanel" aria-labelledby="nav-evidence" hidden>
       <div class="workspace-intro"><h2>证据与交接</h2><p>采纳重要结论，保存原始依据与版本历史，并制作研究交接。</p></div>
@@ -215,6 +231,7 @@
   <script src="capture-core.js"></script>
   <script src="capture-db.js"></script>
   <script src="ai-core.js"></script>
+  <script src="research-map.js"></script>
   <script src="ai-providers.js"></script>
   <script src="ui-dialogs.js"></script>
   <script src="evidence-adoption-ui.js"></script>

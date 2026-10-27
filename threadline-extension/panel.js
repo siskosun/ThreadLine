@@ -13,8 +13,10 @@
   let workspace = "switch"; // normal panel retains three workspaces
   let surface="sidebar",librarySourceTabId=null,librarySourceChatKey=null;
   let libraryInitialProjectId=null,librarySelectionPending=false,libraryTabId=null;
-  let libraryWindowId=null;
+  let libraryWindowId=null,libraryMapRunId=null;
   let libraryViewWarningShown=false,libraryOpening=false;
+  let wideMapBrief=null,wideMapZoom=1,wideMapReading=0;
+  const wideMapCollapsed=new Set();
   let state = ThreadLineCore.emptyState();
   let tabs = [];
   let activeTabId = null;
@@ -143,7 +145,7 @@
   function saveLibraryView() {
     if(surface!=="library")return;
     const header=$("#library-view-project");
-    if(librarySelectionPending){
+    if(librarySelectionPending&&workspace!=="map"){
       header.textContent="查看课题：正在确认…";
       return;
     }
@@ -151,7 +153,9 @@
     const projectId=selection?.value||null;
     const project=state.projects.find(p=>p.id===projectId);
     const name=project?.name||(projectId?selection?.selectedOptions[0]?.textContent:"尚未选择");
-    header.textContent="查看课题："+(name||"尚未选择")+"（仅浏览，不改变来源关联）";
+    header.textContent=workspace==="map"
+      ? "查看采集导图："+(wideMapBrief?.title||"正在读取指定采集")+"（只读，不改变来源关联）"
+      : "查看课题："+(name||"尚未选择")+"（仅浏览，不改变来源关联）";
     if(!libraryTabId)return;
     const query=$("#evidence-query")?.value||"";
     // Very long or control-character queries are not copied into sessionStorage.
@@ -162,7 +166,7 @@
         topicProjectId:selectedId,
         sourceTabId:librarySourceTabId,sourceChatKey:librarySourceChatKey,
         workspace,filter:$("#evidence-filter-status")?.value||"all",
-        query:query.length<=160?query:""
+        query:query.length<=160?query:"",mapRunId:libraryMapRunId
       });
     }catch(error){
       if(!libraryViewWarningShown){
@@ -222,7 +226,9 @@
     }catch(error){notifyCritical("无法切回来源对话："+error.message);}
   }
   function setWorkspace(next, focusCapture=false) {
-    workspace = ["switch","research","evidence"].includes(next) ? next : "switch";
+    const allowed=surface==="library"?["switch","evidence",...(libraryMapRunId?["map"]:[])]:
+      ["switch","research","evidence"];
+    workspace = allowed.includes(next) ? next : "switch";
     document.querySelectorAll("[data-workspace]").forEach(button => {
       const selected = button.dataset.workspace === workspace;
       button.classList.toggle("selected",selected);
@@ -232,6 +238,9 @@
     $("#workspace-switch").hidden = workspace !== "switch";
     $("#workspace-research").hidden = workspace !== "research";
     $("#workspace-evidence").hidden = workspace !== "evidence";
+    $("#workspace-map").hidden = workspace !== "map";
+    if(workspace==="map")readWideMap().catch(error=>
+      $("#wide-map-status").textContent="无法读取导图："+error.message);
     if (workspace === "research" && focusCapture) {
       const tab = activeTab();
       const select = $("#capture-source");
@@ -1081,6 +1090,78 @@
     } catch(e){notifyCritical("交接已读记录失败或结果未确认："+e.message+"。请核对当前课题的交接历史后再决定是否重试。");}
   });
   window.addEventListener("threadline-evidence-changed",()=>{renderEvidence().catch(e=>notifyCritical("证据课题列表读取失败："+e.message));refresh(true);});
+  function renderWideMap(){
+    if(!wideMapBrief)return;
+    const canvas=$("#wide-map-canvas");
+    ThreadLineResearchMap.draw({canvas,brief:wideMapBrief,collapsed:wideMapCollapsed,
+      zoom:wideMapZoom,onToggle:id=>{
+        if(wideMapCollapsed.has(id))wideMapCollapsed.delete(id);
+        else wideMapCollapsed.add(id);
+        renderWideMap();
+      }});
+  }
+  function fitWideMap(){
+    const width=$("#wide-map-scroll").clientWidth;
+    wideMapZoom=Math.max(.6,Math.min(1.35,(width-26)/820));
+    renderWideMap();
+  }
+  async function readWideMap(){
+    const request=++wideMapReading,runId=libraryMapRunId;
+    const status=$("#wide-map-status"),scope=$("#wide-map-scope");
+    status.textContent="正在读取指定采集记录…";
+    $("#wide-map-tools").hidden=true;
+    $("#wide-map-canvas").replaceChildren();
+    wideMapBrief=null;
+    if(surface!=="library"||!ThreadLineLibrarySurface.isMapRunId(runId)||!runId){
+      status.textContent="没有有效采集编号；请从侧栏完成采集后明确打开本次导图。";
+      return;
+    }
+    try{
+      const run=await ThreadLineCaptureDB.getRun(runId);
+      if(request!==wideMapReading||workspace!=="map")return;
+      if(!run){
+        status.textContent="这份采集记录不存在或已过期。请返回来源对话重新采集；不会自动采集。";
+        return;
+      }
+      if(run.id!==runId||run.status!=="done"||
+        ThreadLineCaptureCore.conversationId(run.url)!==run.conversationId){
+        status.textContent="采集尚未完成，或记录来源身份不匹配；不能展示导图。";
+        return;
+      }
+      const pages=await ThreadLineCaptureDB.pages(runId);
+      if(request!==wideMapReading||workspace!=="map")return;
+      const items=ThreadLineCaptureCore.assemble(pages);
+      if(!items.length){
+        status.textContent="该采集没有可读取的文本消息；不能推断导图完整。";
+        return;
+      }
+      // This is a local read-only projection, not a new analysis, an evidence
+      // adoption, or an inference about the *currently active* ChatGPT tab.
+      const rules=ThreadLineCaptureCore.digest(items,{
+        title:run.title,complete:run.complete,url:run.url,tabId:run.tabId});
+      wideMapBrief=run.aiReport?
+        ThreadLineAI.toBrief(run.aiReport,rules,run.aiProvider||"manual"):rules;
+      status.textContent=String(run.title||"未命名采集")+
+        " · "+items.length+" 条文本消息 · "+
+        (run.complete?"网页采集已标记完整":"仅部分历史")+
+        (run.aiReport?" · 含未经独立核实的 AI 归纳":" · 规则提要");
+      scope.textContent="固定读取本地采集记录 "+runId+
+        "；不会跟随当前激活的标签页，不会写入任何课题或采纳记录。";
+      $("#wide-map-tools").hidden=false;
+      fitWideMap();
+      saveLibraryView();
+    }catch(error){
+      if(request!==wideMapReading||workspace!=="map")return;
+      status.textContent="导图读取失败："+error.message+"；本次未修改已有采集记录。";
+    }
+  }
+  $("#wide-map-minus").addEventListener("click",()=>{
+    wideMapZoom=Math.max(.5,Math.round((wideMapZoom-.1)*10)/10);renderWideMap();
+  });
+  $("#wide-map-plus").addEventListener("click",()=>{
+    wideMapZoom=Math.min(1.5,Math.round((wideMapZoom+.1)*10)/10);renderWideMap();
+  });
+  $("#wide-map-fit").addEventListener("click",fitWideMap);
   async function initializeSurface() {
     let tab=null,intent=null,saved=null;
     try{tab=await chrome.tabs.getCurrent();}catch{}
@@ -1093,11 +1174,15 @@
       }
     }
     if(!intent&&!saved)return; // ordinary side panel and direct panel.html remain unchanged
-    const view=saved||{
+    // A new explicit, tab-bound navigation intent must outrank an older
+    // sessionStorage reading position. Reload-only uses the saved position.
+    // Otherwise opening captured run B in an existing library can show run A.
+    const view=intent?{
       viewProjectId:intent.viewProjectId,topicProjectId:null,
       sourceTabId:intent.sourceTabId,sourceChatKey:intent.sourceChatKey,
-      workspace:"evidence",filter:intent.filter,query:intent.query
-    };
+      workspace:intent.workspace||"evidence",filter:intent.filter,query:intent.query,
+      mapRunId:intent.mapRunId??null
+    }:saved;
     surface="library";
     libraryTabId=tab.id;
     libraryWindowId=tab.windowId;
@@ -1108,6 +1193,7 @@
     librarySourceTabId=view.sourceTabId;
     librarySourceChatKey=view.sourceChatKey;
     libraryInitialProjectId=view.viewProjectId;
+    libraryMapRunId=view.mapRunId??null;
     librarySelectionPending=true;
     if(saved)setSelectedId(view.topicProjectId);
     $("#evidence-query").value=view.query;
@@ -1117,6 +1203,7 @@
     $("#library-header").hidden=false;
     $("#nav-research").hidden=true;
     $("#nav-research").tabIndex=-1;
+    $("#nav-map").hidden=!libraryMapRunId;
     $("#nav-switch").lastChild.textContent=" 课题与对话";
     $("#nav-evidence").lastChild.textContent=" 结论与依据";
     $("#manage-accordion").open=true;
@@ -1143,7 +1230,8 @@
   document.querySelector(".workspace-tabs").addEventListener("keydown", e => {
     if (!["ArrowLeft","ArrowRight","Home","End"].includes(e.key)) return;
     e.preventDefault();
-    const names=surface==="library"?["switch","evidence"]:["switch","research","evidence"];
+    const names=surface==="library"?["switch","evidence",...(libraryMapRunId?["map"]:[])]:
+      ["switch","research","evidence"];
     const index=names.indexOf(workspace);
     const next=e.key==="Home"?names[0]:e.key==="End"?names.at(-1):names[(index+(e.key==="ArrowLeft"?-1:1)+names.length)%names.length];
     setWorkspace(next);$("#nav-"+next).focus();

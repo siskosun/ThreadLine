@@ -177,38 +177,14 @@
       if(ThreadLineOrganizeCore.allowedChatUrl(currentRun.url))await chrome.tabs.create({url:currentRun.url,active:true});
     }catch(e){aiStatus("无法打开源对话："+e.message,true);}
   }
-  function node(tag,classes,x,y,w,h,value,parent,opts={}){
-    const n=document.createElement(tag);n.className="map-node "+classes;
-    Object.assign(n.style,{left:`${x}px`,top:`${y}px`,width:`${w}px`,height:`${h}px`});
-    n.textContent=value;
-    if(opts.click){n.setAttribute("aria-expanded",String(!collapsed.has(opts.id)));n.title="展开或收起";n.addEventListener("click",opts.click);}
-    parent.appendChild(n);return n;
-  }
-  function curve(svg,x1,y1,x2,y2){const el=document.createElementNS("http://www.w3.org/2000/svg","path");const mid=Math.round((x2-x1)*.55);el.setAttribute("d",`M ${x1} ${y1} C ${x1+mid} ${y1},${x2-mid} ${y2},${x2} ${y2}`);svg.appendChild(el);}
   function drawMap(){
     if(!brief)return;
-    const groups=brief.mode==="ai"?ThreadLineAI.mapGroups(brief):ThreadLineCaptureCore.mapModel(brief);
-    const rows=groups.map(g=>({...g,expanded:!collapsed.has(g.id),children:collapsed.has(g.id)?0:Math.min(4,g.items.length)}));
-    const padding=30,leafGap=70;
-    let y=padding;
-    for(const r of rows){const height=Math.max(78,r.children*leafGap+12);r.top=y;r.h=height;r.mid=y+height/2;y+=height+22;}
-    const H=Math.max(310,y+20),W=820,c=$("map-canvas");
-    c.replaceChildren();c.style.width=W+"px";c.style.height=H+"px";c.style.zoom=String(zoom);
-    const svg=document.createElementNS("http://www.w3.org/2000/svg","svg");svg.classList.add("map-lines");svg.setAttribute("width",W);svg.setAttribute("height",H);svg.setAttribute("viewBox",`0 0 ${W} ${H}`);c.appendChild(svg);
-    node("div","root",12,H/2-35,160,70,brief.title,c);
-    for(const group of rows){
-      const groupY=group.mid-25;
-      curve(svg,172,H/2,238,group.mid);
-      node("button","group",238,groupY,150,50,`${group.expanded?"−":"＋"} ${group.label}`,c,{id:group.id,click:()=>{if(collapsed.has(group.id))collapsed.delete(group.id);else collapsed.add(group.id);drawMap();}});
-      if(group.expanded){
-        const count=group.children;
-        for(let i=0;i<count;i++){
-          const leafY=group.top+6+i*leafGap;
-          curve(svg,388,group.mid,445,leafY+25);
-          node("div","leaf",445,leafY,350,52,group.items[i],c);
-        }
-      }
-    }
+    ThreadLineResearchMap.draw({canvas:$("map-canvas"),brief,collapsed,zoom,
+      onToggle:id=>{
+        if(collapsed.has(id))collapsed.delete(id);
+        else collapsed.add(id);
+        drawMap();
+      }});
   }
   function modifyZoom(delta){zoom=Math.max(.5,Math.min(1.5,Math.round((zoom+delta)*10)/10));drawMap();}
   async function newChat(deep=false){
@@ -226,6 +202,32 @@
     if(!currentId||!confirm("清除这份对话采集的本地正文和提要？不会删除 ChatGPT 原始对话。"))return;
     try{await ThreadLineCaptureDB.remove(currentId);await chrome.storage.local.set({tl_last_capture_id:""});currentId="";currentRun=null;lastCompleted="";brief=null;rulesBrief=null;linkedProjectId=null;messages=[];$("capture-report").hidden=true;$("capture-progress").hidden=true;showError("");}
     catch(e){showError("无法清除："+e.message);}
+  }
+  async function openWideMap(){
+    const run=currentRun;
+    if(!run||run.status!=="done"||!run.id){
+      showError("请先完成这次采集再打开导图。");return;
+    }
+    if(ThreadLineCaptureCore.conversationId(run.url)!==run.conversationId){
+      showError("采集记录的来源身份不一致，已停止打开导图。");return;
+    }
+    try{
+      const win=await chrome.windows.getCurrent();
+      const source=await chrome.tabs.get(run.tabId).catch(()=>null);
+      const validSource=source&&
+        ThreadLineCaptureCore.conversationId(source.url)===run.conversationId;
+      const result=await ThreadLineLibrarySurface.open({
+        workspace:"map",mapRunId:run.id,windowId:win.id,
+        viewProjectId:linkedProjectId,
+        sourceTabId:validSource?source.id:null,
+        sourceChatKey:validSource?"chat:"+run.conversationId:null
+      });
+      showProgress(result.reused?
+        "已在原资料库宽页打开本次思维导图。":
+        "已打开本次采集的宽页思维导图。");
+    }catch(error){
+      showError("打开宽页思维导图失败："+error.message+"；原始采集与提要未改变。");
+    }
   }
   async function copyDigest(){if(!brief)return;try{await navigator.clipboard.writeText(ThreadLineCaptureCore.handoff(brief));showProgress("提要已复制到剪贴板");}catch(e){showError("复制失败："+e.message);}}
   function aiStatus(value,isError=false){
@@ -412,6 +414,7 @@
     $("report-new-chat").addEventListener("click",()=>newChat(false));
     $("report-ai").addEventListener("click",()=>newChat(true));
     $("report-copy").addEventListener("click",copyDigest);
+    $("report-open-wide-map").addEventListener("click",openWideMap);
     $("report-delete").addEventListener("click",clearCurrent);
     $("map-details").addEventListener("toggle",()=>{
       // A collapsed map has zero content width; recalculate only after the

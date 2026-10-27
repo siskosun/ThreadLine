@@ -233,3 +233,30 @@ html[data-surface="library"] #workspace-switch #advanced-accordion .manage-conte
 .research-tool-details>.map-section{margin:0;padding:14px 6px 10px;border:0;
   border-top:1px solid #edf0f5;max-width:100%}
 .research-tool-details .map-scroll{max-width:100%}
+
+
+/* UI-D3 read-only map workspace. Sidebar retains the renderer behind a
+ * compatibility-hidden element but has only one explicit wide-map action. */
+html:not([data-surface="library"]) #map-details{display:none!important}
+#report-open-wide-map{width:100%;min-height:44px}
+html:not([data-surface="library"]) #nav-map,
+html:not([data-surface="library"]) #workspace-map{display:none!important}
+html[data-surface="library"] #wide-map-reader{
+  padding:18px 18px 22px;min-width:0
+}
+#wide-map-reader h2{font-size:18px;color:#25476a;margin:0 0 10px}
+#wide-map-status{font-size:13px;line-height:1.6;overflow-wrap:anywhere;color:#365676}
+#wide-map-scope{font-size:12px;line-height:1.6;overflow-wrap:anywhere;color:#60758a}
+#wide-map-tools{justify-content:flex-start;gap:9px;padding:10px 0 12px}
+#wide-map-tools button{font-size:13px;min-height:40px;padding:8px 13px}
+#wide-map-scroll{
+  border:1px solid #dbe5ef;border-radius:12px;background:#fbfdff;
+  min-height:300px;max-height:min(72vh,900px);width:100%;
+  overflow:auto;padding:12px
+}
+#wide-map-scroll .map-canvas{transform-origin:top left}
+@media(min-width:860px){#wide-map-scroll{min-height:460px}}
+@media(max-width:480px){
+  html[data-surface="library"] #wide-map-reader{padding:12px}
+  #wide-map-tools{flex-wrap:wrap}
+}

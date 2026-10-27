@@ -39,6 +39,9 @@ function fakeApi({failUpdate=false,failSet=false}={}){
       },
       async remove(id){events.push("close:"+id);
         const i=openTabs.findIndex(t=>t.id===id);if(i>=0)openTabs.splice(i,1);
+      },
+      async reload(id){events.push("reload:"+id);
+        if(failUpdate)throw Error("navigation blocked");
       }
     },
     windows:{async update(id,opts){events.push("focus:"+id);assert.equal(opts.focused,true);}}
@@ -169,4 +172,68 @@ test("UI-D1 interrupted navigation removes temporary intent and blank tab",async
     assert.ok(fake.events.includes("close:41"));
     assert.ok(fake.events.includes("remove"));
   }
+});
+
+const CAP="cap_00000000-0000-4000-8000-000000000001";
+test("UI-D3 does not open a map without an explicit validated capture run",async()=>{
+ for(const candidate of ["cap_foo","cap_00000000-0000-4000-8000-000000000001\n",
+  "tab:6",null]){
+  const fake=fakeApi();
+  await assert.rejects(()=>Surface.open({workspace:"map",mapRunId:candidate,windowId:5},
+    fake.api,500),/无效/);
+  assert.equal(fake.openTabs.length,0);
+  assert.deepEqual(fake.events,[]);
+ }
+ const fake=fakeApi();
+ const valid=await Surface.open({workspace:"map",mapRunId:CAP,windowId:5,
+  sourceTabId:3,sourceChatKey:"chat:stable-a"},fake.api,500);
+ assert.equal(valid.reused,false);
+ const intent=await Surface.consume(valid.tabId,fake.api,501);
+ assert.equal(intent.mapRunId,CAP);
+ assert.equal(intent.workspace,"map");
+ assert.equal(intent.sourceChatKey,"chat:stable-a");
+ assert.equal(intent.viewProjectId,null);
+});
+test("UI-D3 explicit map navigation reloads exactly one registered same-window library and never duplicates",async()=>{
+ const fake=fakeApi(),now=500;
+ const first=await Surface.open({viewProjectId:"tp_A",windowId:5},fake.api,now);
+ await Surface.consume(first.tabId,fake.api,now+1);
+ await Surface.registerOpen(fake.openTabs[0],fake.api);
+ const newMap=await Surface.open({workspace:"map",mapRunId:CAP,windowId:5},fake.api,now+2);
+ assert.equal(newMap.reused,true);
+ assert.equal(newMap.navigated,true);
+ assert.deepEqual(fake.events.filter(e=>e.startsWith("reload:")),["reload:"+first.tabId]);
+ assert.equal(fake.openTabs.filter(t=>t.windowId===5).length,1);
+ const intent=await Surface.consume(first.tabId,fake.api,now+3);
+ assert.equal(intent.workspace,"map");
+ assert.equal(intent.mapRunId,CAP);
+ assert.equal(await Surface.consume(first.tabId,fake.api,now+4),null);
+ const regular=await Surface.open({viewProjectId:"tp_B",windowId:5},fake.api,now+5);
+ assert.equal(regular.reused,true);
+ assert.equal(fake.events.filter(e=>e.startsWith("reload:")).length,1,
+   "ordinary library return must not reset map or search");
+});
+test("UI-D3 reload failure removes unconsumed map intent but preserves old library tab",async()=>{
+ const fake=fakeApi({failUpdate:true});
+ fake.openTabs.push({id:88,windowId:5,url:fake.api.runtime.getURL("panel.html")});
+ await Surface.registerOpen(fake.openTabs[0],fake.api);
+ await assert.rejects(()=>Surface.open({workspace:"map",mapRunId:CAP,windowId:5},
+   fake.api,500),/navigation blocked/);
+ assert.equal(fake.store[Surface.key(88)],undefined);
+ assert.equal(fake.openTabs.length,1);
+});
+test("UI-D3 map reading state is exact-tab scoped and cannot become another browser's work target",()=>{
+ const mem=memoryStorage();
+ const record={viewProjectId:"tp_A",topicProjectId:"tp_A",
+   sourceTabId:null,sourceChatKey:null,workspace:"map",
+   filter:"all",query:"",mapRunId:CAP};
+ Surface.saveView(41,record,mem);
+ assert.equal(Surface.loadView(41,mem).mapRunId,CAP);
+ assert.equal(Surface.loadView(42,mem),null);
+ assert.equal(Surface.loadView(41,mem),null,
+   "attempted cloned-tab read invalidates the one-tab reload slot");
+ Surface.saveView(41,record,mem);
+ assert.throws(()=>Surface.saveView(41,{...record,mapRunId:"cap_invalid"},mem),/无效/);
+ assert.equal(Surface.loadView(41,mem).mapRunId,CAP,
+   "invalid write leaves the legitimate current tab's state untouched");
 });
