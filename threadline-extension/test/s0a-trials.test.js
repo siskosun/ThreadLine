@@ -39,7 +39,12 @@ test("help and non-designer coverage are separate requirements",()=>{
   let r=rows();r[0].assisted=true;assert.equal(P.summarize(r).thresholdsMet,true);
   r[1].assisted=true;assert.equal(P.summarize(r).thresholdsMet,false);
   r=rows();r[3].nonDesigner=false;assert.equal(P.summarize(r).thresholdsMet,false);
-  r=rows();r[0].elapsedMs=90000;assert.equal(P.summarize(r).thresholdsMet,false);
+  r=rows();r[0].elapsedMs=90000;
+  assert.equal(P.summarize(r).thresholdsMet,true,
+    "one outlier does not move nearest-rank P90 in 12 observations");
+  r[1].elapsedMs=90000;
+  assert.equal(P.summarize(r).thresholdsMet,false,
+    "two outliers do move the 11th order statistic above 60 seconds");
   r=rows();r[0].elapsedMs=NaN;assert.equal(P.summarize(r).thresholdsMet,false);
 });
 test("timing statistics exclude unknown attempts without silently treating unknown as success",()=>{
