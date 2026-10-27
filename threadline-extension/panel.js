@@ -8,6 +8,7 @@
     if(selectedId!==value){selectedId=value;selectionRevision++;}
   };
   let filter = "all";
+  let editDetailsProjectId=null; // presentation-only; never a write target
   let workspace = "switch"; // normal panel retains three workspaces
   let surface="sidebar",librarySourceTabId=null,librarySourceChatKey=null;
   let libraryInitialProjectId=null,librarySelectionPending=false,libraryTabId=null;
@@ -347,6 +348,8 @@
       <div class="detail-head"><div><h2>课题详情</h2><div class="details-mini">${branches.length} 条分支 · v${p.knowledgeVersion||0} · ${p.stage==="closed"?"已收口":"进行中"}</div></div>
       <button class="text-button" data-action="collapse-details">收起详情 ↑</button></div>
       ${p.stage==="closed"?'<div class="warning">课题已收口：所有关联 ChatGPT 对话都会出现提醒，并尝试拦截旧窗口的新发送。</div>':''}
+      <details id="topic-edit-details" class="topic-edit-details" ${editDetailsProjectId===p.id?"open":""}>
+        <summary>编辑课题信息 <small>名称、目标、有效结论</small></summary>
       <div id="edit-form">
         <div class="field"><label for="edit-name">课题名称</label><input id="edit-name" maxlength="80" value="${escape(p.name)}" /></div>
         <div class="field"><label for="edit-goal">当前研究目标 <span class="hint">（可选）</span></label><textarea id="edit-goal" maxlength="600" placeholder="这次研究究竟在回答什么问题？">${escape(p.goal)}</textarea></div>
@@ -354,6 +357,7 @@
         <div class="detail-controls"><button class="primary" data-action="save-details">保存课题状态</button>
         <button class="${p.stage==='closed'?'soft':'danger'}" data-action="toggle-close">${p.stage==='closed'?'重新开启课题':'收口整个课题'}</button></div>
       </div>
+      </details>
       <details class="history-details"><summary>课题结论与状态变更记录（最近 ${Math.min((p.history||[]).length,8)} 条）</summary>${hist||'<p class="caption">旧版本没有差异历史，从下次修改开始记录。</p>'}</details>
       <div class="divider"></div>
       <div class="branch-title">关联对话 <span class="badge muted">${branches.length}</span></div>
@@ -470,6 +474,11 @@
     });
   });
   document.addEventListener("click",async event=>{
+    const editSummary=event.target.closest("#topic-edit-details > summary");
+    if(editSummary){
+      editDetailsProjectId=editSummary.parentElement.open?null:selectedId;
+      return; // native details handles expansion; preserve it after re-render
+    }
     const nav=event.target.closest("[data-workspace]");
     if (nav){setWorkspace(nav.dataset.workspace);return;}
     const f=event.target.closest("[data-filter]");
