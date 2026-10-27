@@ -6,12 +6,17 @@
   const PREFIX="tl_library_intent_v1_";
   const TTL_MS=120000;
   const MAX_ID=128;
+  const RELOAD_KEY="tl_library_view_v1";
+  const VALID_WORKSPACES=new Set(["switch","evidence"]);
+  const VALID_FILTERS=new Set(["all","active","withdrawn"]);
   const key=tabId=>PREFIX+tabId;
   const isTabId=value=>Number.isSafeInteger(value)&&value>0;
   const isProjectId=value=>value===null||(typeof value==="string"&&value.length>0&&
     value.length<=MAX_ID&&!/[\u0000-\u001f\u007f]/.test(value));
-  const isChatKey=value=>value===null||(typeof value==="string"&&value.length>0&&
-    value.length<=256&&!/[\u0000-\u001f\u007f]/.test(value));
+  // A tab:NN fallback is not a stable conversation identity. Do not pin
+  // return-navigation or diagnostics to an unsaved/new-chat tab.
+  const isChatKey=value=>value===null||
+    (typeof value==="string"&&/^chat:[a-z0-9-]{1,240}$/.test(value));
   function validIntent(record,tabId,now=Date.now()){
     return !!record&&typeof record==="object"&&
       record.schema===1&&isTabId(tabId)&&record.tabId===tabId&&
@@ -58,7 +63,45 @@
     }
     return validIntent(result?.[k],tabId,now)?result[k]:null;
   }
-  const exposed=Object.freeze({TTL_MS,key,isTabId,isProjectId,isChatKey,validIntent,open,consume});
+  // sessionStorage is scoped to this extension tab. A reload can resume the
+  // reading surface without reusing the one-shot chrome.storage.session intent.
+  // A duplicated tab has a different Chrome tab ID and must not inherit this view.
+  // This is UI navigation state, never authorization or an operation target.
+  function validView(view,tabId){
+    return !!view&&typeof view==="object"&&view.schema===1&&isTabId(tabId)&&
+      view.tabId===tabId&&isProjectId(view.viewProjectId)&&isProjectId(view.topicProjectId)&&
+      isChatKey(view.sourceChatKey)&&
+      (view.sourceTabId===null
+        ? view.sourceChatKey===null
+        : isTabId(view.sourceTabId)&&view.sourceChatKey!==null)&&
+      VALID_WORKSPACES.has(view.workspace)&&VALID_FILTERS.has(view.filter)&&
+      typeof view.query==="string"&&view.query.length<=160&&
+      !/[\u0000-\u001f\u007f]/.test(view.query);
+  }
+  function saveView(tabId,view,storage=root?.sessionStorage){
+    const record={schema:1,tabId,
+      viewProjectId:view.viewProjectId??null,
+      topicProjectId:view.topicProjectId??null,
+      sourceTabId:view.sourceTabId??null,
+      sourceChatKey:view.sourceChatKey??null,
+      workspace:view.workspace,filter:view.filter,query:view.query??""};
+    if(!validView(record,tabId))throw new Error("资料库阅读状态无效");
+    storage.setItem(RELOAD_KEY,JSON.stringify(record));
+    return record;
+  }
+  function loadView(tabId,storage=root?.sessionStorage){
+    if(!isTabId(tabId))return null;
+    const raw=storage.getItem(RELOAD_KEY);
+    if(raw===null)return null;
+    try{
+      const record=JSON.parse(raw);
+      if(validView(record,tabId))return record;
+    }catch{}
+    storage.removeItem(RELOAD_KEY);
+    return null;
+  }
+  const exposed=Object.freeze({TTL_MS,RELOAD_KEY,key,isTabId,isProjectId,isChatKey,
+    validIntent,validView,open,consume,saveView,loadView});
   if(typeof module!=="undefined"&&module.exports)module.exports=exposed;
   if(root)root.ThreadLineLibrarySurface=exposed;
 })(typeof globalThis!=="undefined"?globalThis:null);
