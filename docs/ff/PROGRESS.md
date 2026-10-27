@@ -68,7 +68,7 @@
 
 - 在 `ff-core.js` 新增纯显示函数，从冻结的 P 派生最多 42 个 Unicode 码点的标题；空指令或非空白控制字符返回无标题。普通换行/制表符折叠为空格。标题不写入实验记录，不参与哈希、revision、分支映射、裁决或导入导出。
 - `FF_LIST` 仅返回派生短标题，不返回完整任务正文；列表展示标题、日期、真实 K 和各分支状态。重复标题、无效标题回退到完整实验 ID；详情保留完整冻结文本并新增显式复制实验 ID 按钮。
-- Node 与合成 Chromium 测试覆盖 K=2/3/4、done/failed/unknown/pending、同名任务、长中文截断后完整指令可读、控制字符回退和复制 ID。准确 HEAD 的 Linux/Windows CI 待核验；真实用户、读屏器和完整 WCAG 未执行。
+- Node 与合成 Chromium 测试覆盖 K=2/3/4、done/failed/unknown/pending、同名任务、长中文截断后完整指令可读、控制字符回退和复制 ID。代码 HEAD `fb53abdf919b8d22ef8ff5f65b5d8450124de761` 的 [Linux CI](https://github.com/siskosun/ThreadLine/actions/runs/40342294400)（`npm run verify` 与合成 Chromium `test:e2e`）和 [Windows CI](https://github.com/siskosun/ThreadLine/actions/runs/40342294457) 均 success；本记录更新仍需以新的准确 HEAD 复验。真实用户、读屏器和完整 WCAG 未执行，未做独立人工签署。
 
 
 ## 2026-10-26 #47 主线同步与文档无变更守卫修复
