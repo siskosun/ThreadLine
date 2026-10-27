@@ -187,9 +187,10 @@ def run():
             library.wait_for_function("() => document.documentElement.dataset.surface==='library'")
             library.wait_for_function("() => document.querySelector('#nav-switch').getAttribute('aria-selected')==='true'")
             library.wait_for_function(
-                "id => document.querySelector('#topic-list [data-id="'+id+'"]')?.getAttribute('aria-pressed')==='true'",
+                "id => [...document.querySelectorAll('#topic-list [data-id]')].some(node => node.dataset.id===id && node.getAttribute('aria-pressed')==='true')",
                 arg=other)
-            assert library.locator("#evidence-project").input_value()==other
+            library.wait_for_function(
+                "id => document.querySelector('#evidence-project').value===id",arg=other)
 
             # A second library tab receives independent context; no global last-project.
             with context.expect_page() as opened2:
