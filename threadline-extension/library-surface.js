@@ -4,6 +4,7 @@
 (function(root){
   "use strict";
   const PREFIX="tl_library_intent_v1_";
+  const OPEN_PREFIX="tl_library_open_v1_";
   const TTL_MS=120000;
   const MAX_ID=128;
   const RELOAD_KEY="tl_library_view_v1";
@@ -12,6 +13,8 @@
   const isQuery=value=>typeof value==="string"&&value.length<=160&&
     !/[\u0000-\u001f\u007f]/.test(value);
   const key=tabId=>PREFIX+tabId;
+  const openKey=tabId=>OPEN_PREFIX+tabId;
+  const isWindowId=value=>Number.isSafeInteger(value)&&value>=0;
   const isTabId=value=>Number.isSafeInteger(value)&&value>0;
   const isProjectId=value=>value===null||(typeof value==="string"&&value.length>0&&
     value.length<=MAX_ID&&!/[\u0000-\u001f\u007f]/.test(value));
@@ -31,24 +34,62 @@
         ? record.sourceChatKey===null
         : isTabId(record.sourceTabId)&&record.sourceChatKey!==null);
   }
+  function validOpen(record,tab) {
+    return !!record&&typeof record==="object"&&
+      isTabId(tab?.id)&&isWindowId(tab?.windowId)&&
+      record.schema===1&&record.tabId===tab.id&&
+      record.windowId===tab.windowId;
+  }
+  async function registerOpen(tab,api=chrome){
+    if(!isTabId(tab?.id)||!isWindowId(tab?.windowId))
+      throw new Error("无法登记资料库页面身份");
+    await api.storage.session.set({[openKey(tab.id)]:{
+      schema:1,tabId:tab.id,windowId:tab.windowId
+    }});
+  }
+  async function findOpen(api,windowId,now=Date.now()){
+    if(!isWindowId(windowId))return null;
+    const exact=api.runtime.getURL("panel.html");
+    // Only tabs in the caller's own window. No global selected project.
+    const tabs=await api.tabs.query({windowId,url:exact});
+    for(const tab of tabs){
+      if(tab.url!==exact||tab.windowId!==windowId||!isTabId(tab.id))continue;
+      const known=await api.storage.session.get([openKey(tab.id),key(tab.id)]);
+      if(validOpen(known[openKey(tab.id)],tab)||
+        validIntent(known[key(tab.id)],tab.id,now))
+        return tab;
+    }
+    return null;
+  }
   async function open({viewProjectId=null,sourceTabId=null,sourceChatKey=null,
-    filter="all",query=""}={},api=chrome,now=Date.now()){
+    filter="all",query="",windowId=null}={},api=chrome,now=Date.now()){
     if(!isProjectId(viewProjectId)||!isChatKey(sourceChatKey)||
       !VALID_FILTERS.has(filter)||!isQuery(query)||
       (sourceTabId===null?sourceChatKey!==null:!isTabId(sourceTabId)||sourceChatKey===null))
       throw new Error("资料库导航参数无效");
+    if(windowId!==null&&!isWindowId(windowId))
+      throw new Error("资料库窗口编号无效");
+    // Reuse a real existing library tab without overwriting its reading state.
+    // Repeated returns must not create a growing stack of wide pages.
+    const previous=await findOpen(api,windowId,now);
+    if(previous){
+      await api.tabs.update(previous.id,{active:true});
+      if(api.windows?.update)await api.windows.update(previous.windowId,{focused:true});
+      return {tabId:previous.id,reused:true};
+    }
     let tab=null;
     try{
       // Create a blank tab, persist target-tab-scoped context, then navigate.
       // The page cannot win a race against session storage setup.
-      tab=await api.tabs.create({url:"about:blank",active:false});
+      tab=await api.tabs.create({url:"about:blank",active:false,
+        ...(windowId!==null?{windowId}:{})});
       if(!isTabId(tab?.id))throw new Error("无法确认资料库标签页");
       await api.storage.session.set({[key(tab.id)]:{
         schema:1,tabId:tab.id,viewProjectId,sourceTabId,sourceChatKey,
         filter,query,createdAt:now
       }});
       await api.tabs.update(tab.id,{url:api.runtime.getURL("panel.html"),active:true});
-      return {tabId:tab.id};
+      return {tabId:tab.id,reused:false};
     }catch(error){
       if(isTabId(tab?.id)){
         await api.storage.session.remove(key(tab.id)).catch(()=>{});
@@ -105,8 +146,9 @@
     storage.removeItem(RELOAD_KEY);
     return null;
   }
-  const exposed=Object.freeze({TTL_MS,RELOAD_KEY,key,isTabId,isProjectId,isChatKey,
-    validIntent,validView,open,consume,saveView,loadView});
+  const exposed=Object.freeze({TTL_MS,RELOAD_KEY,key,openKey,isTabId,isWindowId,
+    isProjectId,isChatKey,validIntent,validView,validOpen,
+    findOpen,registerOpen,open,consume,saveView,loadView});
   if(typeof module!=="undefined"&&module.exports)module.exports=exposed;
   if(root)root.ThreadLineLibrarySurface=exposed;
 })(typeof globalThis!=="undefined"?globalThis:null);
