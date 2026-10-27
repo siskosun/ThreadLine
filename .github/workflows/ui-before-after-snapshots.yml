@@ -1,0 +1,46 @@
+name: Capture paired extension source for UI comparison
+
+on:
+  push:
+    branches:
+      - chore/ui-before-after-snapshot-20261027
+
+permissions:
+  contents: read
+
+jobs:
+  collect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout approved before main snapshot
+        uses: actions/checkout@v4
+        with:
+          ref: 52f44779a00890e3e06f762d989f93765a872bec
+          path: before
+      - name: Checkout approved after UI-D1 snapshot
+        uses: actions/checkout@v4
+        with:
+          ref: 98a314ef2455685932d03b9b54b37152ff0a15d5
+          path: after
+      - name: Package both exact extension snapshots
+        run: |
+          python - <<'PY'
+          import zipfile
+          from pathlib import Path
+          dest=Path("threadline-comparison-source-pair.zip")
+          with zipfile.ZipFile(dest,"w",zipfile.ZIP_DEFLATED) as archive:
+              for stage in ["before","after"]:
+                  base=Path(stage)/"threadline-extension"
+                  assert (base/"manifest.json").is_file(),stage
+                  for f in sorted(base.rglob("*")):
+                      if f.is_file() and not any(p in ("node_modules",".git","__pycache__") for p in f.parts):
+                          archive.write(f,Path(stage)/f.relative_to(base))
+          print(dest, dest.stat().st_size)
+          PY
+      - name: Upload exact immutable source pair
+        uses: actions/upload-artifact@v4
+        with:
+          name: threadline-ui-comparison-source-pair
+          path: threadline-comparison-source-pair.zip
+          retention-days: 3
