@@ -9,7 +9,8 @@
   };
   let filter = "all";
   let workspace = "switch"; // normal panel retains three workspaces
-  let surface="sidebar",librarySourceTabId=null,libraryInitialProjectId=null,librarySelectionPending=false;
+  let surface="sidebar",librarySourceTabId=null,librarySourceChatKey=null;
+  let libraryInitialProjectId=null,librarySelectionPending=false;
   let state = ThreadLineCore.emptyState();
   let tabs = [];
   let activeTabId = null;
@@ -137,13 +138,14 @@
       ? ($("#evidence-project")?.value||null)
       : workspace==="switch" ? (selectedId||chatForTab(picked)?.projectId||null)
       : (chatForTab(picked)?.projectId||null);
-    try{await ThreadLineLibrarySurface.open({viewProjectId,sourceTabId});}
+    const sourceChatKey=sourceTabId?getKey(picked):null;
+    try{await ThreadLineLibrarySurface.open({viewProjectId,sourceTabId,sourceChatKey});}
     catch(error){notifyCritical("打开资料库失败："+error.message+"。原侧栏数据未改变。");}
   }
   async function returnToSource() {
     if(!librarySourceTabId){notify("没有绑定来源对话，请自行切回 ChatGPT");return;}
     const source=await chrome.tabs.get(librarySourceTabId).catch(()=>null);
-    if(!source||!ThreadLineCore.isChatURL(source.url)){
+    if(!source||!ThreadLineCore.isChatURL(source.url)||getKey(source)!==librarySourceChatKey){
       notifyCritical("原来源标签已关闭或不再是 ChatGPT 对话，请自行选择正确的来源。");return;
     }
     await chrome.tabs.update(source.id,{active:true}).catch(error=>
@@ -365,7 +367,8 @@
     const current=surface==="library"
       ? (librarySourceTabId?await chrome.tabs.get(librarySourceTabId).catch(()=>null):null)
       : activeTab();
-    if(!current||!ThreadLineCore.isChatURL(current.url)){
+    if(!current||!ThreadLineCore.isChatURL(current.url)||
+      (surface==="library"&&getKey(current)!==librarySourceChatKey)){
       host.textContent='请选择有效的 ChatGPT 来源标签页；不会检查资料库自身。';return;
     }
     host.textContent='正在执行只读自检…';
@@ -930,6 +933,7 @@
     }
     surface="library";
     librarySourceTabId=intent.sourceTabId;
+    librarySourceChatKey=intent.sourceChatKey;
     libraryInitialProjectId=intent.viewProjectId;
     librarySelectionPending=true;
     document.documentElement.dataset.surface="library";
@@ -943,11 +947,11 @@
     const context=$("#library-context-text");
     if(librarySourceTabId){
       const source=await chrome.tabs.get(librarySourceTabId).catch(()=>null);
-      if(source&&ThreadLineCore.isChatURL(source.url))
+      if(source&&ThreadLineCore.isChatURL(source.url)&&getKey(source)===librarySourceChatKey)
         context.textContent="来源对话："+(source.title||"未命名")+
           "。查看别的课题不会改变此来源或任何采集任务。";
       else{
-        librarySourceTabId=null;
+        librarySourceTabId=null;librarySourceChatKey=null;
         context.textContent="原来源对话已关闭或改变；请明确选择课题，不能据此运行网页自检。";
       }
     }else context.textContent="来源对话未指定；只浏览研究资料，操作目标由当前选中的课题决定。";
