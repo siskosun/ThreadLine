@@ -114,6 +114,8 @@
         <div id="report-warning" class="report-note" hidden></div>
         <p id="report-ai-meta" class="report-ai-meta" hidden></p>
         <div id="report-groups"></div>
+        <details id="ai-analysis-details" class="research-tool-details">
+          <summary>AI 深度整理 <span>可选 · 按需展开</span></summary>
         <section class="ai-workbench" aria-label="AI 深度分析">
           <div class="ai-head"><h3>AI 深度整理</h3><span class="badge muted">可选</span></div>
           <p class="ai-help">默认手动分析：复制结构化提示，在 ChatGPT 自行发送，再导入核对后的 JSON。网页自动分析仍是实验功能，只有主动切换并确认后才会操作网页；任何方式均不会自动修改课题收口状态。</p>
@@ -138,7 +140,13 @@
           <div class="ai-actions"><button id="ai-reset" hidden>恢复原始规则提要</button></div>
           <p class="ai-help">自动模式会将采集到的对话文本发往所选模型服务。官方 ChatGPT 计划 OAuth 授权暂未接入；网页实验模式通过已登录的页面发送提示词，并非官方 Responses API 授权。扩展不读取登录令牌，也不持久保存独立 API Key。</p>
         </section>
+        </details>
+        <details id="map-details" class="research-tool-details">
+          <summary>研究思维导图 <span>可视化 · 按需展开</span></summary>
         <section class="map-section" aria-label="思维导图"><div class="map-controls"><h3>研究思维导图</h3><div class="buttons"><button id="map-minus" title="缩小">−</button><button id="map-plus" title="放大">＋</button><button id="map-reset">适配</button></div></div><div class="map-scroll" id="map-scroll"><div class="map-canvas" id="map-canvas"></div></div><div class="map-caption">点击分类节点可展开/收起；左右滚动查看完整导图。</div></section>
+        </details>
+        <details id="source-actions-details" class="research-tool-details">
+          <summary>源对话网页操作 <span>建项目、移入、归档</span></summary>
         <section class="remote-actions" aria-label="在 ChatGPT 网页整理已分析对话">
           <div class="remote-head"><h3>整理到 ChatGPT 网页</h3><span class="badge muted">单次操作</span></div>
           <p class="ai-help">以下按钮作用于<strong>本次采集的原始对话</strong>，不是 ThreadLine 本地临时课题。若网页控件变化，操作会停止并提供手动处理提示。</p>
@@ -148,6 +156,7 @@
           <p id="report-organize-status" class="remote-status" role="status" aria-live="polite"></p>
           <button id="report-open-source" class="remote-source" hidden>打开源对话，手动检查操作结果</button>
         </section>
+        </details>
         <div class="report-actions"><button id="report-promote-state" class="promote-btn" hidden>逐条选择候选结论</button></div>
         <section id="promote-review" class="promote-review" hidden aria-label="审核课题有效结论">
           <h3>审核即将共享的结论</h3>
