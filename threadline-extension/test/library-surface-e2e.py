@@ -106,6 +106,8 @@ def run():
             assert library.locator("#library-launch").is_hidden()
             assert library.locator("#library-header").is_visible()
             assert library.locator("#evidence-handoff").is_hidden(), "D1 keeps writes in sidebar"
+            library.wait_for_function(
+                "() => document.querySelector('#evidence-list-count').textContent.includes('匹配 200 / 200')")
             assert library.get_by_text("匹配 200 / 200 条结论").is_visible()
             library.locator("#evidence-query").fill("稀有核查词")
             library.wait_for_function("() => document.querySelector('#evidence-list-count').textContent.includes('匹配 1 / 200')")
@@ -116,8 +118,18 @@ def run():
             item.get_by_role("button",name="查看版本历史（2）").click()
             library.wait_for_function(
                 "() => document.querySelectorAll('#evidence-list .evidence-history-version').length >= 2")
-            assert "唯一目标结论" in item.inner_text()
-            assert "仅限合成的第二版" in item.inner_text()
+            versions=item.locator(".evidence-history-version")
+            assert versions.count()==2
+            versions.first.locator(":scope > summary").click()
+            assert "唯一目标结论：稀有核查词" in versions.first.locator(
+                ".evidence-history-fulltext").first.inner_text()
+            assert "只用于合成测试" in versions.first.inner_text()
+            source_details=versions.first.locator(".evidence-history-source")
+            assert source_details.count()>=1
+            source_details.first.locator(":scope > summary").click()
+            assert "合成原始依据" in source_details.first.inner_text()
+            versions.nth(1).locator(":scope > summary").click()
+            assert "仅限合成的第二版" in versions.nth(1).inner_text()
             assert item.get_by_role("button",name="修订").is_hidden()
             assert item.get_by_role("button",name="撤回").is_hidden()
             # No change to evidence count or versions from read-only browsing.
