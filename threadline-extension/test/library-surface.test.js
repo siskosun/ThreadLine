@@ -230,7 +230,10 @@ test("UI-D3 map reading state is exact-tab scoped and cannot become another brow
  Surface.saveView(41,record,mem);
  assert.equal(Surface.loadView(41,mem).mapRunId,CAP);
  assert.equal(Surface.loadView(42,mem),null);
+ assert.equal(Surface.loadView(41,mem),null,
+   "attempted cloned-tab read invalidates the one-tab reload slot");
+ Surface.saveView(41,record,mem);
  assert.throws(()=>Surface.saveView(41,{...record,mapRunId:"cap_invalid"},mem),/无效/);
  assert.equal(Surface.loadView(41,mem).mapRunId,CAP,
-   "invalid view write leaves the current valid reading state untouched");
+   "invalid write leaves the legitimate current tab's state untouched");
 });
