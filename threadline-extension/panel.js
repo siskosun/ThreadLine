@@ -1174,12 +1174,15 @@
       }
     }
     if(!intent&&!saved)return; // ordinary side panel and direct panel.html remain unchanged
-    const view=saved||{
+    // A new explicit, tab-bound navigation intent must outrank an older
+    // sessionStorage reading position. Reload-only uses the saved position.
+    // Otherwise opening captured run B in an existing library can show run A.
+    const view=intent?{
       viewProjectId:intent.viewProjectId,topicProjectId:null,
       sourceTabId:intent.sourceTabId,sourceChatKey:intent.sourceChatKey,
       workspace:intent.workspace||"evidence",filter:intent.filter,query:intent.query,
       mapRunId:intent.mapRunId??null
-    };
+    }:saved;
     surface="library";
     libraryTabId=tab.id;
     libraryWindowId=tab.windowId;
