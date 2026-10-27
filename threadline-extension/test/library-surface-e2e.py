@@ -37,7 +37,7 @@ def run():
                 wait_until="domcontentloaded")
             panel.wait_for_selector("#library-open",state="visible")
             panel.wait_for_function("() => document.documentElement.dataset.surface !== 'library'")
-            assert "UI-D3 试用版 · PR #80" in panel.locator(".preview-build-marker").inner_text()
+            assert "UI-D3 开发预览 · main" in panel.locator(".preview-build-marker").inner_text()
             # The missing entry reported by a real installer must be prominent
             # inside the FIRST narrow sidebar viewport, not merely in the DOM.
             for width in (320,360):

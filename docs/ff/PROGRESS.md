@@ -8,6 +8,16 @@
 
 # ThreadLine 开发进度记录
 
+## 2026-10-27 UI-D0–D3 已合并 main（工程集成，不是体验签收或 Release）
+
+- 用户明确授权“合并”，按依赖顺序完成四个 GitHub PR：[#77](https://github.com/siskosun/ThreadLine/pull/77) → main `48c3487`（D0 交互契约与 PLAN）；[#78](https://github.com/siskosun/ThreadLine/pull/78) → `6919b783`（D1 宽页资料库，重复窗口复用）；[#79](https://github.com/siskosun/ThreadLine/pull/79) → `8cdc52db`（D2 折叠减负、回复停止提示与网页分析未知结果诊断）；[#80](https://github.com/siskosun/ThreadLine/pull/80) → `4050382b`（D3 本次采集只读宽页导图）。
+- D1 合并前与已入主干的 D0 在本文件冲突，通过保留双方全部内容的集成提交 `1fee1ade` 化解。准确 D1 集成 SHA 的 Linux `verify` 与 Windows 合成 MV3 最终均 success；首次 Windows Fork K=4 标签页导航未及时完成导致失败，失败日志保留，重新运行后成功；没有降低断言或挪用旧提交检查。
+- D2 集成提交 `172c0c24` 的 Linux、Windows `verify/windows-baseline` 检查成功；D3 集成提交 `fb19935e` 亦双平台成功，包括同一宽页采集 A→B→A 回归。两者均保留 D0 计划记录及完整原有测试。
+- **当前真正完成的是“功能合并”，不是四切片全部体验目标**：原侧栏仍有三个主标签，D2 采用默认折叠和高级工具分层，并未完成计划中的最终“两个任务标签”；D3 已将窄侧栏地图入口改为固定来源的宽页阅读。Fork、备份/恢复、逐条采纳及证据来源规则保留。
+- [根 README](../../README.md)、[扩展 README](../../threadline-extension/README.md)、[main 安装说明](../../threadline-extension/INSTALL_MAIN_PREVIEW.md) 随后以单独文档/标记修补 PR 更新为 **main 开发预览源码**；正式 `v0.8.2` Release 仍是旧版，不包含 D1–D3。源代码合并和 ZIP 下载不自动更新任何用户的 Edge 插件。
+- **仍阻塞**：真实 ChatGPT“深度整理已发送而无回复”的根因与端到端复测；5 位非设计者＋2 位熟练用户冻结体验任务、真实登录完整采集/导图复测、读屏和主线试点 UI SHA 冻结。没有把以上 NOT_EXECUTED 改成 PASS；`S0A/S0B/S1A/S1B` 仍 blocked，LOCATE-PREFLIGHT 仍 planned，13 行机器状态表未动。未创建 Release、未安装扩展到用户设备，也没有因 PR 合并推定正式 UX 验收通过。
+
+
 ## 2026-10-27 双层 UI 重构治理（UI-D0，文档评审候选）
 
 - 已以 main `52f44779` 为基线，将双层侧栏/宽页架构、四个隔离切片、身份隔离、最小授权和真人验收门槛写入 `docs/PLAN.md` 的独立章节，不触碰 13 行唯一机器任务表。
