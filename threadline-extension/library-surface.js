@@ -9,6 +9,8 @@
   const RELOAD_KEY="tl_library_view_v1";
   const VALID_WORKSPACES=new Set(["switch","evidence"]);
   const VALID_FILTERS=new Set(["all","active","withdrawn"]);
+  const isQuery=value=>typeof value==="string"&&value.length<=160&&
+    !/[\u0000-\u001f\u007f]/.test(value);
   const key=tabId=>PREFIX+tabId;
   const isTabId=value=>Number.isSafeInteger(value)&&value>0;
   const isProjectId=value=>value===null||(typeof value==="string"&&value.length>0&&
@@ -24,12 +26,15 @@
       Number.isSafeInteger(now)&&now-record.createdAt>=0&&
       now-record.createdAt<=TTL_MS&&
       isProjectId(record.viewProjectId)&&isChatKey(record.sourceChatKey)&&
+      VALID_FILTERS.has(record.filter)&&isQuery(record.query)&&
       (record.sourceTabId===null
         ? record.sourceChatKey===null
         : isTabId(record.sourceTabId)&&record.sourceChatKey!==null);
   }
-  async function open({viewProjectId=null,sourceTabId=null,sourceChatKey=null}={},api=chrome,now=Date.now()){
+  async function open({viewProjectId=null,sourceTabId=null,sourceChatKey=null,
+    filter="all",query=""}={},api=chrome,now=Date.now()){
     if(!isProjectId(viewProjectId)||!isChatKey(sourceChatKey)||
+      !VALID_FILTERS.has(filter)||!isQuery(query)||
       (sourceTabId===null?sourceChatKey!==null:!isTabId(sourceTabId)||sourceChatKey===null))
       throw new Error("资料库导航参数无效");
     let tab=null;
@@ -39,7 +44,8 @@
       tab=await api.tabs.create({url:"about:blank",active:false});
       if(!isTabId(tab?.id))throw new Error("无法确认资料库标签页");
       await api.storage.session.set({[key(tab.id)]:{
-        schema:1,tabId:tab.id,viewProjectId,sourceTabId,sourceChatKey,createdAt:now
+        schema:1,tabId:tab.id,viewProjectId,sourceTabId,sourceChatKey,
+        filter,query,createdAt:now
       }});
       await api.tabs.update(tab.id,{url:api.runtime.getURL("panel.html"),active:true});
       return {tabId:tab.id};
@@ -75,8 +81,7 @@
         ? view.sourceChatKey===null
         : isTabId(view.sourceTabId)&&view.sourceChatKey!==null)&&
       VALID_WORKSPACES.has(view.workspace)&&VALID_FILTERS.has(view.filter)&&
-      typeof view.query==="string"&&view.query.length<=160&&
-      !/[\u0000-\u001f\u007f]/.test(view.query);
+      isQuery(view.query);
   }
   function saveView(tabId,view,storage=root?.sessionStorage){
     const record={schema:1,tabId,
