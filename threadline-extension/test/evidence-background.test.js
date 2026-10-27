@@ -152,14 +152,16 @@ test('UX-05 history is strictly read-only even when deferred cleanup exists', as
   await s.message({type:'EV_SUMMARY',projectId:'p-taken'});
   const deleted={projectId:'ghost-deleted',deleted:true,cleanupPending:true,evidenceRevision:1};
   s.evidence.projects.set(deleted.projectId,deleted);
-  const prior=structuredClone(Object.fromEntries(s.local));
+  // The service-worker VM and Node host have different object prototypes.
+  // Compare complete serialized state, not realm-specific prototypes.
+  const prior=JSON.stringify(Object.fromEntries(s.local));
   const history=await s.message({type:'EV_HISTORY',projectId:'p-taken',
     conclusionId:adopted.conclusionId},s.panelSender);
   assert.equal(history.versions.length,1);
   assert.equal(history.versions[0].text,'历史读取不应清理其他课题');
   assert.equal(s.evidence.projects.get(deleted.projectId).cleanupPending,true,
     'history read must not finish an unrelated pending delete');
-  assert.deepEqual(Object.fromEntries(s.local),prior,
+  assert.equal(JSON.stringify(Object.fromEntries(s.local)),prior,
     'read did not change local topic snapshots, summaries or records');
 });
 
