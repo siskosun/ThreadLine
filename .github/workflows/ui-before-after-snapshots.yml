@@ -44,3 +44,29 @@ jobs:
           name: threadline-ui-comparison-source-pair
           path: threadline-comparison-source-pair.zip
           retention-days: 3
+      - name: Checkout screenshot harness (isolated branch)
+        uses: actions/checkout@v4
+        with:
+          ref: chore/ui-before-after-snapshot-20261027
+          path: harness
+      - name: Setup Playwright and Chinese fonts
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          python -m pip install playwright==1.60.0
+          python -m playwright install --with-deps chromium
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq fonts-noto-cjk
+      - name: Render before (main) at 360 CSS px
+        run: python harness/scripts/capture-ui-visual-comparison.py --stage before --extension before/threadline-extension --out compare-images
+      - name: Render after (PR 78) at 360 and 1280 CSS px
+        run: python harness/scripts/capture-ui-visual-comparison.py --stage after --extension after/threadline-extension --out compare-images
+      - name: Upload true Chromium screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: threadline-ui-real-screenshots
+          path: compare-images/*.png
+          if-no-files-found: warn
+          retention-days: 3
