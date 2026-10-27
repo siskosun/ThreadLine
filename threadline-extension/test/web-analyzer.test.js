@@ -1,11 +1,19 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
-function create(hostname='chatgpt.com'){
- let listener, clicks=0, posted='';
+function create(hostname='chatgpt.com',options={}){
+ let listener, clicks=0, posted='',submitted=false;
  const field={value:'',focus(){},dispatchEvent(){},getBoundingClientRect(){return{width:500,height:50}}};
  const assistant={innerText:'{"version":1,"objective":"研究目标"}',getBoundingClientRect(){return{width:500,height:100}}};
- const button={disabled:false,focus(){},getBoundingClientRect(){return{width:30,height:30}},click(){clicks++;posted=field.value;field.value='';}};
- const document={querySelector(s){if(s==='#prompt-textarea')return field;if(s==='[data-testid="send-button"]')return button;return null;},querySelectorAll(s){return s.includes('data-message-author-role')&&clicks?[assistant]:[];}};
- const ctx={document,location:{hostname},chrome:{runtime:{onMessage:{addListener(fn){listener=fn}}}},getComputedStyle:()=>({display:'block',visibility:'visible'}),InputEvent:class{constructor(){}},Date,Promise,setTimeout,clearTimeout,console};
+ const button={disabled:false,focus(){},getBoundingClientRect(){return{width:30,height:30}},click(){
+   clicks++;posted=field.value;
+   if(!options.blockSubmit){field.value='';submitted=true;}
+ }};
+ const document={querySelector(s){if(s==='#prompt-textarea')return field;if(s==='[data-testid="send-button"]')return button;return null;},querySelectorAll(s){
+   if(s==='[data-message-author-role="assistant"]')return submitted?[assistant]:[];
+   if(s==='[data-message-author-role="user"]')return submitted?[{innerText:posted}]:[];
+   return [];
+ }};
+ const DateClock=options.fastClock?{now:(()=>{let now=0;return()=>{now+=5000;return now;};})()}:Date;
+ const ctx={document,location:{hostname},chrome:{runtime:{onMessage:{addListener(fn){listener=fn}}}},getComputedStyle:()=>({display:'block',visibility:'visible'}),InputEvent:class{constructor(){}},Date:DateClock,Promise,setTimeout,clearTimeout,console};
  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'..','web-analyzer.js'),'utf8'),ctx);
  const send=m=>new Promise(resolve=>listener(m,{},resolve));
  return {send,get clicks(){return clicks},get posted(){return posted},field};
@@ -24,4 +32,13 @@ test('reject giant prompts and unsupported origins before sending',async()=>{
  assert.match((await x.send({type:'TL_WEB_ASK',prompt:'a'.repeat(35000)})).error,/单次输入过长/);
  assert.match((await y.send({type:'TL_WEB_ASK',prompt:'研究摘要'})).error,/不是 ChatGPT/);
  assert.equal(x.clicks,0);assert.equal(y.clicks,0);
+});
+
+test('unconfirmed click leaves draft in place and never resends automatically',async()=>{
+ const x=create('chatgpt.com',{blockSubmit:true,fastClock:true});
+ const result=await x.send({type:'TL_WEB_ASK',prompt:'请总结'});
+ assert.equal(result.ok,false);
+ assert.match(result.error,/无法确认发送/);
+ assert.equal(x.clicks,1,'a failed acknowledgement must not click Send twice');
+ assert.equal(x.field.value,'请总结');
 });
