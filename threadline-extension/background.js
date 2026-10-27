@@ -638,6 +638,7 @@ async function handleFF(payload, sender) {
         .map(([label,b]) => [label,b.status]));
       return {id:x.id, revision:x.revision, createdAt:x.createdAt,
         bytes:x.frozen?.bytes, branchCount:Object.keys(statuses).length,
+        taskTitle:ThreadLineFFCore.shortTaskTitle(x.frozen?.p),
         statuses, statusA:x.branches?.A?.status, statusB:x.branches?.B?.status};
     }).sort((a,b) => b.createdAt-a.createdAt);
   }

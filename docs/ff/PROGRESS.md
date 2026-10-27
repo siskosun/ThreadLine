@@ -64,6 +64,13 @@
 - 新增 Node 模拟及一次性 Chromium MV3：两个关联对话、单来源更新、另一分支待核对 1、人工核对后清零、启动时从本地状态重建。真实登录 ChatGPT、用户存量数据和实际使用无障碍尚未执行；不合并发布、不改 `docs/PLAN.md` 机器状态。PR 准确 HEAD/CI 另登记。
 
 
+## 2026-10-26 UX-07：Fork 列表任务标题与进度（独立候选）
+
+- 在 `ff-core.js` 新增纯显示函数，从冻结的 P 派生最多 42 个 Unicode 码点的标题；空指令或非空白控制字符返回无标题。普通换行/制表符折叠为空格。标题不写入实验记录，不参与哈希、revision、分支映射、裁决或导入导出。
+- `FF_LIST` 仅返回派生短标题，不返回完整任务正文；列表展示标题、日期、真实 K 和各分支状态。重复标题、无效标题回退到完整实验 ID；详情保留完整冻结文本并新增显式复制实验 ID 按钮。
+- Node 与合成 Chromium 测试覆盖 K=2/3/4、done/failed/unknown/pending、同名任务、长中文截断后完整指令可读、控制字符回退和复制 ID。代码 HEAD `fb53abdf919b8d22ef8ff5f65b5d8450124de761` 的 [Linux CI](https://github.com/siskosun/ThreadLine/actions/runs/40342294400)（`npm run verify` 与合成 Chromium `test:e2e`）和 [Windows CI](https://github.com/siskosun/ThreadLine/actions/runs/40342294457) 均 success；本记录更新仍需以新的准确 HEAD 复验。真实用户、读屏器和完整 WCAG 未执行，未做独立人工签署。
+
+
 ## 2026-10-26 #47 主线同步与文档无变更守卫修复
 
 - 以已合并 #46、#48、#50、#52 的 main `c4e8696f2` 为基线重新组合独立发布守卫；已确认 K=4 精确 tabId 断言与当前主分支相同，保留原实现。
