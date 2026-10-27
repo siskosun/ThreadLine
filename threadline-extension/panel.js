@@ -938,11 +938,7 @@
       try{intent=await ThreadLineLibrarySurface.consume(tab.id);}
       catch(error){notifyCritical("资料库导航意图读取失败："+error.message+"；已恢复原始侧栏布局。");}
     }
-    if(!intent){
-      setWorkspace("switch");
-      renderEvidence().catch(error=>notifyCritical("证据课题列表读取失败："+error.message));
-      return;
-    }
+    if(!intent)return; // original sidebar already initialized synchronously
     surface="library";
     librarySourceTabId=intent.sourceTabId;
     librarySourceChatKey=intent.sourceChatKey;
@@ -982,6 +978,8 @@
     const next=e.key==="Home"?names[0]:e.key==="End"?names.at(-1):names[(index+(e.key==="ArrowLeft"?-1:1)+names.length)%names.length];
     setWorkspace(next);$("#nav-"+next).focus();
   });
+  setWorkspace("switch"); // original eager navigation: no async blank panel
+  renderEvidence().catch(error=>notifyCritical("证据课题列表读取失败："+error.message));
   initializeSurface().catch(error=>
     notifyCritical("资料库初始化失败："+error.message+"。请重新打开面板核对。"));
   refresh(true);
