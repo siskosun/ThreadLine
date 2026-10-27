@@ -246,6 +246,20 @@ def run():
                 "() => document.querySelector('#evidence-project').value===''")
             assert invalid.locator("#evidence-project option:checked").inner_text().startswith("原课题不可用")
             assert invalid.locator("#evidence-handoff").is_hidden()
+            invalid_after_refresh=invalid.evaluate("""async () => {
+                const select=document.querySelector('#evidence-project');
+                return await new Promise((resolve,reject)=>{
+                  const timer=setTimeout(()=>{observer.disconnect();reject(Error('no directory refresh'))},5000);
+                  const observer=new MutationObserver(()=>{
+                    clearTimeout(timer);observer.disconnect();
+                    resolve({selected:select.value,label:select.selectedOptions[0]?.textContent||''});
+                  });
+                  observer.observe(select,{childList:true});
+                  window.dispatchEvent(new Event('threadline-evidence-changed'));
+                });
+            }""")
+            assert invalid_after_refresh["selected"]=="", invalid_after_refresh
+            assert "请选择" in invalid_after_refresh["label"], invalid_after_refresh
 
             # Direct panel.html tab remains the old three-workspace panel (no valid one-time intent).
             direct=context.new_page()
