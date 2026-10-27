@@ -951,8 +951,10 @@ function evidenceUnavailable(detail) {
 /* Only call Locked functions inside serialize. Never acquire the queue twice.
  * Persisted summaries and topic markers detect a missing/replaced authority
  * store; they are never used to reconstruct evidence or permit legacy edits. */
-async function loadEvidenceAuthorityLocked() {
-  await evidenceWorkflows().cleanupPending();
+async function loadEvidenceAuthorityLocked({skipCleanup=false}={}) {
+  // On-demand history is a strict read: pending delete/restore recovery must
+  // not run as a side effect of merely opening the history panel.
+  if(!skipCleanup)await evidenceWorkflows().cleanupPending();
   const db = await evidenceDb();
   const state = await ThreadLineEvidenceDB.snapshot(db);
   const local = await chrome.storage.local.get(null);
@@ -1093,8 +1095,8 @@ async function handleEvidence(payload, sender) {
         payload.conclusionId.length < 4 || payload.conclusionId.length > 128)
       throw new Error("该课题下不存在该结论");
     return serialize(async () => {
-      const authority = await loadEvidenceAuthorityLocked();
-      const state = await ThreadLineEvidenceDB.snapshot(authority.db);
+      const authority = await loadEvidenceAuthorityLocked({skipCleanup:true});
+      const state = authority.state;
       const projectId = payload.projectId;
       const project = state.projects[projectId];
       const conclusion = Object.values(state.conclusions).find(record =>
