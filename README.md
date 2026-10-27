@@ -1,16 +1,22 @@
-# ThreadLine（研线）
+# ThreadLine（研线） · UI-D1 试用分支
 
-> **v0.8.2 测试版** · Chrome / Edge 右侧栏研究工作台
+> **当前分支为 PR #78 的 UI-D1 开发预览版，并非已发布的 v0.8.2 正式包。** 安装后侧栏标题下方应显示「UI-D1 试用版 · PR #78」，三个标签下方应显示「在宽页打开资料库」。
 
 多条 ChatGPT 对话同时研究同一课题时，在不同窗口显示统一的有效结论、已收口状态和需核对的字段差异，避免误在旧分支继续工作。辅助提供按需对话采集、AI 整理、思维导图，以及手动触发的网页项目/归档操作。
 
-## 下载安装包
+## 下载与安装当前 UI-D1 测试分支
 
-**[下载 ThreadLine v0.8.2 安装 ZIP（GitHub Release）](https://github.com/siskosun/ThreadLine/releases/download/v0.8.2/ThreadLine-v0.8.2.zip)**
+**[下载 UI-D1 试用分支 ZIP（包含宽页入口）](https://github.com/siskosun/ThreadLine/archive/refs/heads/feat/ui-d1-library-surface-20261027.zip)**
 
-不需要构建工具。下载 ZIP → 解压 → 打开 `edge://extensions/` 或 `chrome://extensions/` → 启用开发人员模式 →「加载解压缩的扩展程序」→ 选中包含 `manifest.json` 的 `threadline-extension` 文件夹。
+下载 ZIP → 完整解压 → 在 `edge://extensions/` 或 `chrome://extensions/` 启用开发者模式 → “加载已解压的扩展程序” → **选择下载目录内的 `threadline-extension` 子文件夹**，不要选择父目录或旧版 Release 的解压目录。关闭已打开的旧侧栏并重新打开。当前侧栏顶部应显示「UI-D1 试用版 · PR #78」，三标签下有整行的「在宽页打开资料库 ↗」按钮；点击才打开新宽页标签。
 
-正式安装包须在自动化测试通过、适用的人工验收完成后，由仓库所有者在 GitHub Actions 手动批准发布；[下载 SHA256 校验文件](https://github.com/siskosun/ThreadLine/releases/download/v0.8.2/SHA256SUMS.txt)。尚未发布的新提交不能视为可安装版本；请使用上方已发布的安装包，并注意侧载扩展不会自动更新。
+**[完整安装核对与数据保护说明](threadline-extension/INSTALL_UI_D1_PREVIEW.md)**：原正式版和该候选版的基础版本字段同为 `0.8.2`，只有预览标记/本地加载路径能区别；旧版可能与新试用版同名。**不要为了排查而卸载旧版或删除其扩展目录**。不同扩展 ID 的本地资料互不共享，测试建议使用独立浏览器配置。
+
+### 正式 v0.8.2 发行版（不包含 UI-D1 宽页入口）
+
+[下载已发布的 ThreadLine v0.8.2 安装 ZIP](https://github.com/siskosun/ThreadLine/releases/download/v0.8.2/ThreadLine-v0.8.2.zip) · [SHA256](https://github.com/siskosun/ThreadLine/releases/download/v0.8.2/SHA256SUMS.txt)。
+
+正式版按独立人工验收和发布流程交付；UI-D1 候选尚未进入 main 或 Release，不能把分支源码 ZIP 当成正式发行版本。
 
 **v0.8.2 兼容性：** 旧版本地证据数据不承诺迁移或兼容，升级后请以新版重新建立的证据为准；如需保留旧证据，请自行留存 v0.8.1 安装包与本地数据副本。课题备份 JSON 的导出/导入不受影响。
 
