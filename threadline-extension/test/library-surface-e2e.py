@@ -158,6 +158,39 @@ def run():
             assert "稀有核查词" not in library.locator("#evidence-list").inner_text()
             assert "另一个课题专属结论" in library.locator("#evidence-list").inner_text()
 
+            # A library refresh must preserve this tab's view; the one-shot
+            # navigation intent is already consumed and cannot be replayed.
+            library.locator("#evidence-filter-status").select_option("active")
+            library.locator("#evidence-query").fill("另一个课题")
+            assert library.evaluate("""() => {
+                const item=JSON.parse(sessionStorage.getItem(
+                    ThreadLineLibrarySurface.RELOAD_KEY));
+                return item.viewProjectId === document.querySelector('#evidence-project').value
+                    && item.query==='另一个课题' && item.filter==='active';
+            }""")
+            library.reload(wait_until="domcontentloaded")
+            library.wait_for_function(
+                "() => document.documentElement.dataset.surface==='library'")
+            library.wait_for_function(
+                "id => document.querySelector('#evidence-project').value===id",arg=other)
+            assert library.get_by_role("tab").count()==2
+            assert library.locator("#evidence-query").input_value()=="另一个课题"
+            assert library.locator("#evidence-filter-status").input_value()=="active"
+            library.wait_for_function(
+                "() => document.querySelector('#evidence-list-count').textContent.includes('匹配 1 / 1')")
+            assert "另一个课题专属结论" in library.locator("#evidence-list").inner_text()
+            library.get_by_role("tab",name="课题与对话").click()
+            library.locator(f'[data-action="select-project"][data-id="{other}"]').click()
+            library.wait_for_function(
+                "() => document.querySelector('#detail-section').hidden===false")
+            library.reload(wait_until="domcontentloaded")
+            library.wait_for_function("() => document.documentElement.dataset.surface==='library'")
+            library.wait_for_function("() => document.querySelector('#nav-switch').getAttribute('aria-selected')==='true'")
+            library.wait_for_function(
+                "id => document.querySelector('#topic-list [data-id="'+id+'"]')?.getAttribute('aria-pressed')==='true'",
+                arg=other)
+            assert library.locator("#evidence-project").input_value()==other
+
             # A second library tab receives independent context; no global last-project.
             with context.expect_page() as opened2:
                 panel.evaluate("""id => ThreadLineLibrarySurface.open({
