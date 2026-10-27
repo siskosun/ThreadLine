@@ -1,6 +1,6 @@
 /* S0a adoption prototype page logic. Pages only send commands; the service
- * worker is the single evidence writer. Timing protocol: per operation the
- * clock starts at the click and stops when the committed result returns. */
+ * worker is the single evidence writer. These clocks measure synthetic
+ * write acknowledgements, NOT review-to-commit human task time. */
 (() => {
   "use strict";
   const $ = id => document.getElementById(id);
@@ -99,7 +99,7 @@
   }
 
   function record(kind, ms, ok, extra) {
-    window.__timings.push({ kind, ms: Math.round(ms), ok, ...(extra || {}) });
+    window.__timings.push({mode:"synthetic_write_latency",kind,ms:Math.round(ms),ok,...(extra||{})});
     renderTimings();
   }
   function renderTimings() {
@@ -194,9 +194,7 @@
   $("ev-refresh").addEventListener("click", () => refresh().catch(e => notice(e.message, true)));
   $("ev-project").addEventListener("change", () => refresh().catch(e => notice(e.message, true)));
 
-  /* 12-operation timing protocol: load fixture i, adopt, repeat. A trial is
-   * valid when it commits without help; the page records the wall time from
-   * click to committed result for each. */
+  /* Synthetic 12-operation storage performance diagnostic, not manual UX acceptance. */
   $("ev-run-protocol").addEventListener("click", async () => {
     $("ev-run-protocol").disabled = true;
     window.__timings = [];
@@ -207,14 +205,18 @@
         await new Promise(r => setTimeout(r, 50));
         await timedAdopt();
       }
-      notice("协议完成：有效 " + window.__timings.filter(t => t.ok).length + "/12。");
+      notice("合成写入成功 " + window.__timings.filter(t=>t.ok).length + "/12；仅供性能诊断，不计入人工任务验收。");
     } finally { $("ev-run-protocol").disabled = false; }
   });
   $("ev-copy-timings").addEventListener("click", async () => {
     const stats = timings();
-    const payload = { trials: window.__timings, ...stats, at: new Date().toISOString() };
-    await navigator.clipboard.writeText(JSON.stringify(payload, null, 1)).catch(() => {});
-    notice("计时 JSON 已复制（统计：中位 " + stats.medianMs + " ms，P90 " + stats.p90Ms + " ms）。");
+    const payload = {protocol:"threadline-s0a-synthetic-write-latency/1",
+      humanAcceptanceEligible:false,trials:window.__timings,...stats,at:new Date().toISOString()};
+    try{
+      await navigator.clipboard.writeText(JSON.stringify(payload,null,1));
+      notice("合成写入数据已复制；中位 "+stats.medianMs+" ms，P90 "+stats.p90Ms+" ms，不计入人工验收。");
+    }catch(error){notice("合成写入日志复制失败："+error.message,true);}
+
   });
 
   function timings() {
