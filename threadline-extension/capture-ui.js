@@ -413,6 +413,14 @@
     $("report-ai").addEventListener("click",()=>newChat(true));
     $("report-copy").addEventListener("click",copyDigest);
     $("report-delete").addEventListener("click",clearCurrent);
+    $("map-details").addEventListener("toggle",()=>{
+      // A collapsed map has zero content width; recalculate only after the
+      // user explicitly expands it. No change to capture or AI state.
+      if($("map-details").open&&brief){
+        zoom=Math.max(.55,Math.min(1,($("map-scroll").clientWidth-24)/820));
+        drawMap();
+      }
+    });
     $("map-minus").addEventListener("click",()=>modifyZoom(-.1));
     $("map-plus").addEventListener("click",()=>modifyZoom(.1));
     $("map-reset").addEventListener("click",()=>{zoom=Math.max(.55,Math.min(1,($('map-scroll').clientWidth-24)/820));drawMap();});
