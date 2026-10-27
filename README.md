@@ -1,22 +1,25 @@
-# ThreadLine（研线） · UI-D1 试用分支
+# ThreadLine（研线） · main 开发预览版
 
-> **当前分支为 PR #78 的 UI-D1 开发预览版，并非已发布的 v0.8.2 正式包。** 安装后侧栏标题下方应显示「UI-D1 试用版 · PR #78」，三个标签下方应显示「在宽页打开资料库」。
+> **main 已合并 UI-D0 / UI-D1 / UI-D2 / UI-D3（PR #77–#80），尚未发布新的正式 Release。** 这是可侧载测试的主干源码，不等于经过真人可用性验收。已安装的开发预览在侧栏标题下显示「UI-D3 开发预览 · main」。
 
-多条 ChatGPT 对话同时研究同一课题时，在不同窗口显示统一的有效结论、已收口状态和需核对的字段差异，避免误在旧分支继续工作。辅助提供按需对话采集、AI 整理、思维导图，以及手动触发的网页项目/归档操作。
+多条 ChatGPT 对话同时研究同一课题时，在不同窗口显示统一的有效结论、已收口状态和需核对的字段差异，避免误在旧分支继续工作。辅助提供按需对话采集、AI 整理、宽页研究资料库、宽页思维导图，以及手动触发的网页项目/归档操作。
 
-## 下载与安装当前 UI-D1 测试分支
+## 下载并安装当前 main 开发预览版
 
-**[下载 UI-D1 试用分支 ZIP（包含宽页入口）](https://github.com/siskosun/ThreadLine/archive/refs/heads/feat/ui-d1-library-surface-20261027.zip)**
+**[下载最新 main 源码 ZIP（包含宽页、侧栏减负及导图）](https://github.com/siskosun/ThreadLine/archive/refs/heads/main.zip)**
 
-下载 ZIP → 完整解压 → 在 `edge://extensions/` 或 `chrome://extensions/` 启用开发者模式 → “加载已解压的扩展程序” → **选择下载目录内的 `threadline-extension` 子文件夹**，不要选择父目录或旧版 Release 的解压目录。关闭已打开的旧侧栏并重新打开。当前侧栏顶部应显示「UI-D1 试用版 · PR #78」，三标签下有整行的「在宽页打开资料库 ↗」按钮；点击才打开新宽页标签。
+1. 解压 ZIP，在 Chrome/Edge 的 `chrome://extensions` 或 `edge://extensions` 中开启开发者模式。
+2. 选择“加载已解压的扩展程序”，**指定 `ThreadLine-main/threadline-extension` 文件夹**（该文件夹直接包含 `manifest.json` 和 `research-map.js`），不要选择仓库根目录。
+3. 关闭之前打开的研线侧栏，重新通过该扩展打开。侧栏标题应显示「UI-D3 开发预览 · main」；三个主标签下方有“在宽页打开资料库”按钮；完成一次采集后可通过“在宽页查看本次思维导图”打开只读地图。
+4. 原版和开发版的基础版本号同为 `0.8.2`，请以**版本名称、已解压加载路径和侧栏开发预览标识**区别。可能同时有多个同名研线；排查时可临时禁用旧版，但**不要卸载、清空旧版本地数据或删除原扩展目录**。
 
-**[完整安装核对与数据保护说明](threadline-extension/INSTALL_UI_D1_PREVIEW.md)**：原正式版和该候选版的基础版本字段同为 `0.8.2`，只有预览标记/本地加载路径能区别；旧版可能与新试用版同名。**不要为了排查而卸载旧版或删除其扩展目录**。不同扩展 ID 的本地资料互不共享，测试建议使用独立浏览器配置。
+[详细安装、存储隔离及故障处理](threadline-extension/INSTALL_MAIN_PREVIEW.md)。
 
-### 正式 v0.8.2 发行版（不包含 UI-D1 宽页入口）
+### 正式 v0.8.2 Release（不包含这轮 UI-D1–D3）
 
-[下载已发布的 ThreadLine v0.8.2 安装 ZIP](https://github.com/siskosun/ThreadLine/releases/download/v0.8.2/ThreadLine-v0.8.2.zip) · [SHA256](https://github.com/siskosun/ThreadLine/releases/download/v0.8.2/SHA256SUMS.txt)。
+[下载已正式发布的 v0.8.2](https://github.com/siskosun/ThreadLine/releases/download/v0.8.2/ThreadLine-v0.8.2.zip) · [SHA256 校验](https://github.com/siskosun/ThreadLine/releases/download/v0.8.2/SHA256SUMS.txt)。
 
-正式版按独立人工验收和发布流程交付；UI-D1 候选尚未进入 main 或 Release，不能把分支源码 ZIP 当成正式发行版本。
+正式版不会因 main 合并而自动更新；当前开发源码未通过完整 5+2 真人可用性、真实登录 ChatGPT AI 自动整理、读屏验收，**不得描述为新发布版本或完全修复深度整理无回复问题**。原本需要手动发送的结构化提示，仍需用户主动发送。
 
 **v0.8.2 兼容性：** 旧版本地证据数据不承诺迁移或兼容，升级后请以新版重新建立的证据为准；如需保留旧证据，请自行留存 v0.8.1 安装包与本地数据副本。课题备份 JSON 的导出/导入不受影响。
 
