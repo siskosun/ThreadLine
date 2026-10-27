@@ -406,4 +406,5 @@
 - 基于已合并 UX-01/02/03/09、UX-04、UX-06 的当前 main；新增只读 `EV_HISTORY`，仅允许可信研线面板请求。读取时同时校验有效课题和结论归属，未知 ID 与跨课题 ID 返回同一错误；不调用采集缓存、不写证据库、不触发摘要投影。
 - 返回限定字段：版本完整正文、适用条件、时间、变更类型/影响、前一版本 ID、来源连接及可用来源片段。按不可变 predecessor 链排序，时间戳相同不打乱版本顺序；缺失来源显示不可用占位，不伪造原文。
 - 面板按需读取并展开版本历史；历史正文与来源使用 `textContent`，不执行 Markdown/HTML。没有改 evidence schema、采纳/撤回 CAS、操作幂等、权限之外的消息契约或发送行为。
-- 合成 Chromium E2E 覆盖单版本、多版本、条件变化、撤回后保留历史、来源不可定位时降级为片段、跨课题/未知 ID 等价错误、非面板拒绝与查询只读性。真正缺失的来源记录仍由权威库完整性门禁拒绝；不会绕过门禁伪装成可读历史。准确 HEAD 的 Linux/Windows CI 待核验；真实用户查找效率、真实账号、读屏器和完整 WCAG 未执行。
+- 合成 Chromium E2E 覆盖单版本、多版本、条件变化、撤回后保留历史、来源不可定位时降级为片段、跨课题/未知 ID 等价错误、非面板拒绝与查询只读性。另经 Node 测试验证：打开历史不会意外执行其他课题待清理的删除/恢复操作，也不会改变存储快照。真正缺失的来源记录仍由权威库完整性门禁拒绝；不会绕过门禁伪装成可读历史。
+- 代码 HEAD `ac2da3f66f7b8cb3454851ac9bbc3ecbd6505842` 的 [Linux CI](https://github.com/siskosun/ThreadLine/actions/runs/40437414538)（`npm run verify` 与合成 Chromium `test:e2e`）及 [Windows CI](https://github.com/siskosun/ThreadLine/actions/runs/40437414500) 均 success；本记录提交仍需以新 HEAD 复验。真实用户查找效率、真实账号、读屏器和完整 WCAG 未执行。
