@@ -299,7 +299,14 @@
       <div class="end-actions"><button class="text-button danger" data-action="delete-project">删除此临时课题</button></div>
       <p class="caption">收口后所有已关联窗口立即共享状态。修改分支状态不会自动打开或关闭整个课题。</p>`;
   }
-  function render() {renderStats();renderCurrent();renderQuickBranches();renderTopics();renderDetails();}
+  function render() {
+    renderStats();renderCurrent();renderQuickBranches();renderTopics();renderDetails();
+    if(surface==="library") {
+      // UI-D1 is a read-focused migration. Existing writes remain in the sidebar.
+      document.querySelectorAll('#workspace-switch #edit-form input, #workspace-switch #edit-form textarea, #workspace-switch .branch-actions select')
+        .forEach(control=>{control.disabled=true;});
+    }
+  }
   function updatePayload(extra={}) {
     const patch = {name:$("#edit-name")?.value || "",goal:$("#edit-goal")?.value || "",...extra};
     if (!$("#edit-decision")?.readOnly) patch.decision = $("#edit-decision")?.value || "";
@@ -567,12 +574,17 @@
   function createEvidenceNext(action,label) {
     const next=document.createElement("button");
     next.type="button";next.className="secondary evidence-next";next.dataset.action=action;next.textContent=label;
+    if(surface==="library") {
+      const hint=document.createElement("p");hint.className="subtle";
+      hint.textContent="当前资料库以查阅为主；请在研线侧栏执行创建、采纳或整理操作。";
+      return hint;
+    }
     return next;
   }
 
   async function renderEvidenceProject() {
     const request=++evidenceRequest,projectId = ev$("evidence-project").value;
-    if (!projectId) { evidenceListCache=null;evidenceHasRows=false;ev$("evidence-handoff").disabled=true;ev$("evidence-summary").textContent="暂无课题。先创建课题，再从整理结果逐条采纳。";ev$("evidence-list-count").textContent="";ev$("evidence-more").hidden=true;ev$("evidence-list").replaceChildren(createEvidenceNext("start-new-topic","创建课题"));return true; }
+    if (!projectId) { evidenceListCache=null;evidenceHasRows=false;ev$("evidence-handoff").disabled=true;ev$("evidence-summary").textContent=surface==="library"?"请选择要查看的课题；创建、采纳及修订仍在研线侧栏进行。":"暂无课题。先创建课题，再从整理结果逐条采纳。";ev$("evidence-list-count").textContent="";ev$("evidence-more").hidden=true;ev$("evidence-list").replaceChildren(createEvidenceNext("start-new-topic","创建课题"));return true; }
     let data;
     try { data = await evSend({ type: "EV_LIST", projectId }); }
     catch (e) {
@@ -781,7 +793,7 @@
       content.append(historyButton,historyPanel);
       if(c.status!=="withdrawn"){
         const row2=document.createElement("div");row2.className="line";
-        const amend=document.createElement("button");amend.type="button";amend.className="secondary";amend.textContent="修订";
+        const amend=document.createElement("button");amend.type="button";amend.className="secondary evidence-write-action";amend.textContent="修订";
         amend.addEventListener("click",async()=>{
           let signature=null,operationId=null;
           const result=await ThreadLineDialogs.form({title:"修订结论",description:"保存后生成新版本，原有正文和依据保留。",submitLabel:"保存新版本",fields:[
@@ -808,7 +820,7 @@
             else notifyCritical("新版本已保存回执已收到，但当前证据列表刷新失败。请刷新核对，不要重复提交。");
           }
         });
-        const withdraw=document.createElement("button");withdraw.type="button";withdraw.className="secondary";withdraw.textContent="撤回";
+        const withdraw=document.createElement("button");withdraw.type="button";withdraw.className="secondary evidence-write-action";withdraw.textContent="撤回";
         let withdrawPending=false;
         withdraw.addEventListener("click",async()=>{
           if(withdrawPending)return;
