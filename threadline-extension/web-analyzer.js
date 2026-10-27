@@ -40,10 +40,17 @@
     // Do not overwrite a pre-existing user draft in the dedicated analysis tab.
     if(textOf(field))throw new Error('专用标签页已有未发送的草稿，已停止以避免覆盖');
     const before=assistantMessages().length;
+    const userCount=()=>document.querySelectorAll('[data-message-author-role="user"]').length;
+    const usersBefore=userCount();
     await insertPrompt(field,prompt);
     const button=await wait(sendButton,9000,'无法找到可用发送按钮，未发送分析请求');
     button.click();
-    const reply=await wait(()=>assistantMessages().length>before?assistantMessages().at(-1):null,95000,'未等到 ChatGPT 新回答；请检查模型额度或网页状态');
+    // A DOM click is not a server receipt. First distinguish an unchanged
+    // composer from a possible submission; never click Send a second time.
+    await wait(()=>userCount()>usersBefore||textOf(field)===''?true:null,13000,
+      '已点击发送按钮，但输入框仍保留提示且未出现用户消息；无法确认发送，未自动重试。请检查专用分析标签页');
+    const reply=await wait(()=>assistantMessages().length>before?assistantMessages().at(-1):null,
+      95000,'网页可能已发送分析请求，但未识别到新回答；结果未知，未自动重试。请打开专用分析标签页检查回复或模型额度');
     const started=Date.now();let last='',stable=0;
     while(Date.now()-started<260000){
       if(cancelled)throw new Error('网页分析已停止');

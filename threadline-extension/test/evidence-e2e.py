@@ -445,6 +445,8 @@ def run():
             second_panel.reload(wait_until="domcontentloaded")
             second_panel.locator("#manage-accordion > summary").click()
             second_panel.locator(f'[data-action="select-project"][data-id="{project_id}"]').click()
+            second_panel.locator("#topic-edit-details > summary").click()
+            assert second_panel.locator("#topic-edit-details").get_attribute("open") is not None
             assert second_panel.locator("#edit-decision").evaluate("e => e.readOnly")
             second_panel.locator("#edit-goal").fill("通过旧界面更新目标")
             second_panel.locator('[data-action="save-details"]').click()

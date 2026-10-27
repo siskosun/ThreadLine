@@ -167,8 +167,25 @@ async function pageContext(sender, payload) {
     await mutate({type:"observeChat",key,title:payload.title,url:href});
   }
   if (payload.type === "OBSERVE") {
-    const status = {key, title:String(payload.title||"").slice(0,130), streaming:!!payload.streaming, updatedAt:Date.now()};
-    await chrome.storage.session.set({[`tl_live_${tabId}`]:status});
+    const now=Date.now(),storeKey=`tl_live_${tabId}`;
+    const stored=await chrome.storage.session.get(storeKey);
+    const previous=stored[storeKey];
+    const bytes=Number.isSafeInteger(payload.assistantBytes)&&payload.assistantBytes>=0&&
+      payload.assistantBytes<=5_000_000?payload.assistantBytes:null;
+    const status={key,title:String(payload.title||"").slice(0,130),
+      streaming:!!payload.streaming,updatedAt:now,assistantBytes:bytes};
+    // A streaming -> idle transition with visible assistant text is only an
+    // observed UI signal, NOT server-verified completion. Never mark the
+    // user's research branch 'done' or trigger a browser notification.
+    const same=previous?.key===key&&Number.isSafeInteger(previous.updatedAt)&&
+      now-previous.updatedAt>=0&&now-previous.updatedAt<300_000;
+    if(same&&previous.streaming&&!status.streaming&&bytes>0){
+      status.replyObservedAt=now;
+    }else if(same&&!status.streaming&&Number.isSafeInteger(previous.replyObservedAt)&&
+      now-previous.replyObservedAt>=0&&now-previous.replyObservedAt<300_000){
+      status.replyObservedAt=previous.replyObservedAt;
+    }
+    await chrome.storage.session.set({[storeKey]:status});
     try { await serialize(() => ffObserveHook(tabId, status, key)); } catch {}
   }
   const newest = payload.type === "OBSERVE" ? await readFreshState() : state;

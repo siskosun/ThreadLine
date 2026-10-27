@@ -192,7 +192,13 @@ def run():
       # Write through the actual MV3 service worker runtime, then close/reopen profile.
       r=panel.evaluate('''async ({pid}) => chrome.runtime.sendMessage({type:'MUTATE',action:{type:'linkChat',key:'chat:demo-alpha',projectId:pid,title:'A',url:'https://chatgpt.com/c/demo-alpha'}})''', {'pid':pid})
       assert r['ok'],r
-      panel.wait_for_selector('[data-action="label-chat"][data-key="chat:demo-alpha"]')
+      def reveal_branch_tools():
+        details=panel.locator('#detail-section .branch-card:has([data-key="chat:demo-alpha"]) .branch-tool-details')
+        details.wait_for(state='attached')
+        if details.get_attribute('open') is None:
+          details.locator(':scope > summary').click()
+        return details
+      reveal_branch_tools()
       panel.locator('[data-action="label-chat"][data-key="chat:demo-alpha"]').click()
       panel.locator('dialog.tl-dialog #tl-field-label').fill('A · 人工核验')
       panel.locator('dialog.tl-dialog button[type=submit]').click()
@@ -200,6 +206,7 @@ def run():
       assert panel.evaluate("document.activeElement?.dataset?.action")=='label-chat'
       current=panel.evaluate("async () => (await chrome.runtime.sendMessage({type:'SNAPSHOT'})).data.state")
       assert current['chats']['chat:demo-alpha']['label']=='A · 人工核验',current
+      reveal_branch_tools()
       panel.locator('[data-action="note-chat"][data-key="chat:demo-alpha"]').click()
       panel.locator('dialog.tl-dialog #tl-field-note').fill('等待模型复核')
       panel.locator('dialog.tl-dialog button[type=submit]').click()
@@ -221,6 +228,7 @@ def run():
           return original(payload,callback);
         };
       }""")
+      reveal_branch_tools()
       panel.locator('[data-action="note-chat"][data-key="chat:demo-alpha"]').click()
       panel.locator('dialog.tl-dialog #tl-field-note').fill('这次保存应失败且保留输入')
       panel.locator('dialog.tl-dialog button[type=submit]').click()

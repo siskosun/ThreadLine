@@ -126,3 +126,41 @@ test('extension-owned panel tab is trusted without permitting arbitrary tab muta
  }
  assert.equal((await t.send({type:'SNAPSHOT'},legit)).data.state.projects.length,1);
 });
+
+test("UI-D2 only marks a visible same-chat streaming-to-idle observation, not completed research",async()=>{
+ const t=bootstrap(),url=t.tabs[0].url;
+ const create=await t.send({type:"MUTATE",action:{
+   type:"createProject",name:"观察模型回复",chat:{key:"chat:alpha",title:"A",url}}});
+ assert.equal(create.ok,true);
+ await t.send({type:"OBSERVE",href:url,title:"A",streaming:false,assistantBytes:120},1);
+ let live=(await t.send({type:"SNAPSHOT"})).data.liveByTab["1"];
+ assert.equal(live.replyObservedAt,undefined,"idle alone is not a reply");
+ await t.send({type:"OBSERVE",href:url,title:"A",streaming:true,assistantBytes:155},1);
+ live=(await t.send({type:"SNAPSHOT"})).data.liveByTab["1"];
+ assert.equal(live.replyObservedAt,undefined);
+ await t.send({type:"OBSERVE",href:url,title:"A",streaming:false,assistantBytes:231},1);
+ live=(await t.send({type:"SNAPSHOT"})).data.liveByTab["1"];
+ assert.equal(live.streaming,false);
+ assert.ok(Number.isSafeInteger(live.replyObservedAt));
+ const replyAt=live.replyObservedAt;
+ await t.send({type:"OBSERVE",href:url,title:"A",streaming:false,assistantBytes:231},1);
+ assert.equal((await t.send({type:"SNAPSHOT"})).data.liveByTab["1"].replyObservedAt,replyAt);
+ await t.send({type:"OBSERVE",href:url,title:"A",streaming:true,assistantBytes:240},1);
+ assert.equal((await t.send({type:"SNAPSHOT"})).data.liveByTab["1"].replyObservedAt,undefined);
+ const projectId=create.data.result.projectId;
+ const state=(await t.send({type:"SNAPSHOT"})).data.state;
+ assert.equal(state.chats["chat:alpha"].stage,"active","reply signal must not set branch done");
+ assert.equal(state.projects.find(p=>p.id===projectId).stage,"active");
+});
+test("UI-D2 does not carry reply-stop signal between different conversations or empty output",async()=>{
+ const t=bootstrap();
+ await t.send({type:"OBSERVE",href:t.tabs[0].url,streaming:true,assistantBytes:200},1);
+ t.tabs[0].url="https://chatgpt.com/c/changed";
+ await t.send({type:"OBSERVE",href:t.tabs[0].url,streaming:false,assistantBytes:250},1);
+ let live=(await t.send({type:"SNAPSHOT"})).data.liveByTab["1"];
+ assert.equal(live.replyObservedAt,undefined);
+ await t.send({type:"OBSERVE",href:t.tabs[0].url,streaming:true,assistantBytes:0},1);
+ await t.send({type:"OBSERVE",href:t.tabs[0].url,streaming:false,assistantBytes:0},1);
+ live=(await t.send({type:"SNAPSHOT"})).data.liveByTab["1"];
+ assert.equal(live.replyObservedAt,undefined);
+});
