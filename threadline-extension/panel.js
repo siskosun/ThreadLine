@@ -10,7 +10,8 @@
   let filter = "all";
   let workspace = "switch"; // normal panel retains three workspaces
   let surface="sidebar",librarySourceTabId=null,librarySourceChatKey=null;
-  let libraryInitialProjectId=null,librarySelectionPending=false;
+  let libraryInitialProjectId=null,librarySelectionPending=false,libraryTabId=null;
+  let libraryViewWarningShown=false;
   let state = ThreadLineCore.emptyState();
   let tabs = [];
   let activeTabId = null;
@@ -130,10 +131,32 @@
     $("#stat-chats").textContent=Object.keys(state.chats).length;
     $("#clear-closed").disabled=!state.projects.some(p=>p.stage==="closed");
   }
+  function saveLibraryView() {
+    if(surface!=="library"||librarySelectionPending||!libraryTabId)return;
+    const query=$("#evidence-query")?.value||"";
+    // Very long or control-character queries are not copied into sessionStorage.
+    // The current search continues to work; only reload fallback loses the query.
+    try{
+      ThreadLineLibrarySurface.saveView(libraryTabId,{
+        viewProjectId:$("#evidence-project")?.value||null,
+        topicProjectId:selectedId,
+        sourceTabId:librarySourceTabId,sourceChatKey:librarySourceChatKey,
+        workspace,filter:$("#evidence-filter-status")?.value||"all",
+        query:query.length<=160?query:""
+      });
+    }catch(error){
+      if(!libraryViewWarningShown){
+        libraryViewWarningShown=true;
+        notifyCritical("资料库当前阅读位置无法保存到本标签页："+error.message+
+          "。刷新后可能需要重新选择；现有课题和结论未改变。");
+      }
+    }
+  }
   async function openLibrary() {
     const picked=workspace==="research"
       ? tabs.find(t=>String(t.id)===$("#capture-source")?.value) : activeTab();
-    const sourceChatKey=picked&&ThreadLineCore.isChatURL(picked.url)?getKey(picked):null;
+    const key=picked&&ThreadLineCore.isChatURL(picked.url)?getKey(picked):null;
+    const sourceChatKey=key?.startsWith("chat:")?key:null;
     const sourceTabId=sourceChatKey?picked.id:null;
     const viewProjectId=workspace==="evidence"
       ? ($("#evidence-project")?.value||null)
@@ -148,8 +171,10 @@
     if(!source||!ThreadLineCore.isChatURL(source.url)||getKey(source)!==librarySourceChatKey){
       notifyCritical("原来源标签已关闭或不再是 ChatGPT 对话，请自行选择正确的来源。");return;
     }
-    await chrome.tabs.update(source.id,{active:true}).catch(error=>
-      notifyCritical("无法切回来源对话："+error.message));
+    try{
+      await chrome.tabs.update(source.id,{active:true});
+      await chrome.windows.update(source.windowId,{focused:true});
+    }catch(error){notifyCritical("无法切回来源对话："+error.message);}
   }
   function setWorkspace(next, focusCapture=false) {
     workspace = ["switch","research","evidence"].includes(next) ? next : "switch";
@@ -168,6 +193,7 @@
       if (tab && Array.from(select.options).some(o => o.value === String(tab.id))) select.value = String(tab.id);
     }
     if(workspace==="evidence")renderEvidence().catch(error=>notify(error.message,true));
+    saveLibraryView();
     window.scrollTo(0,0);
   }
   function activeSourceKey(projectId) {
@@ -302,9 +328,11 @@
   function render() {
     renderStats();renderCurrent();renderQuickBranches();renderTopics();renderDetails();
     if(surface==="library") {
-      // UI-D1 is a read-focused migration. Existing writes remain in the sidebar.
+      // Read-focused UI only: the trusted panel retains its original backend
+      // authority; do not claim CSS hiding is a security permission boundary.
       document.querySelectorAll('#workspace-switch #edit-form input, #workspace-switch #edit-form textarea, #workspace-switch .branch-actions select')
         .forEach(control=>{control.disabled=true;});
+      saveLibraryView();
     }
   }
   function updatePayload(extra={}) {
@@ -569,6 +597,7 @@
     }else if ([...select.options].some(o => o.value === current)) select.value = current;
     if(select.value!==current)select.dispatchEvent(new Event("change"));
     else await renderEvidenceProject();
+    saveLibraryView();
   }
 
   function createEvidenceNext(action,label) {
@@ -871,8 +900,12 @@
   }
 
   ev$("evidence-refresh").addEventListener("click", () => renderEvidenceProject());
-  ev$("evidence-query").addEventListener("input",()=>{evidenceVisibleLimit=ThreadLineEvidenceList.PAGE_SIZE;renderEvidenceRows();});
-  ev$("evidence-filter-status").addEventListener("change",()=>{evidenceVisibleLimit=ThreadLineEvidenceList.PAGE_SIZE;renderEvidenceRows();});
+  ev$("evidence-query").addEventListener("input",()=>{
+    evidenceVisibleLimit=ThreadLineEvidenceList.PAGE_SIZE;renderEvidenceRows();saveLibraryView();
+  });
+  ev$("evidence-filter-status").addEventListener("change",()=>{
+    evidenceVisibleLimit=ThreadLineEvidenceList.PAGE_SIZE;renderEvidenceRows();saveLibraryView();
+  });
   ev$("evidence-more").addEventListener("click",()=>{
     evidenceVisibleLimit+=ThreadLineEvidenceList.PAGE_SIZE;renderEvidenceRows();
     const more=ev$("evidence-more");
@@ -889,6 +922,7 @@
     const saved=handoffDrafts.get(handoffProject);view.value=saved?.text||"";view.hidden=!saved;evidenceHandoffStamp=saved?.stamp||null;
     for(const id of ["evidence-handoff-copy","evidence-handoff-read"]){ev$(id).hidden=!saved;ev$(id).disabled=!saved?.stamp;}
     renderEvidenceProject();
+    saveLibraryView();
   });
   ev$("evidence-handoff").addEventListener("click",async()=>{
     const projectId=ev$("evidence-project").value;if(!projectId||handoffPending)return;
@@ -932,18 +966,33 @@
   });
   window.addEventListener("threadline-evidence-changed",()=>{renderEvidence().catch(e=>notifyCritical("证据课题列表读取失败："+e.message));refresh(true);});
   async function initializeSurface() {
-    let tab=null,intent=null;
+    let tab=null,intent=null,saved=null;
     try{tab=await chrome.tabs.getCurrent();}catch{}
     if(tab?.id){
       try{intent=await ThreadLineLibrarySurface.consume(tab.id);}
       catch(error){notifyCritical("资料库导航意图读取失败："+error.message+"；已恢复原始侧栏布局。");}
+      if(!intent){
+        try{saved=ThreadLineLibrarySurface.loadView(tab.id);}
+        catch(error){notifyCritical("资料库上次阅读位置不可用："+error.message+"；已恢复原始侧栏布局。");}
+      }
     }
-    if(!intent)return; // original sidebar already initialized synchronously
+    if(!intent&&!saved)return; // ordinary side panel and direct panel.html remain unchanged
+    const view=saved||{
+      viewProjectId:intent.viewProjectId,topicProjectId:null,
+      sourceTabId:intent.sourceTabId,sourceChatKey:intent.sourceChatKey,
+      workspace:"evidence",filter:"all",query:""
+    };
     surface="library";
-    librarySourceTabId=intent.sourceTabId;
-    librarySourceChatKey=intent.sourceChatKey;
-    libraryInitialProjectId=intent.viewProjectId;
+    libraryTabId=tab.id;
+    librarySourceTabId=view.sourceTabId;
+    librarySourceChatKey=view.sourceChatKey;
+    libraryInitialProjectId=view.viewProjectId;
     librarySelectionPending=true;
+    if(saved){
+      setSelectedId(view.topicProjectId);
+      $("#evidence-query").value=view.query;
+      $("#evidence-filter-status").value=view.filter;
+    }
     document.documentElement.dataset.surface="library";
     $("#library-launch").hidden=true;
     $("#library-header").hidden=false;
@@ -968,7 +1017,9 @@
       }
     }else context.textContent="来源对话未指定；只浏览研究资料，操作目标由当前选中的课题决定。";
     $("#library-return").hidden=!librarySourceTabId;
-    setWorkspace("evidence");
+    setWorkspace(view.workspace);
+    if(view.workspace==="switch")
+      renderEvidence().catch(error=>notifyCritical("证据课题列表读取失败："+error.message));
   }
   document.querySelector(".workspace-tabs").addEventListener("keydown", e => {
     if (!["ArrowLeft","ArrowRight","Home","End"].includes(e.key)) return;
