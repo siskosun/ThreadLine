@@ -151,6 +151,41 @@ def run():
                                 "url": "https://example.invalid/source"}],
                  "operationId": "op_s1a_e2e_0001"})
             assert adopted2["ok"], adopted2
+            # History is a panel-only, read-only query scoped to the owning project.
+            proto_rows = rows
+            history_project_id = "ux05-history"
+            ensured_history = send(page, {"type":"EV_ENSURE","projectId":history_project_id})
+            assert ensured_history["ok"], ensured_history
+            adopted_history = send(page, {"type":"EV_ADOPT","projectId":history_project_id,
+                "text":"单版本历史验收","conditions":"只用于合成测试",
+                "fragments":[{"selection":"历史来源片段","before":"前","after":"后",
+                    "conversationId":"synthetic-history-conversation","messageId":"synthetic-history-message"}],
+                "operationId":"op_ux05history001"})
+            assert adopted_history["ok"], adopted_history
+            single_before = raw_evidence(page)
+            single_history = send(panel, {"type":"EV_HISTORY","projectId":history_project_id,
+                "conclusionId":adopted_history["data"]["conclusionId"]})
+            assert single_history["ok"], single_history
+            assert len(single_history["data"]["versions"]) == 1
+            assert raw_evidence(page) == single_before, "history query must be read-only"
+            withdraw_history = send(page, {"type":"EV_WITHDRAW",
+                "conclusionId":adopted_history["data"]["conclusionId"],
+                "reason":"UX-05 单版本撤回历史", "expectedVersionId":single_history["data"]["versions"][0]["id"],
+                "operationId":"op_ux05withdraw001"})
+            assert withdraw_history["ok"], withdraw_history
+            withdrawn_history = send(panel, {"type":"EV_HISTORY","projectId":history_project_id,
+                "conclusionId":adopted_history["data"]["conclusionId"]})
+            assert withdrawn_history["ok"] and withdrawn_history["data"]["status"] == "withdrawn"
+            assert len(withdrawn_history["data"]["versions"]) == 1
+            foreign_history = send(panel, {"type":"EV_HISTORY","projectId":project_id,
+                "conclusionId":proto_rows[0]["conclusion"]["id"]})
+            unknown_history = send(panel, {"type":"EV_HISTORY","projectId":project_id,
+                "conclusionId":"con_unknown_ux05_0001"})
+            assert not foreign_history["ok"] and not unknown_history["ok"]
+            assert foreign_history["error"] == unknown_history["error"] == "该课题下不存在该结论"
+            untrusted_history = send(page, {"type":"EV_HISTORY","projectId":"proto-p1",
+                "conclusionId":proto_rows[0]["conclusion"]["id"]})
+            assert not untrusted_history["ok"] and "仅限研线面板" in untrusted_history["error"]
             # Render the real panel, not only the prototype/message handlers.
             # No ChatGPT tab is opened: location must show the fragment fallback.
             panel_errors = []
@@ -192,6 +227,123 @@ def run():
             assert "匹配 1 / 1 条结论" in panel.locator("#evidence-list-count").inner_text()
             assert panel.locator("#evidence-list button", has_text="修订").count() == 1
             assert panel.locator("#evidence-list button", has_text="撤回").count() == 1
+            # Accessible withdrawal confirmation and durable error feedback.
+            withdraw_button = panel.locator("#evidence-list button", has_text="撤回")
+            withdraw_button.click()
+            panel.locator("dialog.tl-confirm-dialog").wait_for()
+            panel.locator("dialog.tl-confirm-dialog button", has_text="取消").click()
+            assert panel.locator("dialog.tl-confirm-dialog").count() == 0
+            still_adopted = send(panel, {"type":"EV_LIST","projectId":project_id})["data"]["rows"][0]
+            assert still_adopted["conclusion"]["status"] == "adopted"
+            panel.evaluate("""() => {
+                const original=chrome.runtime.sendMessage.bind(chrome.runtime);
+                window.__restoreWithdrawMessage=()=>{chrome.runtime.sendMessage=original;};
+                window.__withdrawCalls=0;
+                chrome.runtime.sendMessage=(payload,callback)=>{
+                    if(payload?.type==="EV_WITHDRAW"){
+                        window.__withdrawCalls++;
+                        callback({ok:false,error:"SIMULATED_WITHDRAW_FAILURE"});
+                        return;
+                    }
+                    return original(payload,callback);
+                };
+            }""")
+            panel.locator("#evidence-list button", has_text="撤回").click()
+            panel.locator("dialog.tl-confirm-dialog button", has_text="撤回结论").click()
+            panel.wait_for_function("() => document.querySelector('#critical-notice')?.hidden===false")
+            assert "SIMULATED_WITHDRAW_FAILURE" in panel.locator("#critical-notice-text").inner_text()
+            panel.wait_for_timeout(3300)
+            assert panel.locator("#critical-notice").is_visible(), "withdraw error must outlive transient toast"
+            assert panel.evaluate("window.__withdrawCalls") == 1, "withdraw must not auto-replay"
+            after_failed_withdraw = send(panel, {"type":"EV_LIST","projectId":project_id})["data"]["rows"][0]
+            assert after_failed_withdraw["conclusion"]["status"] == "adopted"
+            panel.evaluate("window.__restoreWithdrawMessage()")
+            panel.locator("#critical-notice-dismiss").click()
+            assert panel.locator("#critical-notice").is_hidden()
+
+            # Successful withdrawal returns keyboard focus to the same conclusion,
+            # now visibly marked withdrawn, without changing the selected topic.
+            success_project_id = "ux08-success"
+            ensured_success = send(page, {"type":"EV_ENSURE","projectId":success_project_id})
+            assert ensured_success["ok"], ensured_success
+            adopted_success = send(page, {"type":"EV_ADOPT","projectId":success_project_id,
+                "text":"成功撤回焦点验收","conditions":"仅用于合成测试",
+                "fragments":[{"selection":"撤回后保留的来源片段"}],
+                "operationId":"op_ux08success001"})
+            assert adopted_success["ok"], adopted_success
+            panel.evaluate("() => window.dispatchEvent(new Event('threadline-evidence-changed'))")
+            panel.wait_for_function("id => [...document.querySelector('#evidence-project').options].some(o=>o.value===id)",
+                arg=success_project_id)
+            panel.select_option("#evidence-project",success_project_id)
+            panel.wait_for_function("id => [...document.querySelectorAll('#evidence-list .evidence-item')].some(n=>n.dataset.conclusionId===id)",
+                arg=adopted_success["data"]["conclusionId"])
+            panel.locator("#evidence-list button", has_text="撤回").click()
+            panel.locator("dialog.tl-confirm-dialog button", has_text="撤回结论").click()
+            panel.wait_for_function("id => [...document.querySelectorAll('#evidence-list .evidence-item')].some(n=>n.dataset.conclusionId===id&&n.textContent.includes('已撤回'))",
+                arg=adopted_success["data"]["conclusionId"])
+            assert panel.evaluate("id => document.activeElement?.closest('.evidence-item')?.dataset?.conclusionId===id",
+                adopted_success["data"]["conclusionId"])
+            success_listing = send(panel, {"type":"EV_LIST","projectId":success_project_id})
+            assert success_listing["ok"], success_listing
+            success_row = next(row for row in success_listing["data"]["rows"]
+                if row["conclusion"]["id"] == adopted_success["data"]["conclusionId"])
+            assert success_row["conclusion"]["status"] == "withdrawn"
+            panel.select_option("#evidence-project",project_id)
+            panel.wait_for_function("id => document.querySelector('#evidence-project').value===id",arg=project_id)
+            panel.wait_for_function("id => [...document.querySelectorAll('#evidence-list .evidence-item')].some(n=>n.dataset.conclusionId===id)",
+                arg=adopted2["data"]["conclusionId"])
+            # A late withdrawal acknowledgement must not replace the project
+            # the user switched to while the original operation was pending.
+            delayed_project_id = "ux08-delayed"
+            ensured_delayed = send(page, {"type":"EV_ENSURE","projectId":delayed_project_id})
+            assert ensured_delayed["ok"], ensured_delayed
+            adopted_delayed = send(page, {"type":"EV_ADOPT","projectId":delayed_project_id,
+                "text":"延迟撤回范围验收","conditions":"仅用于合成测试",
+                "fragments":[{"selection":"延迟撤回保留的来源"}],
+                "operationId":"op_ux08delayed001"})
+            assert adopted_delayed["ok"], adopted_delayed
+            panel.evaluate("() => window.dispatchEvent(new Event('threadline-evidence-changed'))")
+            panel.wait_for_function("id => [...document.querySelector('#evidence-project').options].some(o=>o.value===id)",
+                arg=delayed_project_id)
+            panel.select_option("#evidence-project",delayed_project_id)
+            panel.wait_for_function("id => [...document.querySelectorAll('#evidence-list .evidence-item')].some(n=>n.dataset.conclusionId===id)",
+                arg=adopted_delayed["data"]["conclusionId"])
+            panel.evaluate("""() => {
+                const original=chrome.runtime.sendMessage.bind(chrome.runtime);
+                window.__restoreDelayedWithdraw=()=>{chrome.runtime.sendMessage=original;};
+                window.__releaseDelayedWithdraw=null;
+                window.__delayedWithdrawCalls=0;
+                chrome.runtime.sendMessage=(payload,callback)=>{
+                    if(payload?.type==="EV_WITHDRAW"){
+                        window.__delayedWithdrawCalls++;
+                        return original(payload,response=>{
+                            window.__delayedWithdrawResponse=response;
+                            window.__releaseDelayedWithdraw=()=>callback(response);
+                        });
+                    }
+                    return original(payload,callback);
+                };
+            }""")
+            panel.locator("#evidence-list button", has_text="撤回").click()
+            panel.locator("dialog.tl-confirm-dialog button", has_text="撤回结论").click()
+            panel.wait_for_function("() => typeof window.__releaseDelayedWithdraw === 'function'")
+            assert panel.locator("#evidence-list button", has_text="撤回").is_disabled()
+            assert panel.evaluate("window.__delayedWithdrawCalls")==1
+            panel.select_option("#evidence-project",project_id)
+            panel.wait_for_function("id => document.querySelector('#evidence-project').value===id",arg=project_id)
+            panel.wait_for_function("id => [...document.querySelectorAll('#evidence-list .evidence-item')].some(n=>n.dataset.conclusionId===id)",
+                arg=adopted2["data"]["conclusionId"])
+            panel.evaluate("() => window.__releaseDelayedWithdraw()")
+            panel.wait_for_timeout(100)
+            assert panel.locator("#evidence-project").input_value()==project_id
+            assert panel.locator("#evidence-list .evidence-item").first.get_attribute("data-conclusion-id")==adopted2["data"]["conclusionId"]
+            delayed_listing = send(panel, {"type":"EV_LIST","projectId":delayed_project_id})
+            assert delayed_listing["ok"], delayed_listing
+            delayed_row = next(row for row in delayed_listing["data"]["rows"]
+                if row["conclusion"]["id"] == adopted_delayed["data"]["conclusionId"])
+            assert delayed_row["conclusion"]["status"] == "withdrawn"
+            assert panel.evaluate("window.__delayedWithdrawCalls")==1
+            panel.evaluate("window.__restoreDelayedWithdraw()")
             first = panel.locator("#evidence-list .evidence-item").first
             assert first.get_attribute("open") is not None
             summary = first.locator(":scope > summary")
@@ -224,6 +376,18 @@ def run():
             changed = send(panel, {"type": "EV_LIST", "projectId": project_id})["data"]["rows"][0]
             assert changed["current"]["conditions"] == original["current"]["conditions"]
             assert changed["fragments"] == original["fragments"], "text edits preserve source IDs, times and provenance"
+            panel.locator("#evidence-list button", has_text="查看版本历史（2）").click()
+            panel.wait_for_function("() => document.querySelectorAll('#evidence-list .evidence-history-version').length === 2")
+            version_one = panel.locator("#evidence-list .evidence-history-version").first
+            version_two = panel.locator("#evidence-list .evidence-history-version").nth(1)
+            version_one.locator(":scope > summary").click()
+            version_two.locator(":scope > summary").click()
+            assert version_one.locator(".evidence-history-fulltext").first.inner_text() == "封口课题的第一条结论"
+            history_text = panel.locator("#evidence-list .evidence-history").inner_text()
+            assert "面板修订后的结论" in history_text
+            assert "仅适用合成样本 A" in history_text
+            version_one.locator(".evidence-history-source > summary").first.click()
+            assert "https://example.invalid/source" in version_one.inner_text()
             retry_request = {"type": "EV_AMEND", "conclusionId": adopted2["data"]["conclusionId"],
                              "text": "可重试修订", "operationId": "op_native_retry001"}
             retry_first = send(panel, retry_request)
@@ -254,7 +418,8 @@ def run():
             second_panel.goto(f"chrome-extension://{eid}/panel.html", wait_until="domcontentloaded")
             stale_version = retry_first["data"]["versionId"]
             fresh_edit = send(second_panel, {"type": "EV_AMEND", "conclusionId": adopted2["data"]["conclusionId"],
-                "text": "另一窗口的新修订", "expectedVersionId": stale_version, "operationId": "op_second_window01"})
+                "text": "另一窗口的新修订", "conditions":"仅适用合成样本 B","changeImpact":"conditions",
+                "expectedVersionId": stale_version, "operationId": "op_second_window01"})
             assert fresh_edit["ok"], fresh_edit
             before_stale = raw_evidence(page)
             stale_edit = send(panel, {"type": "EV_AMEND", "conclusionId": adopted2["data"]["conclusionId"],
@@ -286,6 +451,44 @@ def run():
             second_panel.wait_for_function("() => document.body.textContent.includes('课题状态已保存')")
             after_ui = send(second_panel, {"type": "SNAPSHOT"})["data"]["state"]
             assert next(p for p in after_ui["projects"] if p["id"] == project_id)["goal"] == "通过旧界面更新目标"
+            four_history = send(panel, {"type":"EV_HISTORY","projectId":project_id,
+                "conclusionId":adopted2["data"]["conclusionId"]})
+            assert four_history["ok"] and len(four_history["data"]["versions"]) == 4
+            assert four_history["data"]["versions"][0]["text"] == "封口课题的第一条结论"
+            assert four_history["data"]["versions"][2]["conditions"] == "仅适用合成样本 A"
+            assert four_history["data"]["versions"][3]["conditions"] == "仅适用合成样本 B"
+            withdrawn_commit = send(panel, {"type":"EV_WITHDRAW",
+                "conclusionId":adopted2["data"]["conclusionId"],"reason":"UX-05 历史验收",
+                "expectedVersionId":four_history["data"]["versions"][-1]["id"],
+                "operationId":"op_ux05_withdraw_0001"})
+            assert withdrawn_commit["ok"], withdrawn_commit
+            withdrawn_history = send(panel, {"type":"EV_HISTORY","projectId":project_id,
+                "conclusionId":adopted2["data"]["conclusionId"]})
+            assert withdrawn_history["ok"] and withdrawn_history["data"]["status"] == "withdrawn"
+            assert len(withdrawn_history["data"]["versions"]) == 4
+            source_id = next(fragment["sourceId"] for fragment in withdrawn_history["data"]["versions"][0]["fragments"] if fragment["available"])
+            # Keep the authority store valid but remove live-location identity;
+            # the historical excerpt must remain readable as a fragment only.
+            page.evaluate("""async sourceId => {
+                const db=await new Promise((resolve,reject)=>{const q=indexedDB.open("threadline_evidence_v1");q.onsuccess=()=>resolve(q.result);q.onerror=()=>reject(q.error);});
+                await new Promise((resolve,reject)=>{const tx=db.transaction(["sources"],"readwrite"),store=tx.objectStore("sources"),get=store.get(sourceId);
+                    get.onsuccess=()=>{const source=get.result;source.conversationId=null;source.messageId=null;store.put(source);};
+                    get.onerror=()=>reject(get.error);tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error);tx.onerror=()=>reject(tx.error);});
+                db.close();
+            }""", source_id)
+            damaged_history = send(panel, {"type":"EV_HISTORY","projectId":project_id,
+                "conclusionId":adopted2["data"]["conclusionId"]})
+            assert damaged_history["ok"], damaged_history
+            assert any(fragment["available"] and not fragment["conversationId"] and fragment["selection"] == "封口用片段"
+                for version in damaged_history["data"]["versions"] for fragment in version["fragments"])
+            panel.click("#evidence-refresh")
+            panel.locator("#evidence-list button", has_text="查看版本历史（4）").click()
+            panel.wait_for_function("() => document.querySelectorAll('#evidence-list .evidence-history-version').length === 4")
+            first_history_version = panel.locator("#evidence-list .evidence-history-version").first
+            first_history_version.locator(":scope > summary").click()
+            first_history_version.locator(".evidence-history-source > summary").first.click()
+            assert "仅片段（无会话 ID）" in first_history_version.inner_text()
+            assert "封口用片段" in first_history_version.inner_text()
             before_delete = raw_evidence(page)
             refused_delete = send(panel, {"type": "MUTATE", "action": {"type": "deleteProject", "projectId": project_id}})
             assert not refused_delete["ok"] and "证据库接管" in refused_delete["error"]
