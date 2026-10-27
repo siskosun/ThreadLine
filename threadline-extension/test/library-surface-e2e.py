@@ -37,6 +37,18 @@ def run():
                 wait_until="domcontentloaded")
             panel.wait_for_selector("#library-open",state="visible")
             panel.wait_for_function("() => document.documentElement.dataset.surface !== 'library'")
+            assert "UI-D1 试用版" in panel.locator(".preview-build-marker").inner_text()
+            # The missing entry reported by a real installer must be prominent
+            # inside the FIRST narrow sidebar viewport, not merely in the DOM.
+            for width in (320,360):
+                panel.set_viewport_size({"width":width,"height":720})
+                launch=panel.locator("#library-open")
+                assert launch.is_visible(),f"library launch hidden at {width}px"
+                rect=launch.bounding_box()
+                assert rect and rect["y"] >= 0 and rect["y"] < 240, (width,rect)
+                assert rect["width"] > width*.72, (width,rect)
+                assert launch.is_enabled()
+            panel.set_viewport_size({"width":1280,"height":720})
             assert panel.get_by_role("tab").count()==3, "unmodified sidebar keeps 3 tabs"
             assert panel.locator("#nav-research").is_visible()
 
