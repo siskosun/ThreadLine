@@ -1,0 +1,57 @@
+name: Build UI-D1 preview installable folder artifact
+on:
+  push:
+    branches:
+      - chore/ui-d1-unpacked-package-20261027
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 71543b7d2648e5e05ae8c872573c133a0c2edf74
+      - name: Validate exact UI-D1 branch before packaging
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path("threadline-extension")
+          m=json.loads((root/"manifest.json").read_text("utf-8"))
+          html=(root/"panel.html").read_text("utf-8")
+          assert "UI-D1" in m.get("version_name","")
+          assert 'id="library-open"' in html
+          assert "UI-D1 试用版" in html
+          assert (root/"library-surface.js").is_file()
+          print("Validated UI-D1 preview entry at exact commit 71543b7d2648e5e05ae8c872573c133a0c2edf74")
+          PY
+      - name: Create single-extract folder package
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import shutil
+          source=Path("threadline-extension")
+          dest=Path("dist/ThreadLine-UI-D1-PR78")
+          shutil.copytree(source,dest,ignore=shutil.ignore_patterns("node_modules","__pycache__",".git"))
+          (dest/"INSTALL-FIRST.txt").write_text(
+              "研线 UI-D1 试用版（PR #78）\n"
+              "这是开发测试包，不是正式发布的 v0.8.2。\n"
+              "1. 解压此文件后，找到本目录的 manifest.json。\n"
+              "2. Chrome chrome://extensions 或 Edge edge://extensions 开启开发者模式。\n"
+              "3. 选“加载已解压的扩展程序”，直接选择本目录。\n"
+              "4. 关闭旧侧栏，打开新安装的研线；标题下会显示 UI-D1 试用版。\n"
+              "5. 三个标签下方点击“在宽页打开资料库 ↗”。\n"
+              "不要卸载旧扩展或删除其数据。不同路径加载可能产生独立扩展 ID。\n",
+              encoding="utf-8")
+          PY
+      - name: Upload unpacked extension folder
+        uses: actions/upload-artifact@v4
+        with:
+          name: ThreadLine-UI-D1-PR78-installable
+          path: dist/ThreadLine-UI-D1-PR78/
+          retention-days: 7
+          if-no-files-found: error
