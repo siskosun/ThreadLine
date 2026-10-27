@@ -8,7 +8,9 @@
   const TTL_MS=120000;
   const MAX_ID=128;
   const RELOAD_KEY="tl_library_view_v1";
-  const VALID_WORKSPACES=new Set(["switch","evidence"]);
+  const VALID_WORKSPACES=new Set(["switch","evidence","map"]);
+  const isMapRunId=value=>value===null||
+    (typeof value==="string"&&/^cap_[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(value));
   const VALID_FILTERS=new Set(["all","active","withdrawn"]);
   const isQuery=value=>typeof value==="string"&&value.length<=160&&
     !/[\u0000-\u001f\u007f]/.test(value);
@@ -30,6 +32,9 @@
       now-record.createdAt<=TTL_MS&&
       isProjectId(record.viewProjectId)&&isChatKey(record.sourceChatKey)&&
       VALID_FILTERS.has(record.filter)&&isQuery(record.query)&&
+      VALID_WORKSPACES.has(record.workspace??"evidence")&&
+      isMapRunId(record.mapRunId??null)&&
+      ((record.workspace??"evidence")!=="map"||record.mapRunId!==null&&record.mapRunId!==undefined)&&
       (record.sourceTabId===null
         ? record.sourceChatKey===null
         : isTabId(record.sourceTabId)&&record.sourceChatKey!==null);
@@ -62,9 +67,11 @@
     return null;
   }
   async function open({viewProjectId=null,sourceTabId=null,sourceChatKey=null,
-    filter="all",query="",windowId=null}={},api=chrome,now=Date.now()){
+    filter="all",query="",windowId=null,workspace="evidence",mapRunId=null}={},api=chrome,now=Date.now()){
     if(!isProjectId(viewProjectId)||!isChatKey(sourceChatKey)||
       !VALID_FILTERS.has(filter)||!isQuery(query)||
+      !VALID_WORKSPACES.has(workspace)||!isMapRunId(mapRunId)||
+      (workspace==="map"&&mapRunId===null)||
       (sourceTabId===null?sourceChatKey!==null:!isTabId(sourceTabId)||sourceChatKey===null))
       throw new Error("资料库导航参数无效");
     if(windowId!==null&&!isWindowId(windowId))
@@ -73,9 +80,21 @@
     // Repeated returns must not create a growing stack of wide pages.
     const previous=await findOpen(api,windowId,now);
     if(previous){
+      if(workspace==="map"){
+        // This explicitly requested map changes the current wide tab's view,
+        // not its permissions. Reload is intentional only for a new map.
+        // A generic "open library" still preserves the previous view.
+        const k=key(previous.id);
+        await api.storage.session.set({[k]:{
+          schema:1,tabId:previous.id,viewProjectId,sourceTabId,sourceChatKey,
+          filter,query,workspace,mapRunId,createdAt:now
+        }});
+        try{await api.tabs.reload(previous.id);}
+        catch(error){await api.storage.session.remove(k).catch(()=>{});throw error;}
+      }
       await api.tabs.update(previous.id,{active:true});
       if(api.windows?.update)await api.windows.update(previous.windowId,{focused:true});
-      return {tabId:previous.id,reused:true};
+      return {tabId:previous.id,reused:true,...(workspace==="map"?{navigated:true}:{})};
     }
     let tab=null;
     try{
@@ -86,7 +105,7 @@
       if(!isTabId(tab?.id))throw new Error("无法确认资料库标签页");
       await api.storage.session.set({[key(tab.id)]:{
         schema:1,tabId:tab.id,viewProjectId,sourceTabId,sourceChatKey,
-        filter,query,createdAt:now
+        filter,query,workspace,mapRunId,createdAt:now
       }});
       await api.tabs.update(tab.id,{url:api.runtime.getURL("panel.html"),active:true});
       return {tabId:tab.id,reused:false};
@@ -122,6 +141,8 @@
         ? view.sourceChatKey===null
         : isTabId(view.sourceTabId)&&view.sourceChatKey!==null)&&
       VALID_WORKSPACES.has(view.workspace)&&VALID_FILTERS.has(view.filter)&&
+      isMapRunId(view.mapRunId??null)&&
+      (view.workspace!=="map"||view.mapRunId!==null&&view.mapRunId!==undefined)&&
       isQuery(view.query);
   }
   function saveView(tabId,view,storage=root?.sessionStorage){
@@ -130,7 +151,8 @@
       topicProjectId:view.topicProjectId??null,
       sourceTabId:view.sourceTabId??null,
       sourceChatKey:view.sourceChatKey??null,
-      workspace:view.workspace,filter:view.filter,query:view.query??""};
+      workspace:view.workspace,filter:view.filter,query:view.query??"",
+      mapRunId:view.mapRunId??null};
     if(!validView(record,tabId))throw new Error("资料库阅读状态无效");
     storage.setItem(RELOAD_KEY,JSON.stringify(record));
     return record;
@@ -147,7 +169,7 @@
     return null;
   }
   const exposed=Object.freeze({TTL_MS,RELOAD_KEY,key,openKey,isTabId,isWindowId,
-    isProjectId,isChatKey,validIntent,validView,validOpen,
+    isProjectId,isChatKey,isMapRunId,validIntent,validView,validOpen,
     findOpen,registerOpen,open,consume,saveView,loadView});
   if(typeof module!=="undefined"&&module.exports)module.exports=exposed;
   if(root)root.ThreadLineLibrarySurface=exposed;
