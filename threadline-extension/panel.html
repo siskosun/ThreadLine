@@ -11,7 +11,7 @@
   <main id="app">
     <header class="topbar">
       <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
-      <div class="brand-text"><h1>研线 <span>ThreadLine</span></h1><p>切换对话之前，先看最新状态</p></div>
+      <div class="brand-text"><h1>研线 <span>ThreadLine</span></h1><p class="preview-build-marker">UI-D1 试用版 · PR #78</p></div>
       <div class="top-indicator" title="仅在本地浏览器存储"><i></i> 本地</div>
     </header>
     <nav class="workspace-tabs" aria-label="研线功能" role="tablist">
@@ -19,7 +19,7 @@
       <button id="nav-research" data-workspace="research" role="tab" aria-selected="false" aria-controls="workspace-research"><span class="nav-icon" aria-hidden="true">◎</span> 研究整理</button>
       <button id="nav-evidence" data-workspace="evidence" role="tab" aria-selected="false" aria-controls="workspace-evidence"><span class="nav-icon" aria-hidden="true">◇</span> 证据与交接</button>
     </nav>
-    <div id="library-launch" class="library-launch"><button type="button" id="library-open" class="text-button">在宽页打开资料库 ↗</button></div>
+    <div id="library-launch" class="library-launch"><button type="button" id="library-open" class="library-open-button" aria-label="在新标签页打开宽页资料库">在宽页打开资料库 <span aria-hidden="true">↗</span></button></div>
     <section id="library-header" class="library-header" hidden aria-label="资料库浏览上下文">
       <div><h2>研究资料库</h2>
         <p id="library-view-project" class="library-view-project" role="status">查看课题：正在读取…</p>
