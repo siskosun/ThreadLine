@@ -317,14 +317,33 @@
       holder.appendChild(empty);
       return;
     }
+    const titleKey = title => title.normalize("NFKC").toLocaleLowerCase();
+    const titleCounts = new Map();
+    for (const item of values) {
+      if (typeof item.taskTitle !== "string" || !item.taskTitle) continue;
+      const key = titleKey(item.taskTitle);
+      titleCounts.set(key,(titleCounts.get(key)||0)+1);
+    }
     for (const item of values) {
       const button = document.createElement("button");
       button.type = "button";
-      button.className = "secondary";button.dataset.experimentId=item.id;button.setAttribute("aria-pressed",String(item.id===currentExperiment));
+      button.className = "secondary";
+      button.dataset.experimentId=item.id;
+      button.setAttribute("aria-pressed",String(item.id===currentExperiment));
       const statuses = item.statuses || {A:item.statusA, B:item.statusB};
-      const mark = s => s === "done" ? "✓" : s === "failed" ? "✗" : s === "unknown" ? "?" : "…";
-      button.textContent = item.id + " · K=" + (item.branchCount || Object.keys(statuses).length) +
-        " · " + Object.entries(statuses).map(([l,s]) => l + mark(s)).join(" ");
+      const mark = status => status === "done" ? "✓" : status === "failed" ? "✗" : status === "unknown" ? "?" : "…";
+      const candidate = typeof item.taskTitle === "string" && item.taskTitle ? item.taskTitle : null;
+      const duplicate = candidate && titleCounts.get(titleKey(candidate)) > 1;
+      const displayTitle = candidate && !duplicate ? candidate : item.id;
+      const date = Number.isSafeInteger(item.createdAt) && item.createdAt > 0
+        ? new Date(item.createdAt).toLocaleDateString() : "日期未知";
+      const branchCount = Number.isSafeInteger(item.branchCount) && item.branchCount > 0
+        ? item.branchCount : Object.keys(statuses).length;
+      const progress = Object.entries(statuses).map(([label,status]) => label + mark(status)).join(" ");
+      button.textContent = displayTitle + " · " + date + " · K=" + branchCount + " · " + progress;
+      button.title = duplicate ? "标题重复，列表使用完整实验 ID 区分" :
+        candidate ? candidate : "任务指令为空或含控制字符，列表使用完整实验 ID";
+      button.setAttribute("aria-label",displayTitle + "，" + date + "，" + branchCount + " 个分支，" + progress);
       button.addEventListener("click", () => read(item.id).catch(e=>notice(e.message,true)));
       holder.appendChild(button);
     }
@@ -409,6 +428,15 @@
       await list();
     } catch (e) { notice("导入被拒绝：" + e.message, true); }
     finally { event.target.value = ""; }
+  });
+  $("ff-copy-id").addEventListener("click",async()=>{
+    if(!currentExperiment){notice("请先选择一个实验。",true);return;}
+    try{
+      await navigator.clipboard.writeText(currentExperiment);
+      notice("已复制完整实验 ID。");
+    }catch{
+      notice("无法自动复制；请从实验详情中的 ID 文本手动复制："+currentExperiment,true);
+    }
   });
   $("ff-refresh").addEventListener("click", () =>
     list().catch(error => notice(error.message,true)));
