@@ -141,8 +141,8 @@ def run():
             assert "合成原始依据" in source_details.first.inner_text()
             versions.nth(1).locator(":scope > summary").click()
             assert "仅限合成的第二版" in versions.nth(1).inner_text()
-            assert item.get_by_role("button",name="修订").is_hidden()
-            assert item.get_by_role("button",name="撤回").is_hidden()
+            assert item.get_by_role("button",name="修订").count()==0
+            assert item.get_by_role("button",name="撤回").count()==0
             # No change to evidence count or versions from read-only browsing.
             fresh=send({"type":"EV_LIST","projectId":pid})
             assert len(fresh["rows"])==200
