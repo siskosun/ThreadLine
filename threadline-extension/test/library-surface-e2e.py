@@ -160,11 +160,29 @@ def run():
             assert library.locator("#quick-section").is_hidden()
             assert library.locator("#backup-export").is_hidden()
             assert library.locator("#topic-list .topic-card").count()==2
+            assert library.locator(f'#topic-list [data-action="select-project"][data-id="{pid}"]').get_attribute("aria-pressed")=="true", "evidence A should be the same default in topic view"
             library.get_by_role("tab",name="结论与依据").click()
             library.locator("#evidence-project").select_option(other)
             library.wait_for_function(
                 "() => document.querySelector('#evidence-summary').textContent.includes('已采纳 1 条')")
             assert "稀有核查词" not in library.locator("#evidence-list").inner_text()
+            assert "另一个课题专属结论" in library.locator("#evidence-list").inner_text()
+            library.get_by_role("tab",name="课题与对话").click()
+            library.wait_for_function(
+                "id => [...document.querySelectorAll('#topic-list [data-id]')].some(n=>n.dataset.id===id && n.getAttribute('aria-pressed')==='true')",arg=other)
+            library.locator(f'#topic-list [data-action="select-project"][data-id="{pid}"]').click()
+            library.wait_for_function(
+                "id => document.querySelector('#evidence-project').value===id",arg=pid)
+            library.get_by_role("tab",name="结论与依据").click()
+            library.wait_for_function(
+                "() => document.querySelector('#evidence-list-count').textContent.includes('匹配 200 / 200')")
+            library.get_by_role("tab",name="课题与对话").click()
+            library.locator(f'#topic-list [data-action="select-project"][data-id="{other}"]').click()
+            library.wait_for_function(
+                "id => document.querySelector('#evidence-project').value===id",arg=other)
+            library.get_by_role("tab",name="结论与依据").click()
+            library.wait_for_function(
+                "() => document.querySelector('#evidence-list-count').textContent.includes('匹配 1 / 1')")
             assert "另一个课题专属结论" in library.locator("#evidence-list").inner_text()
 
             # A library refresh must preserve this tab's view; the one-shot
