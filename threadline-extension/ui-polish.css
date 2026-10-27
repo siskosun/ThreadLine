@@ -115,6 +115,7 @@ button{min-height:36px}.primary{min-height:40px}button[aria-busy=true]{cursor:wa
   border:1px solid #ccd9e8;border-radius:13px;background:#f4f8fd;padding:16px 18px;margin:0 0 20px}
 .library-header h2{font-size:19px;line-height:1.4;margin:0 0 5px;color:var(--ui-text)}
 .library-header p{font-size:13px;line-height:1.7;color:var(--ui-muted);margin:0;overflow-wrap:anywhere}
+.library-header-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
 .library-header button{flex:none;font-size:13px;min-height:40px}
 html[data-surface="library"] body{overflow-x:visible}
 html[data-surface="library"] #app{max-width:1120px;padding:20px 22px 34px}
