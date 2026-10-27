@@ -36,7 +36,7 @@ def run():
             panel.set_default_timeout(12000)
             panel.goto(f"chrome-extension://{extid}/panel.html",wait_until="domcontentloaded")
             panel.wait_for_function("() => document.querySelector('#library-open')!==null")
-            panel.evaluate("""async ([id,url])=>{
+            panel.evaluate("""async ([id,url,otherId])=>{
               const now=Date.now();
               const run={id,tabId:42,conversationId:'synthetic-map-source',
                 url,title:'虚构固定研究：历史数据验证',status:'done',
@@ -53,11 +53,11 @@ def run():
                 ]});
               await chrome.storage.local.set({tl_last_capture_id:id});
               await ThreadLineCaptureDB.putRun({
-                ...run,id:arguments[0][2],title:'虚构研究 B：独立采集',
+                ...run,id:otherId,title:'虚构研究 B：独立采集',
                 createdAt:now+1,updatedAt:now+1
               });
               await ThreadLineCaptureDB.putPage({
-                id:arguments[0][2],pageIndex:0,chunkIndex:0,
+                id:otherId,pageIndex:0,chunkIndex:0,
                 messages:[{id:'b1',role:'assistant',
                   content:'第二份独立采集已明确保存，不得显示第一份导图。'}]
               });
