@@ -51,6 +51,25 @@ def run():
             panel.set_viewport_size({"width":1280,"height":720})
             assert panel.get_by_role("tab").count()==3, "unmodified sidebar keeps 3 tabs"
             assert panel.locator("#nav-research").is_visible()
+            # UI-D2: the entire heading is the hit area, not three fake links.
+            panel.set_viewport_size({"width":360,"height":760})
+            manage=panel.locator("#manage-accordion")
+            advanced=panel.locator("#advanced-accordion")
+            assert manage.get_attribute("open") is None
+            assert advanced.get_attribute("open") is None
+            header=manage.locator(":scope > summary")
+            assert header.bounding_box()["height"]>=44
+            assert "创建 · 关联 · 清理" not in header.inner_text()
+            header.click()
+            assert manage.get_attribute("open") is not None
+            assert panel.locator("#create-form").is_visible()
+            assert panel.locator("#ff-preview-link").is_hidden()
+            advanced.locator(":scope > summary").click()
+            assert panel.locator("#ff-preview-link").is_visible()
+            assert panel.locator("#backup-export").is_visible()
+            advanced.locator(":scope > summary").click()
+            assert panel.locator("#ff-preview-link").is_hidden()
+            panel.set_viewport_size({"width":1280,"height":720})
 
             def send(payload):
                 response=panel.evaluate("p=>chrome.runtime.sendMessage(p)",payload)
@@ -62,6 +81,29 @@ def run():
             second=send({"type":"MUTATE","action":{"type":"createProject","name":"测试课题 B"}})
             ids=[x["id"] for x in second["state"]["projects"]]
             other=next(x for x in ids if x!=pid)
+            send({"type":"MUTATE","action":{"type":"linkChat",
+                "projectId":pid,"key":"chat:synthetic-library-source",
+                "title":"合成源对话","url":"https://chatgpt.com/c/synthetic-library-source"}})
+            panel.wait_for_function(
+                "()=>document.querySelectorAll('#topic-list .topic-card').length===2")
+            panel.locator(f'#topic-list .topic-card[data-id="{pid}"]').click()
+            assert panel.locator("#detail-section").is_visible()
+            edit=panel.locator("#topic-edit-details")
+            assert edit.get_attribute("open") is None
+            edit.locator(":scope > summary").click()
+            assert edit.get_attribute("open") is not None
+            panel.locator("#edit-goal").fill("合成目标：检查折叠后可编辑")
+            panel.locator('[data-action="save-details"]').click()
+            panel.wait_for_function(
+                "id=>document.querySelector('#topic-list .topic-card[data-id=\"'+id+'\"]')!==null",arg=pid)
+            assert panel.locator("#topic-edit-details").get_attribute("open") is not None
+            tool=panel.locator("#detail-section .branch-tool-details")
+            assert tool.count()>=1
+            assert tool.first.get_attribute("open") is None
+            assert panel.locator("#detail-section [data-action='go-chat']").first.is_visible()
+            tool.first.locator(":scope > summary").click()
+            assert tool.first.get_attribute("open") is not None
+            assert tool.first.locator('[data-action="note-chat"]').is_visible()
 
             def adopt_one(project_id,name,sequence):
                 return send({"type":"EV_ADOPT","projectId":project_id,"text":name,
