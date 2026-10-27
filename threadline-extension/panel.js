@@ -336,12 +336,19 @@
       return `<article class="branch-card"><div class="branch-top"><div class="branch-name">${escape(c.label||c.title)}</div><span class="badge ${c.stage==='done'?'done':c.stage==='review'?'review':''}">${stageLabels[c.stage]}</span></div>
       <div class="branch-mini">${tab?(isGenerating(tab)?"● 正在回答":"● 标签页已打开"):"○ 标签页未打开"}${c.note?" · "+escape(c.note):""}</div>
       ${ThreadLineCore.isOutdated(state,c)?`<div class="branch-version">待核对：分支 v${c.seenVersion||0} → 课题 v${p.knowledgeVersion||0}<div class="diff-preview">${escape(changeDescriptions(p,c.seenVersion))}</div></div>`:""}
-      <div class="branch-actions"><select aria-label="分支状态" data-stage-key="${escape(c.key)}">${options.map(([v,label])=>`<option value="${v}" ${c.stage===v?"selected":""}>${label}</option>`).join('')}</select>
-      <button data-action="go-chat" data-key="${escape(c.key)}" ${(!tab && c.key.startsWith('tab:'))?'disabled':''}>打开</button>
-      <button data-action="label-chat" data-key="${escape(c.key)}">命名</button>
-      <button data-action="note-chat" data-key="${escape(c.key)}">进度</button>
-      ${ThreadLineCore.isOutdated(state,c)?`<button data-action="ack-branch" data-key="${escape(c.key)}">已核对</button>`:""}
-      <button data-action="unlink-chat" data-key="${escape(c.key)}">移除</button></div></article>`;
+      <div class="branch-actions">
+        <button data-action="go-chat" data-key="${escape(c.key)}" ${(!tab && c.key.startsWith('tab:'))?'disabled':''}>打开对话</button>
+        <details class="branch-tool-details">
+          <summary>管理分支</summary>
+          <div class="branch-tool-content">
+            <select aria-label="分支状态" data-stage-key="${escape(c.key)}">${options.map(([v,label])=>`<option value="${v}" ${c.stage===v?"selected":""}>${label}</option>`).join('')}</select>
+            <button data-action="label-chat" data-key="${escape(c.key)}">命名</button>
+            <button data-action="note-chat" data-key="${escape(c.key)}">进度</button>
+            ${ThreadLineCore.isOutdated(state,c)?`<button data-action="ack-branch" data-key="${escape(c.key)}">已核对</button>`:""}
+            <button data-action="unlink-chat" data-key="${escape(c.key)}">移除</button>
+          </div>
+        </details>
+      </div></article>`;
     }).join("");
     const hist=(p.history||[]).slice(-8).reverse().map(v=>`<article class="history-row"><strong>v${v.version} · ${escape({goal:'目标',decision:'结论',stage:'状态'}[v.field]||v.field)}</strong><p><del>${escape(String(v.before||'（空）').slice(0,180))}</del> → ${escape(String(v.after||'（空）').slice(0,180))}</p></article>`).join('');
     host.innerHTML=`
