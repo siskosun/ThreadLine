@@ -105,3 +105,65 @@ button{min-height:36px}.primary{min-height:40px}button[aria-busy=true]{cursor:wa
 @media(max-width:380px){.workspace-tabs .nav-icon{display:none}#evidence-section{padding-left:11px;padding-right:11px}.tl-dialog,.evidence-adoption-dialog{padding:16px}}
 @media(pointer:coarse){button,summary{min-height:44px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important}}
+
+
+/* UI-D1: opt-in wide library rendered by the exact trusted panel.html.
+ * The normal narrow side panel and its three tabs are deliberately unchanged. */
+.library-launch{display:flex;justify-content:flex-end;margin:-8px 0 12px}
+.library-launch button{font-size:12px;min-height:36px;text-decoration:underline;text-underline-offset:3px}
+.library-header{display:flex;gap:18px;align-items:flex-start;justify-content:space-between;
+  border:1px solid #ccd9e8;border-radius:13px;background:#f4f8fd;padding:16px 18px;margin:0 0 20px}
+.library-header h2{font-size:19px;line-height:1.4;margin:0 0 5px;color:var(--ui-text)}
+.library-header p{font-size:13px;line-height:1.7;color:var(--ui-muted);margin:0;overflow-wrap:anywhere}
+.library-header button{flex:none;font-size:13px;min-height:40px}
+html[data-surface="library"] body{overflow-x:visible}
+html[data-surface="library"] #app{max-width:1120px;padding:20px 22px 34px}
+html[data-surface="library"] .brand-text p{font-size:13px}
+html[data-surface="library"] #nav-research,
+html[data-surface="library"] #workspace-switch #current-section,
+html[data-surface="library"] #workspace-switch #quick-section,
+html[data-surface="library"] #workspace-switch .backup-section,
+html[data-surface="library"] #workspace-switch .health-section,
+html[data-surface="library"] #workspace-switch .manage-content>.surface,
+html[data-surface="library"] #workspace-switch #clear-closed,
+html[data-surface="library"] #workspace-switch .new-topic,
+html[data-surface="library"] #workspace-switch #edit-form .detail-controls,
+html[data-surface="library"] #workspace-switch .end-actions,
+html[data-surface="library"] #workspace-evidence #evidence-handoff,
+html[data-surface="library"] #workspace-evidence #evidence-handoff-view,
+html[data-surface="library"] #workspace-evidence #evidence-handoff-copy,
+html[data-surface="library"] #workspace-evidence #evidence-handoff-read,
+html[data-surface="library"] #workspace-evidence .evidence-write-action{display:none!important}
+html[data-surface="library"] .workspace-tabs{grid-template-columns:repeat(2,minmax(0,1fr));max-width:510px;position:static}
+html[data-surface="library"] .workspace-tabs button{font-size:14px;min-height:44px;padding:10px 12px}
+html[data-surface="library"] #workspace-evidence .workspace-intro h2{font-size:18px}
+html[data-surface="library"] #workspace-evidence #evidence-section{padding:2px 18px 26px}
+html[data-surface="library"] #workspace-evidence #evidence-section .line{gap:12px}
+html[data-surface="library"] #workspace-evidence .evidence-item{padding:17px 18px;margin:12px 0}
+html[data-surface="library"] #workspace-evidence .evidence-item>summary{font-size:15px;line-height:1.7}
+html[data-surface="library"] #workspace-evidence .evidence-item-body{font-size:15px}
+html[data-surface="library"] #workspace-switch #manage-accordion{margin-top:0}
+html[data-surface="library"] #workspace-switch .manage-content{padding:12px 18px 20px}
+html[data-surface="library"] #workspace-switch #detail-section{margin-top:14px}
+html[data-surface="library"] #workspace-switch #edit-form input:disabled,
+html[data-surface="library"] #workspace-switch #edit-form textarea:disabled,
+html[data-surface="library"] #workspace-switch .branch-actions select:disabled{opacity:1;color:#304b64;background:#f6f8fb}
+@media(min-width:860px){
+  html[data-surface="library"] #app{display:grid;grid-template-columns:220px minmax(0,1fr);column-gap:26px}
+  html[data-surface="library"] .topbar{grid-column:1 / -1}
+  html[data-surface="library"] .workspace-tabs{
+    grid-column:1;grid-row:2 / span 3;position:sticky;top:20px;align-self:start;
+    display:flex;flex-direction:column;max-width:none;margin:0}
+  html[data-surface="library"] #library-header{grid-column:2;grid-row:2}
+  html[data-surface="library"] #critical-notice{grid-column:2;grid-row:3}
+  html[data-surface="library"] .workspace-pane{grid-column:2;grid-row:4}
+  html[data-surface="library"] footer{grid-column:1 / -1}
+  html[data-surface="library"] .workspace-tabs button{text-align:left;width:100%}
+  html[data-surface="library"] .topic-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:480px){
+  .library-header{flex-direction:column;gap:10px;padding:13px}
+  html[data-surface="library"] #app{padding:13px 12px 20px}
+  html[data-surface="library"] #workspace-evidence #evidence-section{padding:0 10px 16px}
+  html[data-surface="library"] .workspace-tabs button{font-size:12px}
+}
