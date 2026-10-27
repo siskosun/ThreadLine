@@ -10,6 +10,7 @@ EXT=Path(os.environ.get("THREADLINE_EXTENSION_PATH",
     Path(__file__).resolve().parents[1])).resolve()
 SOURCE="https://chatgpt.com/c/synthetic-map-source"
 RUN="cap_00000000-0000-4000-8000-000000000001"
+RUN_B="cap_00000000-0000-4000-8000-000000000002"
 SITE="""<!doctype html><html lang="zh-CN"><title>模拟对话</title><body>
 <form><div id="prompt-textarea" contenteditable="true"></div></form>
 <div data-message-author-role="assistant">虚构研究回答</div>
@@ -51,7 +52,16 @@ def run():
                     content:'初步结论：示例指标仍需复算，尚未确认增长原因。下一步建议补充对照组。'}
                 ]});
               await chrome.storage.local.set({tl_last_capture_id:id});
-            }""",[RUN,SOURCE])
+              await ThreadLineCaptureDB.putRun({
+                ...run,id:arguments[0][2],title:'虚构研究 B：独立采集',
+                createdAt:now+1,updatedAt:now+1
+              });
+              await ThreadLineCaptureDB.putPage({
+                id:arguments[0][2],pageIndex:0,chunkIndex:0,
+                messages:[{id:'b1',role:'assistant',
+                  content:'第二份独立采集已明确保存，不得显示第一份导图。'}]
+              });
+            }""",[RUN,SOURCE,RUN_B])
             panel.reload(wait_until="domcontentloaded")
             panel.get_by_role("tab",name="研究整理").click()
             panel.locator("#capture-report").wait_for(state="visible")
@@ -96,6 +106,26 @@ def run():
             panel.locator("#report-open-wide-map").click()
             library.wait_for_function(
                 "() => document.querySelector('#wide-map-status')?.textContent.includes('虚构固定研究')")
+            assert len(context.pages)==existing+1
+            # A new explicit map B intent must win over map A sessionStorage,
+            # and choosing A again must restore A without cloning the wide tab.
+            switched=panel.evaluate("""async id=>{
+              const w=await chrome.windows.getCurrent();
+              return await ThreadLineLibrarySurface.open({
+                workspace:'map',mapRunId:id,windowId:w.id
+              });
+            }""",RUN_B)
+            assert switched["reused"] is True
+            library.wait_for_function(
+                "() => document.querySelector('#wide-map-status')?.textContent.includes('虚构研究 B')")
+            assert RUN_B in library.locator("#wide-map-scope").inner_text()
+            assert RUN not in library.locator("#wide-map-scope").inner_text()
+            assert len(context.pages)==existing+1
+            panel.bring_to_front()
+            panel.locator("#report-open-wide-map").click()
+            library.wait_for_function(
+                "() => document.querySelector('#wide-map-status')?.textContent.includes('虚构固定研究')")
+            assert RUN in library.locator("#wide-map-scope").inner_text()
             assert len(context.pages)==existing+1
             # Navigating the browser source does not silently replace map target.
             source.goto("https://chatgpt.com/c/other-synthetic",wait_until="domcontentloaded")
