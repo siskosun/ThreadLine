@@ -214,3 +214,22 @@ html[data-surface="library"] #workspace-switch .branch-actions select:disabled{o
 html[data-surface="library"] #workspace-switch #advanced-accordion .manage-content>.surface{
   display:block!important
 }
+
+/* Optional research tools do not compete with the captured report and
+ * individual evidence adoption on the first reading path. */
+.research-tool-details{border:1px solid #d9e3ef;border-radius:11px;
+  background:#fff;margin:12px 0;overflow:hidden}
+.research-tool-details>summary{list-style:none;display:flex;align-items:center;min-height:44px;
+  gap:8px;padding:11px 12px;cursor:pointer;color:#305578;font-size:13px;font-weight:700}
+.research-tool-details>summary::-webkit-details-marker{display:none}
+.research-tool-details>summary::before{content:"▸";color:#416da0;font-size:16px}
+.research-tool-details[open]>summary::before{content:"▾"}
+.research-tool-details>summary>span{margin-left:auto;color:#617991;font-size:11px;font-weight:500}
+.research-tool-details>summary:hover{background:#f0f6fd}
+.research-tool-details>summary:focus-visible{outline:3px solid #8eb7e7;outline-offset:-3px}
+.research-tool-details>.ai-workbench,
+.research-tool-details>.remote-actions{margin:0;border:0;border-top:1px solid #edf0f5;
+  padding:14px 12px;background:#fff;box-shadow:none}
+.research-tool-details>.map-section{margin:0;padding:14px 6px 10px;border:0;
+  border-top:1px solid #edf0f5;max-width:100%}
+.research-tool-details .map-scroll{max-width:100%}
