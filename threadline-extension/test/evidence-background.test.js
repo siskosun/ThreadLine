@@ -146,7 +146,10 @@ test('first adoption takes over, captures legacy note, projects summary to stora
 test('UX-05 history is strictly read-only even when deferred cleanup exists', async () => {
   const s=system();
   const adopted=await s.message(adoption('p-taken','历史读取不应清理其他课题'));
-  await new Promise(resolve=>setImmediate(resolve));
+  // Drain the write-side projection through the normal authoritative read
+  // before introducing a separate pending-cleanup marker. The assertion then
+  // measures only the EV_HISTORY request, not the preceding adoption.
+  await s.message({type:'EV_SUMMARY',projectId:'p-taken'});
   const deleted={projectId:'ghost-deleted',deleted:true,cleanupPending:true,evidenceRevision:1};
   s.evidence.projects.set(deleted.projectId,deleted);
   const prior=structuredClone(Object.fromEntries(s.local));
