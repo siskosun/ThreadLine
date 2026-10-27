@@ -916,14 +916,52 @@
     } catch(e){notifyCritical("交接已读记录失败或结果未确认："+e.message+"。请核对当前课题的交接历史后再决定是否重试。");}
   });
   window.addEventListener("threadline-evidence-changed",()=>{renderEvidence().catch(e=>notifyCritical("证据课题列表读取失败："+e.message));refresh(true);});
-  renderEvidence().catch(error=>notifyCritical("证据课题列表读取失败："+error.message));
+  async function initializeSurface() {
+    let tab=null,intent=null;
+    try{tab=await chrome.tabs.getCurrent();}catch{}
+    if(tab?.id){
+      try{intent=await ThreadLineLibrarySurface.consume(tab.id);}
+      catch(error){notifyCritical("资料库导航意图读取失败："+error.message+"；已恢复原始侧栏布局。");}
+    }
+    if(!intent){
+      setWorkspace("switch");
+      renderEvidence().catch(error=>notifyCritical("证据课题列表读取失败："+error.message));
+      return;
+    }
+    surface="library";
+    librarySourceTabId=intent.sourceTabId;
+    libraryInitialProjectId=intent.viewProjectId;
+    librarySelectionPending=true;
+    document.documentElement.dataset.surface="library";
+    $("#library-launch").hidden=true;
+    $("#library-header").hidden=false;
+    $("#nav-research").hidden=true;
+    $("#nav-research").tabIndex=-1;
+    $("#nav-switch").lastChild.textContent=" 课题与对话";
+    $("#nav-evidence").lastChild.textContent=" 结论与依据";
+    $("#manage-accordion").open=true;
+    const context=$("#library-context-text");
+    if(librarySourceTabId){
+      const source=await chrome.tabs.get(librarySourceTabId).catch(()=>null);
+      if(source&&ThreadLineCore.isChatURL(source.url))
+        context.textContent="来源对话："+(source.title||"未命名")+
+          "。查看别的课题不会改变此来源或任何采集任务。";
+      else{
+        librarySourceTabId=null;
+        context.textContent="原来源对话已关闭或改变；请明确选择课题，不能据此运行网页自检。";
+      }
+    }else context.textContent="来源对话未指定；只浏览研究资料，操作目标由当前选中的课题决定。";
+    setWorkspace("evidence");
+  }
   document.querySelector(".workspace-tabs").addEventListener("keydown", e => {
     if (!["ArrowLeft","ArrowRight","Home","End"].includes(e.key)) return;
     e.preventDefault();
-    const names=["switch","research","evidence"],index=names.indexOf(workspace);
+    const names=surface==="library"?["switch","evidence"]:["switch","research","evidence"];
+    const index=names.indexOf(workspace);
     const next=e.key==="Home"?names[0]:e.key==="End"?names.at(-1):names[(index+(e.key==="ArrowLeft"?-1:1)+names.length)%names.length];
     setWorkspace(next);$("#nav-"+next).focus();
   });
-  setWorkspace("switch");
+  initializeSurface().catch(error=>
+    notifyCritical("资料库初始化失败："+error.message+"。请重新打开面板核对。"));
   refresh(true);
 })();
