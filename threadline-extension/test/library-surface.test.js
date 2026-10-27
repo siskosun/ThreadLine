@@ -3,21 +3,47 @@ const assert=require("node:assert/strict");
 const Surface=require("../library-surface.js");
 
 function fakeApi({failUpdate=false,failSet=false}={}){
-  const store={},events=[];let nextId=41;
+  const store={},events=[],openTabs=[];let nextId=41;
   const api={
     runtime:{getURL(path){return "chrome-extension://scope-test/"+path;}},
     storage:{session:{
       async set(value){events.push("store");if(failSet)throw Error("storage blocked");Object.assign(store,value);},
-      async get(key){events.push("get:"+key);return {[key]:store[key]};},
-      async remove(key){events.push("remove");delete store[key];}
+      async get(key){
+        events.push("get:"+key);
+        const keys=Array.isArray(key)?key:[key];
+        return Object.fromEntries(keys.map(k=>[k,store[k]]));
+      },
+      async remove(key){
+        events.push("remove");
+        for(const k of Array.isArray(key)?key:[key])delete store[k];
+      }
     }},
     tabs:{
-      async create(options){events.push("create:"+options.url);return{id:nextId++};},
-      async update(id,options){events.push("navigate:"+id);if(failUpdate)throw Error("navigation blocked");assert.equal(options.url,"chrome-extension://scope-test/panel.html");assert.equal(options.active,true);},
-      async remove(id){events.push("close:"+id);}
-    }
+      async query({windowId,url}={}){
+        return openTabs.filter(t=>t.windowId===windowId&&t.url===url);
+      },
+      async create(options){
+        events.push("create:"+options.url);
+        const tab={id:nextId++,windowId:options.windowId??5,url:options.url};
+        openTabs.push(tab);return tab;
+      },
+      async update(id,options){
+        events.push("navigate:"+id);
+        if(failUpdate)throw Error("navigation blocked");
+        const tab=openTabs.find(t=>t.id===id);assert.ok(tab);
+        if(options.url!==undefined){
+          assert.equal(options.url,"chrome-extension://scope-test/panel.html");
+          tab.url=options.url;
+        }
+        assert.equal(options.active,true);return tab;
+      },
+      async remove(id){events.push("close:"+id);
+        const i=openTabs.findIndex(t=>t.id===id);if(i>=0)openTabs.splice(i,1);
+      }
+    },
+    windows:{async update(id,opts){events.push("focus:"+id);assert.equal(opts.focused,true);}}
   };
-  return {api,store,events};
+  return {api,store,events,openTabs};
 }
 test("UI-D1 source and target are handed to one exact tab before navigation",async()=>{
   const fake=fakeApi(),now=100000;
@@ -36,6 +62,34 @@ test("UI-D1 source and target are handed to one exact tab before navigation",asy
   assert.equal(item.viewProjectId,"tp_projectA");
   assert.equal(item.sourceTabId,4);
   assert.equal(await Surface.consume(41,fake.api,now+301),null,"intent is strictly one-shot");
+});
+test("UI-D1 reuses same-window library tab without resetting view, even while first intent pending",async()=>{
+  const fake=fakeApi(),now=100000;
+  const first=await Surface.open({viewProjectId:"tp_A",windowId:5},fake.api,now);
+  assert.equal(first.reused,false);
+  const pending=await Surface.open({viewProjectId:"tp_B",windowId:5},fake.api,now+10);
+  assert.deepEqual(pending,{tabId:first.tabId,reused:true});
+  assert.equal(fake.events.filter(e=>e.startsWith("create:")).length,1);
+  assert.equal(fake.store[Surface.key(first.tabId)].viewProjectId,"tp_A");
+  assert.ok(fake.events.includes("focus:5"));
+  await Surface.consume(first.tabId,fake.api,now+20);
+  await Surface.registerOpen(fake.openTabs[0],fake.api);
+  const reopened=await Surface.open({viewProjectId:"tp_B",windowId:5},fake.api,now+30);
+  assert.equal(reopened.reused,true);
+  assert.equal(fake.events.filter(e=>e.startsWith("create:")).length,1);
+  assert.ok(fake.store[Surface.openKey(first.tabId)]);
+  const newWindow=await Surface.open({viewProjectId:"tp_B",windowId:6},fake.api,now+40);
+  assert.equal(newWindow.reused,false);
+  assert.equal(fake.openTabs.filter(t=>t.windowId===6).length,1);
+});
+test("UI-D1 ignores direct panel tabs not actually registered as library",async()=>{
+  const fake=fakeApi(),url=fake.api.runtime.getURL("panel.html");
+  fake.openTabs.push({id:9,windowId:5,url});
+  assert.equal(await Surface.findOpen(fake.api,5),null);
+  assert.equal(Surface.validOpen({schema:1,tabId:9,windowId:6},fake.openTabs[0]),false);
+  const created=await Surface.open({windowId:5},fake.api,200);
+  assert.equal(created.reused,false);
+  assert.equal(created.tabId,41);
 });
 test("UI-D1 intent cannot be consumed by another tab or after deadline",async()=>{
   const fake=fakeApi(),now=100000;
