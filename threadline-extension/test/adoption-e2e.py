@@ -28,6 +28,7 @@ def run():
                 context.wait_for_event("serviceworker", timeout=15000)
             extension_id = worker.url.split("/")[2]
             page = context.new_page()
+            page.set_viewport_size({"width": 360, "height": 900})
             page.set_default_timeout(10000)
             page.goto(f"chrome-extension://{extension_id}/panel.html", wait_until="domcontentloaded")
             page.wait_for_selector("#evidence-section", state="attached")
@@ -77,6 +78,23 @@ def run():
             assert opened is None
             dialog = page.locator("dialog.evidence-adoption-dialog")
             expect(dialog).to_be_visible()
+            def action_bounds():
+                return dialog.evaluate("""dialog => {
+                    const outer = dialog.getBoundingClientRect();
+                    return [...dialog.querySelectorAll('.evidence-adoption-actions button')].map(button => {
+                      const rect = button.getBoundingClientRect();
+                      return {text:button.textContent,visible:rect.top >= Math.max(0, outer.top) &&
+                        rect.bottom <= Math.min(innerHeight, outer.bottom) &&
+                        rect.left >= Math.max(0, outer.left) && rect.right <= Math.min(innerWidth, outer.right)};
+                    });
+                }""")
+            assert all(button["visible"] for button in action_bounds()), action_bounds()
+            content = dialog.locator(".evidence-adoption-body")
+            assert content.get_attribute("tabindex") == "0"
+            content.focus()
+            page.keyboard.press("PageDown")
+            page.wait_for_function("node => node.scrollTop > 0", arg=content.element_handle(), timeout=2000)
+            assert all(button["visible"] for button in action_bounds()), action_bounds()
             dialog.locator("#evidence-adopt-project").select_option(project_id)
             original = dialog.locator('textarea[aria-label="原始消息全文"]')
             expect(original).to_have_value("重复片段；中间内容；重复片段。")

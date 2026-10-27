@@ -33,3 +33,24 @@ test("maintenance UI has no normal snapshot dependency and keeps explicit commit
   assert.ok(source.includes("不会自动重试"));
   assert.ok(source.includes("包含对话原文片段"));
 });
+
+test("maintenance target defaults to viewed project, allows explicit other target and skips deleted records",()=>{
+  const projects=[{id:"A",name:"viewed",deleted:false},{id:"B",name:"other",deleted:false},{id:"C",deleted:true}];
+  assert.equal(UI.chooseMaintenanceProject(projects,"B",""),"B");
+  assert.equal(UI.chooseMaintenanceProject(projects,"A","B"),"B", "ordinary refresh keeps manual maintenance target");
+  assert.equal(UI.chooseMaintenanceProject(projects,"A","B",true),"A", "view switching explicitly re-aligns scope");
+  assert.equal(UI.chooseMaintenanceProject(projects,"C","A",true),"A", "deleted view cannot become maintenance target");
+  assert.equal(UI.chooseMaintenanceProject(projects,"C","C",true),"A");
+  assert.equal(UI.chooseMaintenanceProject([],"A","B",true),"");
+});
+
+test("maintenance scope syncing does not replace destructive preview identity or depend on ordinary snapshot",()=>{
+  const fs=require("node:fs");
+  const path=require("node:path");
+  const source=fs.readFileSync(path.join(__dirname,"..","evidence-maintenance-ui.js"),"utf8");
+  assert.ok(source.includes('viewSelect?.addEventListener("change",followCurrentView)'));
+  assert.ok(source.includes('if(busy||pendingRestore||(!retry.hidden&&pendingDelete))'));
+  assert.ok(source.includes("与当前查看课题不同，请核对范围"));
+  assert.ok(source.includes('type:"EV_DELETE_COMMIT"'));
+  assert.equal(source.includes('type:"SNAPSHOT"'),false);
+});

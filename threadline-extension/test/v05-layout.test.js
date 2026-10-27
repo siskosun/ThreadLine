@@ -34,3 +34,19 @@ test('stale branch reminder stays nonblocking, unlike explicit closure',()=>{
  const fn=content.slice(content.indexOf('  function guarded()'), content.indexOf('  function paint()'));
  assert.ok(!fn.includes('stale'));
 });
+test('legacy backup copy states its actual scope and exclusions',()=>{
+ assert.ok(html.includes('不包含已采纳结论与证据、Fork 实验或临时采集全文'));
+ assert.ok(html.includes('检查并替换本地课题与关联'));
+ assert.ok(!html.includes('检查并导入（覆盖当前课题）'));
+ assert.ok(panel.includes('替换当前所有本地课题与对话关联'));
+});
+test('empty evidence next action preserves any existing legacy note in lazy list rendering',()=>{
+ assert.ok(panel.includes('legacyNote:data.project?.legacyNote?.text||""'));
+ const start=panel.indexOf('function renderEvidenceRows()');
+ const end=panel.indexOf('ev$("evidence-refresh")',start);
+ assert.ok(start>=0&&end>start);
+ const segment=panel.slice(start,end);
+ assert.ok(segment.includes('if(cache.legacyNote)'));
+ assert.ok(segment.includes('body.textContent=cache.legacyNote'));
+ assert.ok(segment.includes('createEvidenceNext("open-research","打开研究整理")'));
+});

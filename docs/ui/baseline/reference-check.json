@@ -1,0 +1,41 @@
+{
+  "source": "80f4524668b42ac36cdd65dd13ff5c44726cb71e",
+  "sourceDirty": false,
+  "capturedAt": "2026-10-26T09:55:42.409Z",
+  "playwright": "1.62.1",
+  "browser": "156.0.8078.4",
+  "referenceViewports": [
+    1280,
+    768,
+    360,
+    320
+  ],
+  "layouts": [
+    {
+      "width": 1280,
+      "documentWidth": 1280,
+      "noOverflow": true
+    },
+    {
+      "width": 768,
+      "documentWidth": 768,
+      "noOverflow": true
+    },
+    {
+      "width": 360,
+      "documentWidth": 360,
+      "noOverflow": true
+    },
+    {
+      "width": 320,
+      "documentWidth": 320,
+      "noOverflow": true
+    }
+  ],
+  "search": true,
+  "filter": true,
+  "dialogEscapeAndFocus": true,
+  "feedback": true,
+  "links": true,
+  "pageErrors": []
+}

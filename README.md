@@ -1,16 +1,18 @@
 # ThreadLine（研线）
 
-> **v0.8.1 测试版** · Chrome / Edge 右侧栏研究工作台
+> **v0.8.2 测试版** · Chrome / Edge 右侧栏研究工作台
 
 多条 ChatGPT 对话同时研究同一课题时，在不同窗口显示统一的有效结论、已收口状态和需核对的字段差异，避免误在旧分支继续工作。辅助提供按需对话采集、AI 整理、思维导图，以及手动触发的网页项目/归档操作。
 
 ## 下载安装包
 
-**[下载 ThreadLine v0.8.1 安装 ZIP（GitHub Release）](https://github.com/siskosun/ThreadLine/releases/download/v0.8.1/ThreadLine-v0.8.1.zip)**
+**[下载 ThreadLine v0.8.2 安装 ZIP（GitHub Release）](https://github.com/siskosun/ThreadLine/releases/download/v0.8.2/ThreadLine-v0.8.2.zip)**
 
 不需要构建工具。下载 ZIP → 解压 → 打开 `edge://extensions/` 或 `chrome://extensions/` → 启用开发人员模式 →「加载解压缩的扩展程序」→ 选中包含 `manifest.json` 的 `threadline-extension` 文件夹。
 
-正式安装包由 GitHub Actions 在全部测试通过后构建并发布；[下载 SHA256 校验文件](https://github.com/siskosun/ThreadLine/releases/download/v0.8.1/SHA256SUMS.txt)。如 Release 尚未完成，可使用[旧版 v0.6.0 仓库压缩包](dist/ThreadLine-v0.6.0.zip)。侧载扩展不会自动更新。
+正式安装包须在自动化测试通过、适用的人工验收完成后，由仓库所有者在 GitHub Actions 手动批准发布；[下载 SHA256 校验文件](https://github.com/siskosun/ThreadLine/releases/download/v0.8.2/SHA256SUMS.txt)。尚未发布的新提交不能视为可安装版本；请使用上方已发布的安装包，并注意侧载扩展不会自动更新。
+
+**v0.8.2 兼容性：** 旧版本地证据数据不承诺迁移或兼容，升级后请以新版重新建立的证据为准；如需保留旧证据，请自行留存 v0.8.1 安装包与本地数据副本。课题备份 JSON 的导出/导入不受影响。
 
 **从 v0.5.0 升级：** 使用相同扩展目录覆盖并重新加载，先在新版「全部课题与管理 → 课题备份与恢复」导出一次 JSON。v0.6.0 没有强行添加 `manifest.key`，避免改变旧扩展 ID 导致原状态不可见。以后迁移到其他安装路径，应先从原扩展导出 JSON，安装后导入。备份不包含短期采集全文。
 
@@ -41,6 +43,8 @@
 GitHub Actions 会执行计划状态、实际 PR 合并/检查结果核验，以及全部既有回归测试。**自动化通过不代替真实登录 ChatGPT 的人工验收**。旧版计划文件和外部资料库副本不再作为当前状态来源。
 
 ## 验证与开发
+
+界面开发先读 [UI 与体验标准](DESIGN.md)、[v0.8.2 现状基线](docs/ui/BASELINE_20261026.md)及[验收清单](docs/ui/CHECKLIST.md)。[视觉参考样张](docs/ui/reference.html)可下载后在浏览器打开；它展示建议方向，尚未应用到生产界面。任务状态仍以正式计划为准。
 
 源码位于 [`threadline-extension/`](threadline-extension/)，不需要 Node 才能安装；Node 22+ 用于开发和测试：
 

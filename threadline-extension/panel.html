@@ -19,6 +19,10 @@
       <button id="nav-research" data-workspace="research" role="tab" aria-selected="false" aria-controls="workspace-research"><span class="nav-icon" aria-hidden="true">◎</span> 研究整理</button>
       <button id="nav-evidence" data-workspace="evidence" role="tab" aria-selected="false" aria-controls="workspace-evidence"><span class="nav-icon" aria-hidden="true">◇</span> 证据与交接</button>
     </nav>
+    <section id="critical-notice" role="alert" aria-live="assertive" aria-atomic="true" hidden>
+      <p id="critical-notice-text"></p>
+      <button id="critical-notice-dismiss" type="button" class="secondary">关闭提示</button>
+    </section>
     <section id="workspace-switch" class="workspace-pane" role="tabpanel" aria-labelledby="nav-switch">
     <section class="surface current" id="current-section">
       <div class="eyebrow"><span class="small-dot"></span> 当前浏览器标签页</div>
@@ -61,12 +65,12 @@
       <div id="ff-progress" class="caption" hidden></div>
       <a id="ff-preview-link" href="ff.html" target="_blank" rel="noopener noreferrer">打开 Fork 实验页面</a>
     </section>
-    <section class="backup-section" aria-label="备份与恢复">
-      <h3>课题备份与恢复</h3>
-      <p class="caption">导出本地课题、分支和结论历史（不包含临时采集全文）。导出文件可能含研究资料，请妥善保管。</p>
-      <div class="backup-actions"><button type="button" id="backup-export">导出 JSON 备份</button><button type="button" id="backup-rollback">恢复最近快照</button></div>
-      <label for="backup-file">从 JSON 恢复课题状态</label><input id="backup-file" type="file" accept=".json,application/json"/>
-      <button type="button" id="backup-import" class="soft">检查并导入（覆盖当前课题）</button>
+    <section class="backup-section" aria-label="课题与对话关联备份">
+      <h3>课题与对话关联备份</h3>
+      <p class="caption">导出课题、对话关联及旧版课题状态历史；不包含已采纳结论与证据、Fork 实验或临时采集全文。导出文件可能含研究资料，请妥善保管。</p>
+      <div class="backup-actions"><button type="button" id="backup-export">导出课题与对话关联</button><button type="button" id="backup-rollback">恢复最近快照</button></div>
+      <label for="backup-file">从 JSON 替换课题与对话关联</label><input id="backup-file" type="file" accept=".json,application/json"/>
+      <button type="button" id="backup-import" class="soft">检查并替换本地课题与关联</button>
       <p id="backup-status" role="status" class="caption"></p>
     </section>
     <section class="health-section" aria-label="网页适配自检">
@@ -96,10 +100,10 @@
         <div id="report-groups"></div>
         <section class="ai-workbench" aria-label="AI 深度分析">
           <div class="ai-head"><h3>AI 深度整理</h3><span class="badge muted">可选</span></div>
-          <p class="ai-help">优先使用已登录的 ChatGPT 网页进行分析，不需要安装 Ollama。网页自动分析属于实验模式，运行前会要求你确认；结果将更新报告和导图，不会自动修改课题收口状态。</p>
+          <p class="ai-help">默认手动分析：复制结构化提示，在 ChatGPT 自行发送，再导入核对后的 JSON。网页自动分析仍是实验功能，只有主动切换并确认后才会操作网页；任何方式均不会自动修改课题收口状态。</p>
           <div class="ai-field"><label for="ai-provider">分析方式</label><select id="ai-provider">
-            <option value="webui" selected>ChatGPT 网页自动分析（实验性，需确认）</option>
-            <option value="manual">ChatGPT 手动分析并导入（不自动操作网页）</option>
+            <option value="manual" selected>ChatGPT 手动分析并导入（默认，不自动操作网页）</option>
+            <option value="webui">ChatGPT 网页自动分析（实验性，需确认）</option>
             <optgroup label="其他模型方式（可选）">
               <option value="ollama">本机 Ollama（需自行安装）</option>
               <option value="openai">OpenAI API（独立 API Key）</option>
@@ -156,10 +160,20 @@
         <button class="secondary" id="evidence-refresh" type="button">刷新</button>
       </div>
       <p id="evidence-summary" class="subtle" role="status" aria-live="polite"></p>
-      <div id="evidence-list"></div>
+      <div class="line evidence-search-line" role="search" aria-label="查找已采纳结论">
+        <label for="evidence-query">查找结论
+          <input type="search" id="evidence-query" placeholder="搜索正文、适用条件或编号" autocomplete="off"/>
+        </label>
+        <label for="evidence-filter-status">状态
+          <select id="evidence-filter-status"><option value="all">全部</option><option value="active">已采纳</option><option value="withdrawn">已撤回</option></select>
+        </label>
+      </div>
       <div class="line">
         <button class="secondary" id="evidence-handoff" type="button">生成交接预览</button>
       </div>
+      <p id="evidence-list-count" class="subtle" role="status" aria-live="polite"></p>
+      <div id="evidence-list"></div>
+      <button class="secondary" id="evidence-more" type="button" hidden>显示更多结论</button>
       <textarea id="evidence-handoff-view" rows="12" aria-label="可编辑的研究交接材料" hidden></textarea>
       <button class="secondary" id="evidence-handoff-copy" type="button" hidden>复制编辑后的交接</button>
       <button class="secondary" id="evidence-handoff-read" type="button" hidden>我已看过此份材料</button>
@@ -179,6 +193,7 @@
   <script src="ui-dialogs.js"></script>
   <script src="evidence-adoption-ui.js"></script>
   <script src="capture-ui.js"></script>
+  <script src="evidence-list-core.js"></script>
   <script src="panel.js"></script>
   <script src="evidence-maintenance-ui.js"></script>
 </body>

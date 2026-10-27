@@ -72,6 +72,27 @@ async function readState() {
   const record = await chrome.storage.local.get(STORE_KEY);
   return ThreadLineCore.normalizedState(record[STORE_KEY]);
 }
+
+// Badge counts out-of-date *linked conversations*, not unread notifications.
+// The only input is the existing authoritative topic state; no new permissions.
+let reviewBadgeQueue=Promise.resolve();
+function refreshReviewBadge() {
+  if(typeof chrome.action?.setBadgeText!=="function")return Promise.resolve();
+  const next=reviewBadgeQueue.catch(()=>{}).then(async()=>{
+    const state=await readState();
+    const count=Object.values(state.chats)
+      .filter(chat=>ThreadLineCore.isOutdated(state,chat)).length;
+    await chrome.action.setBadgeText({text:count>99?"99+":count?String(count):""});
+    if(typeof chrome.action.setBadgeBackgroundColor==="function")
+      await chrome.action.setBadgeBackgroundColor({color:"#B36A24"}).catch(()=>{});
+    if(typeof chrome.action.setTitle==="function")
+      await chrome.action.setTitle({title:count
+        ? "研线：有 "+count+" 条关联对话待核对课题更新"
+        : "打开研线课题面板"}).catch(()=>{});
+  });
+  reviewBadgeQueue=next;
+  return next;
+}
 async function writeState(previous,next,reason,extra={}) {
   const preserve = !["observeChat", "acknowledgeProject"].includes(reason);
   if (!preserve) { await chrome.storage.local.set({...extra,[STORE_KEY]:next}); return; }
@@ -205,10 +226,22 @@ async function receiveCapture(payload,sender){
     default:throw new Error("未知采集状态");
   }
 }
+// A handoff carries the decision text rendered when the panel was last read.
+// If that project's conclusion came from the evidence library, refuse to hand
+// it off while the authoritative records are missing or inconsistent.
+async function guardHandoffAuthorityLocked(projectId){
+  if(!projectId)return;
+  const local=await chrome.storage.local.get(null);
+  const topic=ThreadLineCore.normalizedState(local[STORE_KEY]);
+  const marked=topic.projects.some(p=>p.id===projectId&&p.evidenceTakeover) ||
+    (local[EVIDENCE_SUMMARY_PREFIX+projectId]?.evidenceRevision||0)>0;
+  if(marked)await loadEvidenceAuthorityLocked();
+}
 async function openChatWithDraft(handoff,windowId,projectId){
   const text=String(handoff||"");
   if(new TextEncoder().encode(text).length>128*1024)throw new Error("接续材料超过 128 KiB，请缩小范围；未截断");
   if(!text)throw new Error("没有可用于接续的研究信息");
+  if(projectId)await serialize(()=>guardHandoffAuthorityLocked(projectId));
   const tab=await chrome.tabs.create({url:"https://chatgpt.com/",active:true,...(Number.isInteger(windowId)?{windowId}:{})});
   await chrome.storage.session.set({[`tl_handoff_${tab.id}`]:{text,projectId:projectId||null,createdAt:Date.now()}});
   if(projectId){
@@ -605,6 +638,7 @@ async function handleFF(payload, sender) {
         .map(([label,b]) => [label,b.status]));
       return {id:x.id, revision:x.revision, createdAt:x.createdAt,
         bytes:x.frozen?.bytes, branchCount:Object.keys(statuses).length,
+        taskTitle:ThreadLineFFCore.shortTaskTitle(x.frozen?.p),
         statuses, statusA:x.branches?.A?.status, statusB:x.branches?.B?.status};
     }).sort((a,b) => b.createdAt-a.createdAt);
   }
@@ -835,12 +869,18 @@ async function handleFF(payload, sender) {
 }
 chrome.runtime.onInstalled.addListener(() => {
   chrome.sidePanel.setPanelBehavior({openPanelOnActionClick:true}).catch(() => {});
+  refreshReviewBadge().catch(()=>{});
 });
 chrome.runtime.onStartup.addListener(() => {
+  refreshReviewBadge().catch(()=>{});
   recoverCaptures().catch(()=>{});
   chrome.sidePanel.setPanelBehavior({openPanelOnActionClick:true}).catch(() => {});
   ffRecoverBindings().catch(()=>{});
   consumeAllPendingProjections().catch(()=>{});
+});
+chrome.storage.onChanged?.addListener((changes,area)=>{
+  if(area==="local" && Object.prototype.hasOwnProperty.call(changes,STORE_KEY))
+    refreshReviewBadge().catch(()=>{});
 });
 chrome.tabs.onUpdated.addListener(async(tabId,change)=>{
   if(change.status!=="complete")return;
@@ -912,8 +952,10 @@ function evidenceUnavailable(detail) {
 /* Only call Locked functions inside serialize. Never acquire the queue twice.
  * Persisted summaries and topic markers detect a missing/replaced authority
  * store; they are never used to reconstruct evidence or permit legacy edits. */
-async function loadEvidenceAuthorityLocked() {
-  await evidenceWorkflows().cleanupPending();
+async function loadEvidenceAuthorityLocked({skipCleanup=false}={}) {
+  // On-demand history is a strict read: pending delete/restore recovery must
+  // not run as a side effect of merely opening the history panel.
+  if(!skipCleanup)await evidenceWorkflows().cleanupPending();
   const db = await evidenceDb();
   const state = await ThreadLineEvidenceDB.snapshot(db);
   const local = await chrome.storage.local.get(null);
@@ -954,7 +996,7 @@ async function loadEvidenceAuthorityLocked() {
 }
 async function projectEvidenceLocked(authority) {
   const {db,state,local,topic,taken} = authority;
-  const next = structuredClone(topic), updates = {}, completed = [];
+  const next = structuredClone(topic), updates = {}, completed = [], pending = [];
   let topicChanged = false;
   for (const id of taken) {
     const p = state.projects[id];
@@ -988,13 +1030,17 @@ async function projectEvidenceLocked(authority) {
     // Topic projection, monotonic revision marker and summary become visible together.
     await writeState(topic,next,"evidenceProjection",updates);
   } else if (Object.keys(updates).length) await chrome.storage.local.set(updates);
-  for (const [id,revision] of completed) await ThreadLineEvidenceDB.clearProjectionTodo(db,id,revision);
-  return {ok:true};
+  for (const [id,revision] of completed) {
+    // A stale CAS means a newer revision landed while this one was projected.
+    // Keep the todo flag and report pending instead of claiming the summary is current.
+    const cleared=await ThreadLineEvidenceDB.clearProjectionTodo(db,id,revision);
+    if(!cleared?.cleared)pending.push(id);
+  }
+  return {ok:true,pending};
 }
 async function reconcileEvidenceLocked() {
   const authority = await loadEvidenceAuthorityLocked();
-  await projectEvidenceLocked(authority);
-  return authority;
+  return projectEvidenceLocked(authority);
 }
 async function readFreshState() {
   return serialize(async () => { await reconcileEvidenceLocked(); return readState(); });
@@ -1038,6 +1084,95 @@ async function handleEvidence(payload, sender) {
   else if(sender.tab?.url && sender.tab.url !== sender.url)
     throw new Error("证据消息来源标签与扩展页面不一致");
   const Core = ThreadLineEvidenceCore;
+  if (payload.type === "EV_HISTORY") {
+    // Historical full text is exposed only through the trusted research panel.
+    // Never resolve a conclusion by ID alone: the project boundary is part of
+    // the lookup, so a foreign or unknown ID has the same response.
+    if (sender.url !== chrome.runtime.getURL("panel.html"))
+      throw new Error("版本历史仅限研线面板读取");
+    if (!Core.validProjectId(payload.projectId))
+      throw new Error("课题 ID 无效或缺失");
+    if (typeof payload.conclusionId !== "string" ||
+        payload.conclusionId.length < 4 || payload.conclusionId.length > 128)
+      throw new Error("该课题下不存在该结论");
+    return serialize(async () => {
+      const authority = await loadEvidenceAuthorityLocked({skipCleanup:true});
+      const state = authority.state;
+      const projectId = payload.projectId;
+      const project = state.projects[projectId];
+      const conclusion = Object.values(state.conclusions).find(record =>
+        record.id === payload.conclusionId && record.projectId === projectId);
+      if (!project || project.deleted || !conclusion)
+        throw new Error("该课题下不存在该结论");
+      const versions = Object.values(state.versions)
+        .filter(version => version.conclusionId === conclusion.id);
+      if (!versions.length || versions.length > Core.LIMITS.versionsPerConclusion)
+        throw new Error("该课题下不存在有效版本历史");
+      // Timestamps can share a millisecond. Prefer the immutable predecessor
+      // chain for ordering; use time/ID only as a deterministic corruption fallback.
+      const timeOrder = (a,b) => (a.createdAt || 0) - (b.createdAt || 0) ||
+        String(a.id).localeCompare(String(b.id));
+      const byId = new Map(versions.map(version => [version.id,version]));
+      const childByPredecessor = new Map();
+      for (const version of versions)
+        if (byId.has(version.predecessorId)) childByPredecessor.set(version.predecessorId,version);
+      const ordered = [], used = new Set();
+      for (const root of versions.filter(version => !byId.has(version.predecessorId)).sort(timeOrder)) {
+        let cursor = root;
+        while (cursor && !used.has(cursor.id)) {
+          ordered.push(cursor);used.add(cursor.id);
+          cursor = childByPredecessor.get(cursor.id);
+        }
+      }
+      for (const version of versions.slice().sort(timeOrder))
+        if (!used.has(version.id)) ordered.push(version);
+      const history = ordered.map(version => {
+        const links = Object.values(state.links)
+          .filter(link => link.versionId === version.id)
+          .sort((a,b) => String(a.id).localeCompare(String(b.id)));
+        const fragments = links.map(link => {
+          const source = state.sources[link.sourceId];
+          if (!source) return {
+            sourceId:link.sourceId, relation:link.relation, available:false
+          };
+          return {
+            sourceId:link.sourceId, relation:link.relation, available:true,
+            kind:typeof source.kind === "string" ? source.kind : null,
+            conversationId:typeof source.conversationId === "string" ? source.conversationId : null,
+            messageId:typeof source.messageId === "string" ? source.messageId : null,
+            url:typeof source.url === "string" ? source.url : null,
+            sourceRole:typeof source.sourceRole === "string" ? source.sourceRole : null,
+            capturedAt:Number.isSafeInteger(source.capturedAt) ? source.capturedAt : null,
+            selection:typeof source.selection === "string" ? source.selection : "",
+            before:typeof source.before === "string" ? source.before : "",
+            after:typeof source.after === "string" ? source.after : "",
+            completeness:typeof source.completeness === "string" ? source.completeness : "unknown"
+          };
+        });
+        return {
+          id:version.id,
+          createdAt:Number.isSafeInteger(version.createdAt) ? version.createdAt : null,
+          creator:typeof version.creator === "string" ? version.creator : null,
+          changeType:typeof version.changeType === "string" ? version.changeType : "unknown",
+          changeImpact:typeof version.changeImpact === "string" ? version.changeImpact : null,
+          carryForward:version.carryForward === true,
+          predecessorId:typeof version.predecessorId === "string" ? version.predecessorId : null,
+          text:typeof version.text === "string" ? version.text : "",
+          conditions:typeof version.conditions === "string" ? version.conditions : "",
+          sourceCount:links.length,
+          recordedSourceCount:Number.isSafeInteger(version.sourceCount) ? version.sourceCount : null,
+          fragments
+        };
+      });
+      return {
+        projectId, conclusionId:conclusion.id, status:conclusion.status,
+        currentVersionId:conclusion.currentVersionId,
+        withdrawnAt:Number.isSafeInteger(conclusion.withdrawnAt) ? conclusion.withdrawnAt : null,
+        withdrawalReason:typeof conclusion.withdrawalReason === "string" ? conclusion.withdrawalReason : null,
+        versions:history
+      };
+    });
+  }
   const advanced = await evidenceWorkflows().handle(payload);
   if (advanced !== undefined) return advanced;
   if (payload.type === "EV_ENSURE") {
@@ -1051,7 +1186,10 @@ async function handleEvidence(payload, sender) {
     return serialize(async () => {
     const authority = await loadEvidenceAuthorityLocked();
     let projectionError = null;
-    try { await projectEvidenceLocked(authority); } catch (e) { projectionError = String(e.message || e); }
+    try {
+      const projection = await projectEvidenceLocked(authority);
+      if (projection.pending.length) projectionError = "共享摘要待更新";
+    } catch (e) { projectionError = String(e.message || e); }
     const state = await ThreadLineEvidenceDB.snapshot(authority.db);
     const rows = Object.values(state.conclusions)
       .filter(c => c.projectId === payload.projectId)
@@ -1073,9 +1211,18 @@ async function handleEvidence(payload, sender) {
   if (payload.type === "EV_SUMMARY") {
     return serialize(async () => {
       const authority = await loadEvidenceAuthorityLocked();
-      let projectionPending = false;
-      try { await projectEvidenceLocked(authority); } catch { projectionPending = true; }
-      return {summary:Core.projectSummary(authority.state,payload.projectId),projectionPending};
+      let projectionPending = false, projectionError;
+      try {
+        const projection = await projectEvidenceLocked(authority);
+        if (projection.pending.length) {
+          projectionPending = true;
+          projectionError = "共享摘要待更新";
+        }
+      } catch (e) {
+        projectionPending = true;
+        projectionError = String(e.message || e);
+      }
+      return {summary:Core.projectSummary(authority.state,payload.projectId),projectionPending,projectionError};
     });
   }
   if (payload.type === "EV_ADOPT" || payload.type === "EV_WITHDRAW" || payload.type === "EV_IMPORT" || payload.type === "EV_AMEND") {
@@ -1090,6 +1237,10 @@ async function handleEvidence(payload, sender) {
           if (Object.prototype.hasOwnProperty.call(payload,field)) input[field] = payload[field];
         plan = await Core.planAmendment(state,payload.conclusionId,input,payload.operationId);
       } else if (payload.type === "EV_ADOPT") {
+        // Reject invalid input before creating a project row, so a denied adopt
+        // never leaves an orphan evidence project behind.
+        Core.validateAdoption({projectId:payload.projectId,text:payload.text,
+          conditions:payload.conditions,fragments:payload.fragments});
         // Topic-store projects adopt without a prior EV_ENSURE call.
         await ThreadLineEvidenceDB.ensureProject(db, payload.projectId, Core);
         // Refresh after ensureProject so planning sees the project row.
@@ -1110,7 +1261,11 @@ async function handleEvidence(payload, sender) {
       await evidenceBudget(state,plan);
       const result = await ThreadLineEvidenceDB.applyPlan(db,plan);
       // Once authority committed, projection failure must never report the write as failed.
-      try { await reconcileEvidenceLocked(); return {...result,projectionPending:false}; }
+      try {
+        const projection = await reconcileEvidenceLocked();
+        return {...result,projectionPending:projection.pending.length>0,
+          ...(projection.pending.length?{projectionError:"共享摘要待更新"}:{})};
+      }
       catch (e) { return {...result,projectionPending:true,projectionError:String(e.message || e)}; }
     });
   }
@@ -1202,6 +1357,23 @@ chrome.runtime.onMessage.addListener((payload,sender,reply) => {
     if(payload.type === "NEW_CHAT"){
       await requirePanelSender(sender,"只有研线面板可接续研究");
       return openChatWithDraft(payload.handoff,payload.windowId,payload.projectId);
+    }
+    if(payload.type==="HANDOFF_PEEK"){
+      // Pure presence check for existing chat/Project pages. Do not expose
+      // draft text, reserve an attempt, ACK or mutate the pending handoff.
+      const allowed = input => {
+        try {
+          const u = new URL(input);
+          return u.protocol==="https:" &&
+            ["chatgpt.com","chat.openai.com"].includes(u.hostname);
+        } catch{return false;}
+      };
+      if(!Number.isInteger(sender.tab?.id) ||
+          !allowed(sender.tab.url) || !allowed(sender.url))
+        throw new Error("only a ChatGPT tab can check its own handoff status");
+      const key="tl_handoff_"+sender.tab.id;
+      const found=await chrome.storage.session.get(key);
+      return {pending:typeof found[key]?.text==="string" && found[key].text.length>0};
     }
     if(["HANDOFF_GET","HANDOFF_BEGIN","HANDOFF_ACK"].includes(payload.type)){
       // A stale tab, Project/Temporary redirect or background page cannot

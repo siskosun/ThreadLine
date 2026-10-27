@@ -17,6 +17,7 @@ const FFCore = require('../ff-core.js');
  * exercise the service-worker paths: projection, sealing, recovery). */
 function system() {
   const session = new Map(), local = new Map(), events = {}, calls = [];
+  let createdTabs = 0, staleClears = false;
   const evidence = { conclusions: new Map(), versions: new Map(), sources: new Map(),
     links: new Map(), projects: new Map(), operations: new Map() };
   const state = () => ({ conclusions: Object.fromEntries(evidence.conclusions),
@@ -50,6 +51,7 @@ function system() {
       return plan.result;
     },
     async clearProjectionTodo(_db, projectId, expectedRevision) {
+      if (staleClears) return { cleared: false, stale: true };
       const project = evidence.projects.get(projectId);
       if (!project || project.evidenceRevision !== expectedRevision)
         return { cleared: false, stale: true };
@@ -74,7 +76,7 @@ function system() {
       onMessage: { addListener(fn) { events.message = fn; } } },
     tabs: { onUpdated: { addListener() {} }, onRemoved: { addListener() {} },
       async get() { throw new Error('no tab'); }, async query() { return []; },
-      async create() { return { id: 1 }; }, async update() { return {}; }, async sendMessage() { return { ok: true }; } },
+      async create() { createdTabs += 1; return { id: 1 }; }, async update() { return {}; }, async sendMessage() { return { ok: true }; } },
     scripting: { async executeScript() {} },
     sidePanel: { setPanelBehavior: async () => {} },
     storage: {
@@ -114,6 +116,8 @@ function system() {
   }
   return { message, panelSender, evSender, local, evidence, events, calls,
     failNextStorageWrites(n) { storageSetShouldFail = n; },
+    forceStaleProjectionClears() { staleClears = true; },
+    createdTabs: () => createdTabs,
     readTopicState: () => local.get('threadline_state_v1'),
     storageSetShouldFailRef: () => storageSetShouldFail };
 }
@@ -137,6 +141,28 @@ test('first adoption takes over, captures legacy note, projects summary to stora
   assert.ok(projection.summary.includes('第一条证据结论'));
   assert.equal(project.projectionTodo, false, 'todo cleared after successful projection');
   assert.equal(project.projectionRevision, 1);
+});
+
+test('UX-05 history is strictly read-only even when deferred cleanup exists', async () => {
+  const s=system();
+  const adopted=await s.message(adoption('p-taken','历史读取不应清理其他课题'));
+  // Drain the write-side projection through the normal authoritative read
+  // before introducing a separate pending-cleanup marker. The assertion then
+  // measures only the EV_HISTORY request, not the preceding adoption.
+  await s.message({type:'EV_SUMMARY',projectId:'p-taken'});
+  const deleted={projectId:'ghost-deleted',deleted:true,cleanupPending:true,evidenceRevision:1};
+  s.evidence.projects.set(deleted.projectId,deleted);
+  // The service-worker VM and Node host have different object prototypes.
+  // Compare complete serialized state, not realm-specific prototypes.
+  const prior=JSON.stringify(Object.fromEntries(s.local));
+  const history=await s.message({type:'EV_HISTORY',projectId:'p-taken',
+    conclusionId:adopted.conclusionId},s.panelSender);
+  assert.equal(history.versions.length,1);
+  assert.equal(history.versions[0].text,'历史读取不应清理其他课题');
+  assert.equal(s.evidence.projects.get(deleted.projectId).cleanupPending,true,
+    'history read must not finish an unrelated pending delete');
+  assert.equal(JSON.stringify(Object.fromEntries(s.local)),prior,
+    'read did not change local topic snapshots, summaries or records');
 });
 
 test('sealed project: decision edits refused at message level, other fields still editable', async () => {
@@ -357,4 +383,43 @@ test('EV_ requires the actual extension document, not a lookalike pathname', asy
   assert.ok(await s.message(request,s.evSender),'valid same-extension prototype still works');
   assert.ok(await s.message({type:'EV_LIST',projectId:'p-free'},s.panelSender),
     'native panel remains authorized');
+});
+
+test('handoff refuses a sealed project when the evidence library is missing', async () => {
+  const s = system();
+  const topic = structuredClone(s.local.get('threadline_state_v1'));
+  const taken = topic.projects.find(p => p.id === 'p-taken');
+  taken.evidenceTakeover = true;
+  taken.evidenceProjectionRevision = 1;
+  s.local.set('threadline_state_v1', topic);
+  await assert.rejects(
+    s.message({type:'NEW_CHAT',handoff:'上次看到的旧结论',projectId:'p-taken'}, s.panelSender),
+    /已接管课题与持久标记不一致/);
+  assert.equal(s.createdTabs(), 0, 'no tab may open before the authority check');
+  const healthy = system();
+  const free = await healthy.message({type:'NEW_CHAT',handoff:'自由课题文本',projectId:'p-free'}, healthy.panelSender);
+  assert.equal(free.tabId, 1);
+  assert.equal(healthy.createdTabs(), 1, 'projects without evidence are not blocked');
+});
+
+test('rejected adoption leaves no orphan evidence project', async () => {
+  const s = system();
+  await assert.rejects(
+    s.message({type:'EV_ADOPT',projectId:'p-orphan',text:'   ',
+      fragments:[{selection:'依据',before:'前',after:'后'}],operationId:'op_bad_empty'}),
+    /结论正文不能为空/);
+  assert.equal(s.evidence.projects.has('p-orphan'), false,
+    'validation must run before ensureProject');
+});
+
+test('stale projection CAS is reported as pending, never as current', async () => {
+  const s = system();
+  s.forceStaleProjectionClears();
+  const adopted = await s.message(adoption('p-free','待更新结论'));
+  assert.equal(adopted.projectionPending, true);
+  const summary = await s.message({type:'EV_SUMMARY',projectId:'p-free'}, s.panelSender);
+  assert.equal(summary.projectionPending, true);
+  assert.equal(summary.projectionError, '共享摘要待更新');
+  assert.equal(s.evidence.projects.get('p-free').projectionTodo, true,
+    'todo stays set so the next reconcile retries');
 });
