@@ -638,6 +638,15 @@
           notifyCritical("资料库找不到原课题；未自动切换到其他课题，请明确选择。");
       }
     }else if ([...select.options].some(o => o.value === current)) select.value = current;
+    else if(surface==="library"){
+      // When the selected project is missing or no project was chosen, never
+      // allow the native select element to silently pick another project.
+      const option=document.createElement("option");option.value="";
+      option.textContent=current?"所选课题已不可用，请重新选择":"请选择要查看的课题";
+      select.insertBefore(option,select.firstChild);
+      select.value="";
+      if(current)notifyCritical("当前查看课题已不可用；未自动切换到其他课题，请明确选择。");
+    }
     if(restoringLibraryView){
       // Initial wide-page project is a *navigation* choice. Keep the topic
       // detail tab on the same project without changing chat associations.
