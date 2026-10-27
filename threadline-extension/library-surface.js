@@ -10,18 +10,22 @@
   const isTabId=value=>Number.isSafeInteger(value)&&value>0;
   const isProjectId=value=>value===null||(typeof value==="string"&&value.length>0&&
     value.length<=MAX_ID&&!/[\u0000-\u001f\u007f]/.test(value));
+  const isChatKey=value=>value===null||(typeof value==="string"&&value.length>0&&
+    value.length<=256&&!/[\u0000-\u001f\u007f]/.test(value));
   function validIntent(record,tabId,now=Date.now()){
     return !!record&&typeof record==="object"&&
       record.schema===1&&isTabId(tabId)&&record.tabId===tabId&&
       Number.isSafeInteger(record.createdAt)&&
       Number.isSafeInteger(now)&&now-record.createdAt>=0&&
       now-record.createdAt<=TTL_MS&&
-      isProjectId(record.viewProjectId)&&
-      (record.sourceTabId===null||isTabId(record.sourceTabId));
+      isProjectId(record.viewProjectId)&&isChatKey(record.sourceChatKey)&&
+      (record.sourceTabId===null
+        ? record.sourceChatKey===null
+        : isTabId(record.sourceTabId)&&record.sourceChatKey!==null);
   }
-  async function open({viewProjectId=null,sourceTabId=null}={},api=chrome,now=Date.now()){
-    if(!isProjectId(viewProjectId)||
-      (sourceTabId!==null&&!isTabId(sourceTabId)))
+  async function open({viewProjectId=null,sourceTabId=null,sourceChatKey=null}={},api=chrome,now=Date.now()){
+    if(!isProjectId(viewProjectId)||!isChatKey(sourceChatKey)||
+      (sourceTabId===null?sourceChatKey!==null:!isTabId(sourceTabId)||sourceChatKey===null))
       throw new Error("资料库导航参数无效");
     let tab=null;
     try{
@@ -30,7 +34,7 @@
       tab=await api.tabs.create({url:"about:blank",active:false});
       if(!isTabId(tab?.id))throw new Error("无法确认资料库标签页");
       await api.storage.session.set({[key(tab.id)]:{
-        schema:1,tabId:tab.id,viewProjectId,sourceTabId,createdAt:now
+        schema:1,tabId:tab.id,viewProjectId,sourceTabId,sourceChatKey,createdAt:now
       }});
       await api.tabs.update(tab.id,{url:api.runtime.getURL("panel.html"),active:true});
       return {tabId:tab.id};
@@ -54,7 +58,7 @@
     }
     return validIntent(result?.[k],tabId,now)?result[k]:null;
   }
-  const exposed=Object.freeze({TTL_MS,key,isTabId,isProjectId,validIntent,open,consume});
+  const exposed=Object.freeze({TTL_MS,key,isTabId,isProjectId,isChatKey,validIntent,open,consume});
   if(typeof module!=="undefined"&&module.exports)module.exports=exposed;
   if(root)root.ThreadLineLibrarySurface=exposed;
 })(typeof globalThis!=="undefined"?globalThis:null);
