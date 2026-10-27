@@ -145,7 +145,7 @@
   function saveLibraryView() {
     if(surface!=="library")return;
     const header=$("#library-view-project");
-    if(librarySelectionPending){
+    if(librarySelectionPending&&workspace!=="map"){
       header.textContent="查看课题：正在确认…";
       return;
     }
@@ -153,7 +153,9 @@
     const projectId=selection?.value||null;
     const project=state.projects.find(p=>p.id===projectId);
     const name=project?.name||(projectId?selection?.selectedOptions[0]?.textContent:"尚未选择");
-    header.textContent="查看课题："+(name||"尚未选择")+"（仅浏览，不改变来源关联）";
+    header.textContent=workspace==="map"
+      ? "查看采集导图："+(wideMapBrief?.title||"正在读取指定采集")+"（只读，不改变来源关联）"
+      : "查看课题："+(name||"尚未选择")+"（仅浏览，不改变来源关联）";
     if(!libraryTabId)return;
     const query=$("#evidence-query")?.value||"";
     // Very long or control-character queries are not copied into sessionStorage.
@@ -1147,6 +1149,7 @@
         "；不会跟随当前激活的标签页，不会写入任何课题或采纳记录。";
       $("#wide-map-tools").hidden=false;
       fitWideMap();
+      saveLibraryView();
     }catch(error){
       if(request!==wideMapReading||workspace!=="map")return;
       status.textContent="导图读取失败："+error.message+"；本次未修改已有采集记录。";
