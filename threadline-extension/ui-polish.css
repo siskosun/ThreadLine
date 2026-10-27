@@ -183,3 +183,34 @@ html[data-surface="library"] #workspace-switch .branch-actions select:disabled{o
   html[data-surface="library"] #workspace-evidence #evidence-section{padding:0 10px 16px}
   html[data-surface="library"] .workspace-tabs button{font-size:12px}
 }
+
+
+/* UI-D2 candidate: the sidebar exposes the current action first. Management
+ * remains directly accessible without stacking five parallel button rows. */
+#topic-edit-details{border:1px solid #dce5ee;border-radius:11px;margin:12px 0;background:#fafcff}
+#topic-edit-details>summary{display:flex;align-items:center;justify-content:space-between;
+  gap:8px;list-style:none;cursor:pointer;min-height:44px;padding:10px 12px;
+  font-weight:700;color:#315678}
+#topic-edit-details>summary::-webkit-details-marker{display:none}
+#topic-edit-details>summary::before{content:"▸";font-size:16px;color:#41678d;margin-right:5px}
+#topic-edit-details[open]>summary::before{content:"▾"}
+#topic-edit-details>summary small{font-size:11px;font-weight:450;color:#63768b}
+#topic-edit-details>summary:focus-visible,.branch-tool-details>summary:focus-visible{
+  outline:3px solid #8eb7e7;outline-offset:-2px;border-radius:9px}
+#topic-edit-details>summary:hover,.branch-tool-details>summary:hover{background:#eff5fc}
+#topic-edit-details #edit-form{padding:9px 12px 12px;border-top:1px solid #e6edf5}
+.branch-actions{align-items:flex-start}
+.branch-actions>button[data-action="go-chat"]{min-height:40px}
+.branch-tool-details{flex:1 1 110px;min-width:100px;border:1px solid #d9e3ef;border-radius:9px;background:#fff}
+.branch-tool-details>summary{list-style:none;cursor:pointer;display:flex;align-items:center;
+  padding:10px 9px;min-height:40px;font-weight:650;color:#375c81;gap:7px}
+.branch-tool-details>summary::-webkit-details-marker{display:none}
+.branch-tool-details>summary::before{content:"▸";font-size:14px;color:#4976a6}
+.branch-tool-details[open]>summary::before{content:"▾"}
+.branch-tool-content{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:10px 9px;
+  border-top:1px solid #e4eaf1}
+.branch-tool-content select{flex:1 1 150px;max-width:none;min-height:38px}
+.branch-tool-content button{min-height:38px}
+html[data-surface="library"] #workspace-switch #advanced-accordion .manage-content>.surface{
+  display:block!important
+}
