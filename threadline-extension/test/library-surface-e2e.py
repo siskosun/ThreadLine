@@ -111,7 +111,8 @@ def run():
             library.wait_for_function("() => document.querySelector('#evidence-list-count').textContent.includes('匹配 1 / 200')")
             item=library.locator("#evidence-list .evidence-item")
             assert item.count()==1
-            item.locator("summary").first.click()
+            if item.get_attribute("open") is None:
+                item.locator(":scope > summary").click()
             item.get_by_role("button",name="查看版本历史（2）").click()
             library.wait_for_function(
                 "() => document.querySelectorAll('#evidence-list .evidence-history-version').length >= 2")
@@ -165,8 +166,7 @@ def run():
                 "() => document.documentElement.dataset.surface==='library'")
             invalid.wait_for_function(
                 "() => document.querySelector('#evidence-project').value===''")
-            assert "原课题不可用" in invalid.locator("#evidence-project").input_value() or \
-                invalid.locator("#evidence-project option:checked").inner_text().startswith("原课题不可用")
+            assert invalid.locator("#evidence-project option:checked").inner_text().startswith("原课题不可用")
             assert invalid.locator("#evidence-handoff").is_hidden()
 
             # Direct panel.html tab remains the old three-workspace panel (no valid one-time intent).
@@ -177,7 +177,6 @@ def run():
             assert direct.locator("#library-header").is_hidden()
 
             # Explicit source binding must reject changed conversation URL, even on same tab ID.
-            source_tab_id=source.evaluate("() => chrome.runtime.id") if False else None
             source_tab_id=panel.evaluate("""async () => {
                 const tabs=await chrome.tabs.query({url:'https://chatgpt.com/*'});
                 return tabs.find(t=>t.url.includes('synthetic-library-source'))?.id;
