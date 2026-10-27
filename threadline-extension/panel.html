@@ -45,7 +45,7 @@
     </section>
     <section id="detail-section" class="detail-section" hidden></section>
     <details class="manage-accordion" id="manage-accordion">
-      <summary><span>全部课题与管理</span><span class="manage-desc">创建 · 关联 · 清理</span></summary>
+      <summary><span>全部课题与管理</span><span class="manage-desc"><span class="when-closed">展开</span><span class="when-open">收起</span></span></summary>
       <div class="manage-content">
     <section class="stats" aria-label="课题概况">
       <div class="stat"><strong id="stat-active">0</strong><span>进行中课题</span></div>
@@ -70,6 +70,11 @@
       </div>
       <div id="topic-list" class="topic-list"></div>
     </section>
+      </div>
+    </details>
+    <details class="manage-accordion advanced-accordion" id="advanced-accordion">
+      <summary><span>高级研究与维护工具</span><span class="manage-desc"><span class="when-closed">展开</span><span class="when-open">收起</span></span></summary>
+      <div class="manage-content">
     <section class="surface" aria-label="Fork 对照实验">
       <h3>Fork 对照实验</h3>
       <p class="caption">冻结材料，对照多个分支的回复；发送始终由你手动完成，研线永不自动发送。</p>
