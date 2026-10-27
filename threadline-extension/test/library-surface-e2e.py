@@ -106,6 +106,7 @@ def run():
             assert library.locator("#library-launch").is_hidden()
             assert library.locator("#library-header").is_visible()
             assert library.locator("#evidence-handoff").is_hidden(), "D1 keeps writes in sidebar"
+            library.locator("#evidence-maintenance").wait_for(state="attached")
             assert library.locator("#evidence-maintenance").is_hidden(), "D1 keeps restore and delete in sidebar"
             library.wait_for_function(
                 "() => document.querySelector('#evidence-list-count').textContent.includes('匹配 200 / 200')")
