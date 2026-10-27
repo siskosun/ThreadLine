@@ -8,7 +8,8 @@
     if(selectedId!==value){selectedId=value;selectionRevision++;}
   };
   let filter = "all";
-  let workspace = "switch"; // every newly opened panel starts with the main workflow
+  let workspace = "switch"; // normal panel retains three workspaces
+  let surface="sidebar",librarySourceTabId=null,libraryInitialProjectId=null,librarySelectionPending=false;
   let state = ThreadLineCore.emptyState();
   let tabs = [];
   let activeTabId = null;
@@ -127,6 +128,26 @@
     $("#stat-closed").textContent=state.projects.filter(p=>p.stage==="closed").length;
     $("#stat-chats").textContent=Object.keys(state.chats).length;
     $("#clear-closed").disabled=!state.projects.some(p=>p.stage==="closed");
+  }
+  async function openLibrary() {
+    const picked=workspace==="research"
+      ? tabs.find(t=>String(t.id)===$("#capture-source")?.value) : activeTab();
+    const sourceTabId=picked&&ThreadLineCore.isChatURL(picked.url)?picked.id:null;
+    const viewProjectId=workspace==="evidence"
+      ? ($("#evidence-project")?.value||null)
+      : workspace==="switch" ? (selectedId||chatForTab(picked)?.projectId||null)
+      : (chatForTab(picked)?.projectId||null);
+    try{await ThreadLineLibrarySurface.open({viewProjectId,sourceTabId});}
+    catch(error){notifyCritical("打开资料库失败："+error.message+"。原侧栏数据未改变。");}
+  }
+  async function returnToSource() {
+    if(!librarySourceTabId){notify("没有绑定来源对话，请自行切回 ChatGPT");return;}
+    const source=await chrome.tabs.get(librarySourceTabId).catch(()=>null);
+    if(!source||!ThreadLineCore.isChatURL(source.url)){
+      notifyCritical("原来源标签已关闭或不再是 ChatGPT 对话，请自行选择正确的来源。");return;
+    }
+    await chrome.tabs.update(source.id,{active:true}).catch(error=>
+      notifyCritical("无法切回来源对话："+error.message));
   }
   function setWorkspace(next, focusCapture=false) {
     workspace = ["switch","research","evidence"].includes(next) ? next : "switch";
@@ -340,8 +361,13 @@
   }
   function formatHealthTime(value){return value?new Date(value).toLocaleString('zh-CN',{hour12:false}):'尚无已验证成功记录';}
   async function runHealth(){
-    const current=activeTab();const host=$('#health-result');
-    if(!current)return host.textContent='请先打开要检查的 ChatGPT 标签页。';
+    const host=$('#health-result');
+    const current=surface==="library"
+      ? (librarySourceTabId?await chrome.tabs.get(librarySourceTabId).catch(()=>null):null)
+      : activeTab();
+    if(!current||!ThreadLineCore.isChatURL(current.url)){
+      host.textContent='请选择有效的 ChatGPT 来源标签页；不会检查资料库自身。';return;
+    }
     host.textContent='正在执行只读自检…';
     try {
       const data=await message({type:'HEALTH_CHECK',tabId:current.id});
@@ -373,6 +399,8 @@
     if (nav){setWorkspace(nav.dataset.workspace);return;}
     const f=event.target.closest("[data-filter]");
     if (f){filter=f.dataset.filter;renderTopics();return;}
+    if(event.target.id==="library-open"){await openLibrary();return;}
+    if(event.target.id==="library-return"){await returnToSource();return;}
     if (event.target.id==='backup-export')return exportBackup();
     if (event.target.id==='backup-import')return importBackup();
     if (event.target.id==='backup-rollback')return rollbackBackup();
