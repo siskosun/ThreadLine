@@ -104,10 +104,26 @@ footer{display:flex;align-items:flex-start;gap:8px;margin-top:21px;color:#9ba7b3
 .quick-chat-arrow{color:#9aa8b6;font-size:16px;flex:none}
 .quick-empty{padding:13px 8px 16px;font-size:12px;color:var(--muted);line-height:1.7}
 .manage-accordion{border:1px solid #e2e7ee;border-radius:13px;background:#fff;overflow:hidden;margin-top:12px}
-.manage-accordion>summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:13px;color:#466078;font-size:12px;font-weight:700}
+.manage-accordion>summary{
+  list-style:none;cursor:pointer;display:flex;align-items:center;gap:9px;
+  min-height:48px;padding:13px 14px;color:#314d6c;font-size:13px;font-weight:720;
+  background:#f7f9fc;transition:background .12s
+}
+.manage-accordion>summary:hover{background:#edf4fc}
+.manage-accordion>summary:focus-visible{outline:3px solid #7ba9db;outline-offset:-3px}
 .manage-accordion>summary::-webkit-details-marker{display:none}
-.manage-accordion>summary::before{content:'▸';color:#7b90a7;font-size:12px;margin-right:4px}.manage-accordion[open]>summary::before{content:'▾'}
-.manage-accordion>summary .manage-desc{margin-left:auto;color:var(--muted);font-weight:400;font-size:12px}
+.manage-accordion>summary::before{content:'▸';color:#426a9b;font-size:18px;line-height:1;margin-right:3px}
+.manage-accordion[open]>summary::before{content:'▾'}
+.manage-accordion>summary .manage-desc{
+  margin-left:auto;color:#47627e;font-weight:650;font-size:12px;
+  background:#e9f0fa;padding:5px 9px;border:1px solid #ccdbec;border-radius:8px
+}
+.manage-accordion .manage-desc .when-open{display:none}
+.manage-accordion[open]>.manage-desc .when-open{display:inline}
+.manage-accordion[open]>summary .manage-desc .when-open{display:inline}
+.manage-accordion[open]>summary .manage-desc .when-closed{display:none}
+.advanced-accordion{margin-top:10px}
+.advanced-accordion .manage-content>section{margin-top:12px}
 .manage-content{padding:0 12px 14px;border-top:1px solid #edf0f4}
 .manage-content .stats{margin:14px 0 11px}
 .manage-content .stat{padding:9px 8px}.manage-content .stat strong{font-size:18px}.manage-content .stat span{font-size:12px}
