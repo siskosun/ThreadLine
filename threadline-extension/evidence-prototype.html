@@ -23,6 +23,9 @@
     #ev-notice{margin:8px 0;min-height:20px;font-size:14px}
     #ev-notice[data-error="true"]{color:#a4262c}
     .timing{font-size:13px;color:#41586e}
+    input[type=text]{min-width:130px;padding:8px;border:1px solid #cbd6e4;border-radius:8px;font:inherit}
+    .manual-instructions{border-left:4px solid #215e9b;padding:9px 12px;background:#f4f8fd}
+    .manual-instructions pre{white-space:pre-wrap;overflow-wrap:anywhere}
     table{border-collapse:collapse;width:100%;font-size:13px}
     td,th{border-bottom:1px solid #e3eaf1;text-align:left;padding:4px 6px}
   </style>
@@ -58,16 +61,40 @@
   </section>
 
   <section class="surface" aria-label="计时与探针">
-    <h2>计时协议（12 次有效操作）</h2>
+    <h2>人工采纳试次（真实操作者参与）</h2>
+    <p class="subtle">仅在一次性测试浏览器配置中使用；会把虚构结论写入扩展本地证据库，不使用真实聊天。
+    按顺序完成 6 次直接采纳、3 次修改错误结论、3 次补齐缺失依据。每次从出现待审阅材料开始计时，直到保存回执或终止。
+    至少 4 次应由非设计者操作；记录求助、失败与未知回执。自报结果仍须独立人工复核，不会自动将 S0A 标为完成。</p>
     <div class="row">
-      <button id="ev-run-protocol" type="button">自动执行 12 次计时协议</button>
-      <button class="secondary" id="ev-copy-timings" type="button">复制计时 JSON</button>
+      <label>匿名操作者代码 <input id="ev-manual-operator" type="text" maxlength="16" value="P01" placeholder="如 P01，勿填写真实姓名"></label>
+      <label><input id="ev-manual-nondesign" type="checkbox"> 本次操作者不是设计者</label>
+      <label><input id="ev-manual-assist" type="checkbox"> 本次任务接受过帮助</label>
+      <label><input id="ev-manual-confirm" type="checkbox"> 已核对采纳结果与任务要求</label>
+    </div>
+    <div class="manual-instructions" aria-live="polite">
+      <p id="ev-manual-instructions">尚未开始人工试次。</p>
+      <pre id="ev-manual-reference"></pre>
+    </div>
+    <div class="row">
+      <button id="ev-start-manual" type="button">开始下一项人工任务</button>
+      <button id="ev-manual-save" type="button" disabled>保存本项人工试次</button>
+      <button class="secondary" id="ev-manual-abandon" type="button" disabled>记录放弃本项</button>
+      <button class="secondary" id="ev-copy-manual" type="button">复制脱敏人工记录</button>
+    </div>
+    <pre id="ev-manual-summary" class="timing" role="status" aria-live="polite" style="white-space:pre-wrap"></pre>
+
+    <h2 style="margin-top:18px">自动写入基准（合成，不能当人工验收）</h2>
+    <p class="subtle">下方按钮只量化后端写入回执耗时；不会经历真人阅读、修改、找证据或求助过程。</p>
+    <div class="row">
+      <button id="ev-run-protocol" type="button">自动执行 12 次合成写入</button>
+      <button class="secondary" id="ev-copy-timings" type="button">复制合成写入日志 JSON</button>
     </div>
     <div id="ev-timing-table"><table><thead><tr><th>#</th><th>类型</th><th>耗时 ms</th><th>结果</th></tr></thead><tbody></tbody></table></div>
     <h2 style="margin-top:12px">存储探针</h2>
     <pre id="ev-quota" class="mono subtle" style="white-space:pre-wrap"></pre>
   </section>
 </main>
+<script src="s0a-trials.js"></script>
 <script src="evidence-prototype.js"></script>
 </body>
 </html>
