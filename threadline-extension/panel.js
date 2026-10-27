@@ -9,6 +9,7 @@
   };
   let filter = "all";
   let editDetailsProjectId=null; // presentation-only; never a write target
+  const openBranchToolKeys=new Set(); // keeps explicit user expansion across harmless re-renders
   let workspace = "switch"; // normal panel retains three workspaces
   let surface="sidebar",librarySourceTabId=null,librarySourceChatKey=null;
   let libraryInitialProjectId=null,librarySelectionPending=false,libraryTabId=null;
@@ -346,7 +347,7 @@
       ${ThreadLineCore.isOutdated(state,c)?`<div class="branch-version">待核对：分支 v${c.seenVersion||0} → 课题 v${p.knowledgeVersion||0}<div class="diff-preview">${escape(changeDescriptions(p,c.seenVersion))}</div></div>`:""}
       <div class="branch-actions">
         <button data-action="go-chat" data-key="${escape(c.key)}" ${(!tab && c.key.startsWith('tab:'))?'disabled':''}>打开对话</button>
-        <details class="branch-tool-details">
+        <details class="branch-tool-details" data-branch-key="${escape(c.key)}" ${openBranchToolKeys.has(c.key)?"open":""}>
           <summary>管理分支</summary>
           <div class="branch-tool-content">
             <select aria-label="分支状态" data-stage-key="${escape(c.key)}">${options.map(([v,label])=>`<option value="${v}" ${c.stage===v?"selected":""}>${label}</option>`).join('')}</select>
@@ -489,6 +490,12 @@
     });
   });
   document.addEventListener("click",async event=>{
+    const branchSummary=event.target.closest(".branch-tool-details > summary");
+    if(branchSummary){
+      const detail=branchSummary.parentElement,key=detail.dataset.branchKey;
+      if(key){if(detail.open)openBranchToolKeys.delete(key);else openBranchToolKeys.add(key);}
+      return; // native details handles the toggle
+    }
     const editSummary=event.target.closest("#topic-edit-details > summary");
     if(editSummary){
       editDetailsProjectId=editSummary.parentElement.open?null:selectedId;
