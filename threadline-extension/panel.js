@@ -162,7 +162,13 @@
       ? ($("#evidence-project")?.value||null)
       : workspace==="switch" ? (selectedId||chatForTab(picked)?.projectId||null)
       : (chatForTab(picked)?.projectId||null);
-    try{await ThreadLineLibrarySurface.open({viewProjectId,sourceTabId,sourceChatKey});}
+    const search=workspace==="evidence"?$("#evidence-query")?.value||"":"";
+    const filter=workspace==="evidence"?$("#evidence-filter-status")?.value||"all":"all";
+    const query=search.length<=160?search:"";
+    try{
+      await ThreadLineLibrarySurface.open({viewProjectId,sourceTabId,sourceChatKey,filter,query});
+      if(search!==query)notify("检索词超过160字，未带入宽页；请在宽页重新输入。");
+    }
     catch(error){notifyCritical("打开资料库失败："+error.message+"。原侧栏数据未改变。");}
   }
   async function returnToSource() {
@@ -982,7 +988,7 @@
     const view=saved||{
       viewProjectId:intent.viewProjectId,topicProjectId:null,
       sourceTabId:intent.sourceTabId,sourceChatKey:intent.sourceChatKey,
-      workspace:"evidence",filter:"all",query:""
+      workspace:"evidence",filter:intent.filter,query:intent.query
     };
     surface="library";
     libraryTabId=tab.id;
@@ -990,11 +996,9 @@
     librarySourceChatKey=view.sourceChatKey;
     libraryInitialProjectId=view.viewProjectId;
     librarySelectionPending=true;
-    if(saved){
-      setSelectedId(view.topicProjectId);
-      $("#evidence-query").value=view.query;
-      $("#evidence-filter-status").value=view.filter;
-    }
+    if(saved)setSelectedId(view.topicProjectId);
+    $("#evidence-query").value=view.query;
+    $("#evidence-filter-status").value=view.filter;
     document.documentElement.dataset.surface="library";
     $("#library-launch").hidden=true;
     $("#library-header").hidden=false;
