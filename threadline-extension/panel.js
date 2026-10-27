@@ -12,7 +12,7 @@
   let surface="sidebar",librarySourceTabId=null,librarySourceChatKey=null;
   let libraryInitialProjectId=null,librarySelectionPending=false,libraryTabId=null;
   let libraryWindowId=null;
-  let libraryViewWarningShown=false;
+  let libraryViewWarningShown=false,libraryOpening=false;
   let state = ThreadLineCore.emptyState();
   let tabs = [];
   let activeTabId = null;
@@ -177,11 +177,18 @@
     const search=workspace==="evidence"?$("#evidence-query")?.value||"":"";
     const filter=workspace==="evidence"?$("#evidence-filter-status")?.value||"all":"all";
     const query=search.length<=160?search:"";
+    if(libraryOpening)return;
+    libraryOpening=true;
+    const button=$("#library-open");button.disabled=true;
     try{
-      await ThreadLineLibrarySurface.open({viewProjectId,sourceTabId,sourceChatKey,filter,query});
-      if(search!==query)notify("检索词超过160字，未带入宽页；请在宽页重新输入。");
-    }
-    catch(error){notifyCritical("打开资料库失败："+error.message+"。原侧栏数据未改变。");}
+      const win=await chrome.windows.getCurrent();
+      const result=await ThreadLineLibrarySurface.open({
+        viewProjectId,sourceTabId,sourceChatKey,filter,query,windowId:win.id
+      });
+      if(result.reused)notify("已切回原资料库标签页，原有查看位置不会重置。");
+      else if(search!==query)notify("检索词超过160字，未带入宽页；请在宽页重新输入。");
+    }catch(error){notifyCritical("打开资料库失败："+error.message+"。原侧栏数据未改变。");}
+    finally{libraryOpening=false;button.disabled=false;}
   }
   async function openSidebar() {
     if(!Number.isSafeInteger(libraryWindowId)||libraryWindowId<0){
@@ -1063,6 +1070,10 @@
     surface="library";
     libraryTabId=tab.id;
     libraryWindowId=tab.windowId;
+    // Registry only marks that this top-level tab really initialized as a
+    // library; it never grants any extra background data permissions.
+    try{await ThreadLineLibrarySurface.registerOpen(tab);}
+    catch(error){notifyCritical("资料库标签登记失败："+error.message+"，返回入口可能打开重复标签。");}
     librarySourceTabId=view.sourceTabId;
     librarySourceChatKey=view.sourceChatKey;
     libraryInitialProjectId=view.viewProjectId;
