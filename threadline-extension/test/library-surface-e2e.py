@@ -119,6 +119,15 @@ def run():
             assert library.get_by_role("tab").count()==2
             assert library.locator("#library-launch").is_hidden()
             assert library.locator("#library-header").is_visible()
+            # Return to the source/side panel and reopen the library repeatedly:
+            # it must focus the same tab, not create a stack of duplicates.
+            original_count=len(context.pages)
+            for _ in range(3):
+                panel.bring_to_front()
+                panel.locator("#library-open").click()
+                panel.wait_for_function(
+                    "() => document.querySelector('#toast').textContent.includes('原资料库')")
+                assert len(context.pages)==original_count, "repeated clicks created library duplicates"
             assert "测试课题 A" in library.locator("#library-view-project").inner_text()
             assert library.locator("#library-open-sidebar").is_visible()
             assert library.locator("#evidence-handoff").is_hidden(), "D1 keeps writes in sidebar"
