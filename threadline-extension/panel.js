@@ -581,7 +581,8 @@
       option.textContent = (project.name || project.id)+(project.unavailable?"（需恢复）":"");
       select.appendChild(option);
     }
-    if(surface==="library"&&librarySelectionPending){
+    const restoringLibraryView=surface==="library"&&librarySelectionPending;
+    if(restoringLibraryView){
       librarySelectionPending=false;
       if(libraryInitialProjectId&&[...select.options].some(o=>o.value===libraryInitialProjectId)){
         select.value=libraryInitialProjectId;
@@ -595,8 +596,9 @@
           notifyCritical("资料库找不到原课题；未自动切换到其他课题，请明确选择。");
       }
     }else if ([...select.options].some(o => o.value === current)) select.value = current;
-    if(select.value!==current)select.dispatchEvent(new Event("change"));
-    else await renderEvidenceProject();
+    if(select.value!==current&&!restoringLibraryView)
+      select.dispatchEvent(new Event("change"));
+    else await renderEvidenceProject(); // restoration is not a user project switch
     saveLibraryView();
   }
 
