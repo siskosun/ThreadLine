@@ -2,6 +2,7 @@
 (()=>{
   if(globalThis.__TL_HANDOFF_V2__)return;globalThis.__TL_HANDOFF_V2__=true;
   let data=null,attempts=0,working=false,done=false,mismatchMeta='';
+  let replyCheckReady=false;
   let bannerHost=null,bannerObserver=null,bannerRestores=0,bannerDismissed=false;
   // Only a freshly created plain-chat composer is eligible for this handoff.
   // Fail closed on Project, Temporary, existing chat or unknown redirects.
@@ -23,6 +24,34 @@
   }
   function send(payload){return new Promise((resolve,reject)=>chrome.runtime.sendMessage(payload,r=>{if(chrome.runtime.lastError)return reject(new Error(chrome.runtime.lastError.message));if(!r?.ok)return reject(new Error(r?.error||"连接研线失败"));resolve(r.data);}));}
   function editor(){return document.querySelector('#prompt-textarea,div[contenteditable="true"][data-lexical-editor],div[contenteditable="true"][data-testid="composer-input"],form [contenteditable="true"]');}
+  // Read-only, user-triggered DOM check. Neither message nodes nor a Stop
+  // control proves server delivery, response completeness, or model failure.
+  function inspectLastReply(){
+    try{
+      const nodes=[...document.querySelectorAll(
+        '[data-message-author-role="user"],[data-message-author-role="assistant"]')];
+      const textPresent=el=>String(el?.innerText??el?.textContent??'').trim().length>0;
+      let lastUser=-1;
+      for(let i=nodes.length-1;i>=0;i--){
+        if(nodes[i]?.getAttribute('data-message-author-role')==='user' && textPresent(nodes[i])){
+          lastUser=i;break;
+        }
+      }
+      if(lastUser<0)
+        return '当前页面未识别到用户消息。可能已切换对话或页面尚未渲染；无法核实本次发送，请人工查看，不自动重发。';
+      const assistantAfter=nodes.slice(lastUser+1).some(el=>
+        el?.getAttribute('data-message-author-role')==='assistant' && textPresent(el));
+      const stopPresent=!!document.querySelector(
+        '[data-testid="stop-button"],button[aria-label="Stop streaming"],button[aria-label*="Stop generating"]');
+      if(assistantAfter)
+        return '当前页面最近一条用户消息之后有助手文本，但无法据此确认回复完整或研究整理成功；请人工核对。';
+      if(stopPresent)
+        return '当前页面有用户消息，并发现可能仍在生成的控件。尚未看到随后出现的助手正文；请在 ChatGPT 页面检查，不自动重发。';
+      return '当前页面最近一条用户消息之后未识别到助手正文，也未看到生成控件。这不等于已证明服务端故障；可在普通新聊天手动发送短测试消息，并核对模型额度、网络及服务状态。研线不会自动重发。';
+    }catch{
+      return '当前页面结构无法核实回复状态。请在 ChatGPT 页面人工检查；研线不会自动发送或重试。';
+    }
+  }
   function banner(message,error=false){
     if(bannerDismissed)return;
     let host=bannerHost||document.querySelector('#tl-handoff-banner');
@@ -43,6 +72,15 @@
     }
     host.replaceChildren();const text=document.createElement('div');text.textContent=message;host.appendChild(text);
     if(data){const btn=document.createElement('button');btn.type='button';btn.textContent='复制接续提示';btn.style.cssText='margin:9px 8px 0 0;padding:7px 10px;border-radius:8px;background:#294d75;color:#fff;border:0;cursor:pointer';btn.onclick=async()=>{try{await navigator.clipboard.writeText(data.text);banner('已复制接续提示。请粘贴到输入框并检查后发送。');}catch{banner('复制失败，请重新点击扩展图标使用接续功能。',true);}};host.appendChild(btn);}
+    if(data && replyCheckReady){
+      const checkButton=document.createElement('button');
+      checkButton.type='button';
+      checkButton.textContent='检查回答状态';
+      checkButton.title='仅核对当前网页可见的消息与生成控件；不发送消息';
+      checkButton.style.cssText='margin:9px 8px 0 0;padding:7px 10px;border-radius:8px;background:#f1f4f8;color:#29435c;border:1px solid #cbd9e9;cursor:pointer';
+      checkButton.onclick=()=>banner(inspectLastReply());
+      host.appendChild(checkButton);
+    }
     const close=document.createElement('button');close.type='button';close.textContent='关闭提示';close.style.cssText='padding:7px 9px;border-radius:8px;background:#f1f4f8;border:1px solid #e2e8f0;cursor:pointer';close.onclick=()=>{bannerDismissed=true;bannerObserver.disconnect();host.remove();};host.appendChild(close);
     if(error)host.style.borderColor='#deac92';
   }
@@ -206,6 +244,7 @@
       const outcome=fill(data.text);
       if(outcome==='exact'){
         done=true;
+        replyCheckReady=true;
         banner('研线已逐字核对预填草稿。检查内容后按发送；不会自动替你发送。');
         await send({type:'HANDOFF_ACK'});return;
       }
