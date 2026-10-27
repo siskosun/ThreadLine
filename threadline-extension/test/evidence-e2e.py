@@ -277,8 +277,10 @@ def run():
                 const original=chrome.runtime.sendMessage.bind(chrome.runtime);
                 window.__restoreDelayedWithdraw=()=>{chrome.runtime.sendMessage=original;};
                 window.__releaseDelayedWithdraw=null;
+                window.__delayedWithdrawCalls=0;
                 chrome.runtime.sendMessage=(payload,callback)=>{
                     if(payload?.type==="EV_WITHDRAW"){
+                        window.__delayedWithdrawCalls++;
                         return original(payload,response=>{
                             window.__delayedWithdrawResponse=response;
                             window.__releaseDelayedWithdraw=()=>callback(response);
@@ -290,6 +292,8 @@ def run():
             panel.locator("#evidence-list button", has_text="撤回").click()
             panel.locator("dialog.tl-confirm-dialog button", has_text="撤回结论").click()
             panel.wait_for_function("() => typeof window.__releaseDelayedWithdraw === 'function'")
+            assert panel.locator("#evidence-list button", has_text="撤回").is_disabled()
+            assert panel.evaluate("window.__delayedWithdrawCalls")==1
             panel.select_option("#evidence-project",project_id)
             panel.wait_for_function("id => document.querySelector('#evidence-project').value===id",arg=project_id)
             panel.wait_for_function("id => [...document.querySelectorAll('#evidence-list .evidence-item')].some(n=>n.dataset.conclusionId===id)",
@@ -303,6 +307,7 @@ def run():
             delayed_row = next(row for row in delayed_listing["data"]["rows"]
                 if row["conclusion"]["id"] == adopted_delayed["data"]["conclusionId"])
             assert delayed_row["conclusion"]["status"] == "withdrawn"
+            assert panel.evaluate("window.__delayedWithdrawCalls")==1
             panel.evaluate("window.__restoreDelayedWithdraw()")
             first = panel.locator("#evidence-list .evidence-item").first
             assert first.get_attribute("open") is not None
