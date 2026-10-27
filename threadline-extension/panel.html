@@ -19,6 +19,11 @@
       <button id="nav-research" data-workspace="research" role="tab" aria-selected="false" aria-controls="workspace-research"><span class="nav-icon" aria-hidden="true">◎</span> 研究整理</button>
       <button id="nav-evidence" data-workspace="evidence" role="tab" aria-selected="false" aria-controls="workspace-evidence"><span class="nav-icon" aria-hidden="true">◇</span> 证据与交接</button>
     </nav>
+    <div id="library-launch" class="library-launch"><button type="button" id="library-open" class="text-button">在宽页打开资料库 ↗</button></div>
+    <section id="library-header" class="library-header" hidden aria-label="资料库浏览上下文">
+      <div><h2>研究资料库</h2><p id="library-context-text" role="status">正在确认本窗口的查看范围…</p></div>
+      <button type="button" id="library-return" class="secondary">返回来源对话</button>
+    </section>
     <section id="critical-notice" role="alert" aria-live="assertive" aria-atomic="true" hidden>
       <p id="critical-notice-text"></p>
       <button id="critical-notice-dismiss" type="button" class="secondary">关闭提示</button>
@@ -194,6 +199,7 @@
   <script src="evidence-adoption-ui.js"></script>
   <script src="capture-ui.js"></script>
   <script src="evidence-list-core.js"></script>
+  <script src="library-surface.js"></script>
   <script src="panel.js"></script>
   <script src="evidence-maintenance-ui.js"></script>
 </body>
