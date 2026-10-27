@@ -88,7 +88,7 @@
     $("#critical-notice-text").textContent="";
   });
   async function change(action,success) {
-    if (busy) {notify("上一项更改正在保存，请稍后再试");return;}
+    if (busy) {notify("上一项更改正在保存，请稍后再试");return false;}
     const requestedSelectionRevision=selectionRevision;
     busy=true;
     try {
@@ -97,11 +97,14 @@
         setSelectedId(res.result.projectId);
       const refreshed=await refresh(true);
       if (success && refreshed) notify(success);
+      else if(!refreshed)notifyCritical("保存成功回执已收到，但课题状态刷新失败。请重新打开面板核对，不要重复提交。");
+      return true;
     } catch(error) {
       const refreshed=await refresh(true);
       notifyCritical("操作失败或结果未确认："+error.message+"。"+
         (refreshed?"已刷新当前状态；请核对课题与分支是否已变化，再决定是否重试。":"状态刷新也失败，当前显示可能过期；请重新打开面板核对。")+
         "研线未自动重放操作。");
+      return false;
     }
     finally{busy=false;}
   }
@@ -359,7 +362,11 @@
       const old=ThreadLineCore.getProject(state,state.chats[key].projectId);
       if (!confirm(`当前对话已在「${old?.name||'其他课题'}」中。创建新课题时将转移它，继续吗？`)) return;
     }
-    change({type:"createProject",name,chat:key?{key,title:t.title||"新对话",url:t.url}:null},"临时课题已创建").then(()=>{$("#topic-name").value="";});
+    change({type:"createProject",name,chat:key?{key,title:t.title||"新对话",url:t.url}:null},"临时课题已创建").then(committed=>{
+      // Failed/unknown/busy writes preserve text; a late ACK must not erase
+      // a different name typed while the original request was pending.
+      if(committed && $("#topic-name").value.trim()===name) $("#topic-name").value="";
+    });
   });
   document.addEventListener("click",async event=>{
     const nav=event.target.closest("[data-workspace]");
