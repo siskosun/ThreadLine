@@ -649,7 +649,9 @@
           }
         });
         const withdraw=document.createElement("button");withdraw.type="button";withdraw.className="secondary";withdraw.textContent="撤回";
+        let withdrawPending=false;
         withdraw.addEventListener("click",async()=>{
+          if(withdrawPending)return;
           const targetProjectId=evidenceListCache?.projectId;
           if(!targetProjectId)return;
           const accepted=await ThreadLineDialogs.confirm({
@@ -662,6 +664,7 @@
             notifyCritical("查看课题已切换，撤回未发送。请回到原课题核对后再操作。");
             return;
           }
+          withdrawPending=true;withdraw.disabled=true;
           try{
             await evSend({type:"EV_WITHDRAW",conclusionId:c.id,reason:"面板撤回",expectedVersionId:row.current.id,operationId:"op_wd_"+crypto.randomUUID().replace(/-/g,"").slice(0,12)});
             if(targetProjectId!==ev$("evidence-project").value){
@@ -684,6 +687,9 @@
             notifyCritical("撤回失败或结果未确认："+error.message+
               "。"+(refreshed?"已刷新当前结论；":"当前结论刷新也失败；")+
               "请核对状态与历史后再决定是否重试。研线未自动重放撤回操作。");
+          }finally{
+            withdrawPending=false;
+            if(withdraw.isConnected)withdraw.disabled=false;
           }
         });
         row2.append(amend,withdraw);content.appendChild(row2);
