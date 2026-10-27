@@ -133,12 +133,12 @@
   async function openLibrary() {
     const picked=workspace==="research"
       ? tabs.find(t=>String(t.id)===$("#capture-source")?.value) : activeTab();
-    const sourceTabId=picked&&ThreadLineCore.isChatURL(picked.url)?picked.id:null;
+    const sourceChatKey=picked&&ThreadLineCore.isChatURL(picked.url)?getKey(picked):null;
+    const sourceTabId=sourceChatKey?picked.id:null;
     const viewProjectId=workspace==="evidence"
       ? ($("#evidence-project")?.value||null)
       : workspace==="switch" ? (selectedId||chatForTab(picked)?.projectId||null)
       : (chatForTab(picked)?.projectId||null);
-    const sourceChatKey=sourceTabId?getKey(picked):null;
     try{await ThreadLineLibrarySurface.open({viewProjectId,sourceTabId,sourceChatKey});}
     catch(error){notifyCritical("打开资料库失败："+error.message+"。原侧栏数据未改变。");}
   }
