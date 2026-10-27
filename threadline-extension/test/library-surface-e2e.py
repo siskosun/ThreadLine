@@ -107,6 +107,7 @@ def run():
             assert library.get_by_role("tab").count()==2
             assert library.locator("#library-launch").is_hidden()
             assert library.locator("#library-header").is_visible()
+            assert "测试课题 A" in library.locator("#library-view-project").inner_text()
             assert library.locator("#library-open-sidebar").is_visible()
             assert library.locator("#evidence-handoff").is_hidden(), "D1 keeps writes in sidebar"
             library.locator("#evidence-maintenance").wait_for(state="attached")
@@ -167,6 +168,7 @@ def run():
                 "() => document.querySelector('#evidence-summary').textContent.includes('已采纳 1 条')")
             assert "稀有核查词" not in library.locator("#evidence-list").inner_text()
             assert "另一个课题专属结论" in library.locator("#evidence-list").inner_text()
+            assert "测试课题 B" in library.locator("#library-view-project").inner_text()
             library.get_by_role("tab",name="课题与对话").click()
             library.wait_for_function(
                 "id => [...document.querySelectorAll('#topic-list [data-id]')].some(n=>n.dataset.id===id && n.getAttribute('aria-pressed')==='true')",arg=other)
@@ -246,6 +248,7 @@ def run():
                 "() => document.querySelector('#evidence-project').value===''")
             assert invalid.locator("#evidence-project option:checked").inner_text().startswith("原课题不可用")
             assert invalid.locator("#evidence-handoff").is_hidden()
+            assert "尚未选择" in invalid.locator("#library-view-project").inner_text()
             invalid_after_refresh=invalid.evaluate("""async () => {
                 const select=document.querySelector('#evidence-project');
                 return await new Promise((resolve,reject)=>{
