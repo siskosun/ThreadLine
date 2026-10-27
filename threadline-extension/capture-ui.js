@@ -4,7 +4,7 @@
   let tabs=[],currentId="",lastCompleted="",currentRun=null,brief=null,rulesBrief=null,messages=[],collapsed=new Set(),zoom=0.8,timer=0,watchBusy=false;
   let aiAbort=null;
   let organizing=false,captureStarting=false;
-  let webHelperTabId=null;
+  let webHelperTabId=null,failedWebHelperTabId=null;
   let linkedProjectId=null;
   const htmlEsc=s=>String(s??"").replace(/[&<>"']/g,x=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[x]));
   function isTab(tab){return !!ThreadLineCaptureCore.conversationId(tab.url);}
@@ -251,12 +251,42 @@
     if(!result)throw new Error("原采集记录已清除，无法保存 AI 结果");
     if(currentId===runId){currentRun=result;await showReport(result);lastCompleted=runId;}
   }
+  async function openAnalysisTab(){
+    const id=webHelperTabId||failedWebHelperTabId;
+    if(!id){aiStatus("没有可查阅的分析标签页",true);return;}
+    const tab=await chrome.tabs.get(id).catch(()=>null);
+    const valid=(()=>{try{
+      const url=new URL(tab?.url||"");
+      return url.protocol==="https:"&&["chatgpt.com","chat.openai.com"].includes(url.hostname);
+    }catch{return false;}})();
+    if(!tab||!valid){
+      if(id===failedWebHelperTabId)failedWebHelperTabId=null;
+      if(id===webHelperTabId)webHelperTabId=null;
+      $("ai-open-webtab").hidden=true;
+      aiStatus("分析标签页已关闭或已离开 ChatGPT；没有自动重发。",true);
+      return;
+    }
+    try{
+      await chrome.tabs.update(id,{active:true});
+      await chrome.windows.update(tab.windowId,{focused:true});
+    }catch(error){aiStatus("无法打开分析标签页："+error.message,true);}
+  }
   async function analyzeWithProvider(){
     if(!currentRun||!rulesBrief||!messages.length){aiStatus("请先完成对话采集",true);return;}
     if(aiAbort){aiStatus("已有一项分析正在运行",true);return;}
     const kind=selectedProvider();if(kind==="manual"){aiStatus("当前为手动分析：请复制结构化提示，在 ChatGPT 自行发送后导入 JSON；若确需自动分析，请主动切换方式。",true);return;}
     const model=$("ai-model").value,token=$("ai-api-key").value;
     if(kind!=="webui"){try{ThreadLineProviders.config(kind,model,token);}catch(e){aiStatus(e.message,true);return;}}
+    if(kind==="webui"&&failedWebHelperTabId){
+      const previous=await chrome.tabs.get(failedWebHelperTabId).catch(()=>null);
+      if(previous){
+        $("ai-open-webtab").hidden=false;
+        aiStatus("上次网页分析可能已发送但未确认结果。请先查看保留的分析标签页，复制可用 JSON 或关闭标签页后再决定是否重试；不会自动重发。",true);
+        return;
+      }
+      failedWebHelperTabId=null;
+      $("ai-open-webtab").hidden=true;
+    }
     const maxChars=kind==="ollama"?4900:kind==="webui"?5600:10500;
     let units;
     try{units=ThreadLineAI.segment(messages,{maxChars});}catch(e){aiStatus(e.message,true);return;}
@@ -280,6 +310,8 @@
     try{
       if(kind==="webui"){
         const tab=await chrome.tabs.create({url:"https://chatgpt.com/",active:false});webHelperTabId=tab.id;
+        $("ai-open-webtab").hidden=false;
+        aiStatus("专用 ChatGPT 分析标签页已打开。若进度停滞可主动查看；不重复发送。");
         const started=Date.now();let ready=false;
         while(Date.now()-started<26000){
           if(controller.signal.aborted)throw new Error("分析已取消");
@@ -294,6 +326,7 @@
         maxChars,complete,signal:controller.signal,
         request:({instructions,prompt,signal})=>kind==="webui"?(async()=>{
           if(signal?.aborted)throw new Error("分析已取消");
+          aiStatus("已将分析请求交给网页。若 ChatGPT 没有回复，请查看专用标签页。系统不会自动重试或将未知结果当作成功。");
           const answer=await chrome.tabs.sendMessage(webHelperTabId,{type:"TL_WEB_ASK",prompt:instructions+"\n\n"+prompt});
           if(signal?.aborted)throw new Error("分析已取消");
           if(!answer?.ok)throw new Error(answer?.error||"ChatGPT 网页分析失败");
@@ -308,11 +341,21 @@
       await saveAI(runId,result.report,kind,result.coverage);
       webSucceeded=true;
       aiStatus(`AI 整理已写回本地报告：${result.coverage.requests} 次模型请求，${result.coverage.analyzedMessages} 条消息。请核对关键来源编号。`);
-    }catch(e){aiStatus("分析未完成："+e.message,true);}
-    finally{
+    }catch(e){
+      aiStatus("分析未完成："+e.message+
+        (kind==="webui"?"。专用网页保留供检查；可能已提交但未收到可核查回复，勿直接重复发送。可复制已有的 JSON 再手动导入。":""),true);
+    }finally{
       if(kind==="webui" && webHelperTabId){
-        // Successful helper tab is closed; unsuccessful one remains for inspection.
-        if(webSucceeded)await chrome.tabs.remove(webHelperTabId).catch(()=>{});
+        if(webSucceeded){
+          await chrome.tabs.remove(webHelperTabId).catch(()=>{});
+          failedWebHelperTabId=null;
+          $("ai-open-webtab").hidden=true;
+        }else{
+          // Preserve uncertain action for manual verification before another
+          // attempt. A failed request can still have consumed model quota.
+          failedWebHelperTabId=webHelperTabId;
+          $("ai-open-webtab").hidden=false;
+        }
         webHelperTabId=null;
       }
       if(aiAbort===controller)aiAbort=null;$("ai-run").disabled=false;$("ai-stop").hidden=true;
@@ -360,6 +403,7 @@
     $("ai-provider").addEventListener("change",updateProvider);
     $("ai-run").addEventListener("click",analyzeWithProvider);
     $("ai-stop").addEventListener("click",()=>{aiAbort?.abort();if(webHelperTabId)chrome.tabs.sendMessage(webHelperTabId,{type:"TL_WEB_STOP"}).catch(()=>{});aiStatus("正在停止分析…");});
+    $("ai-open-webtab").addEventListener("click",openAnalysisTab);
     $("ai-copy-prompt").addEventListener("click",copyAIPrompt);
     $("ai-import-clipboard").addEventListener("click",importClipboard);
     $("ai-import-manual").addEventListener("click",()=>importAI($("ai-json").value));
