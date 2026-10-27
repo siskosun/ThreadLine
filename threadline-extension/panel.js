@@ -956,6 +956,10 @@
     $("#nav-switch").lastChild.textContent=" 课题与对话";
     $("#nav-evidence").lastChild.textContent=" 结论与依据";
     $("#manage-accordion").open=true;
+    const manageLabel=document.querySelector("#manage-accordion > summary > span");
+    if(manageLabel)manageLabel.textContent="课题与对话（只读）";
+    const manageDesc=document.querySelector("#manage-accordion .manage-desc");
+    if(manageDesc)manageDesc.textContent="查看";
     const context=$("#library-context-text");
     if(librarySourceTabId){
       const source=await chrome.tabs.get(librarySourceTabId).catch(()=>null);
@@ -967,6 +971,7 @@
         context.textContent="原来源对话已关闭或改变；请明确选择课题，不能据此运行网页自检。";
       }
     }else context.textContent="来源对话未指定；只浏览研究资料，操作目标由当前选中的课题决定。";
+    $("#library-return").hidden=!librarySourceTabId;
     setWorkspace("evidence");
   }
   document.querySelector(".workspace-tabs").addEventListener("keydown", e => {
