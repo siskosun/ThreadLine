@@ -66,3 +66,7 @@ D1/D4 与投影已按上文设计落地（PR 见 S1A-PERSIST 证据）：
 - **旧 decision 封口（D1）**：首次采纳即置 `takeover:true`（撤回也不解除），旧正文以 `legacyNote{text, verified:false}` 原样封存；`MUTATE`（decision 补丁）、`BACKUP_IMPORT`（含接管课题的旧备份）、`BACKUP_ROLLBACK`（快照含接管课题）在**消息层**拒绝并说明指引；goal 等其他字段照常可编辑；未接管课题不受影响。
 - **E2E**：真实浏览器验证 storage 投影、封口拒绝、goal 仍可编辑、投影跨完整重启存活。
 - **大库探针（一次性合成配置，未入 CI）**：150 结论 × 8 片段（包 7.03 MiB，IndexedDB 用量 3.2 MiB，quota ≈ 10 GiB，persisted=false）：采纳中位 62.5 ms/条、LIST 767 ms、EXPORT 878 ms、SUMMARY 47 ms。首期默认容量**维持冻结**；EV_LIST 当前全量返回片段，S1b 接 UI 时按需分页（已记录）。
+
+## 8. 2026-10-27 人工工效口径纠偏（新增，不改历史记录）
+
+第 5 节的毫秒级记录来自自动化写入延迟，不足以证明 12 次真实人工采纳中的审阅、纠错、补证与求助情况。新增 [人工试次执行与证据核验指南](S0A_HUMAN_TRIAL_GUIDE_20261027.md) 与 `s0a-trials.js` / `s0a-human-ui.js`，将合成和人工计时分轨；自动化不再具备“人工达标”的含义。真实人工试次和 4 次非设计者操作 NOT_EXECUTED，S0A 状态不变。

@@ -1,6 +1,6 @@
 """S0a evidence prototype E2E on a one-shot synthetic profile (plan §十一.6).
 Real MV3 service worker + real IndexedDB, no accounts, no external sites.
-Probes: single-writer adoption protocol (12 timed operations), restart
+Probes: synthetic write-latency benchmark (not human acceptance), restart
 recovery of the authoritative store, read-only summary projection, withdraw
 with history, export/import roundtrip, storage.estimate visibility."""
 import json
@@ -75,6 +75,7 @@ def run():
             wait_true(page, "() => window.__timings.length === 12", timeout=60)
             stats = page.evaluate("window.__timingsStats()")
             trials = page.evaluate("window.__timings")
+            assert all(x["mode"] == "synthetic_write_latency" for x in trials)
             assert stats["valid"] == 12, stats
             assert stats["medianMs"] <= 30000, stats
             assert stats["p90Ms"] <= 60000, stats
@@ -587,7 +588,87 @@ def run():
                     assert not failed["ok"] and "冲突" in failed["error"], failed
                     assert raw_evidence(restored_page) == before_invalid, "invalid import must leave every store unchanged"
                     restored_ctx.close()
-            print("PASS: S0a+S1a evidence prototype — 12 timed adoptions "
+            # Manual trial recorder gets its own disposable browser profile. Playwright
+            # interaction here is a UI regression, never evidence of human participation.
+            with TemporaryDirectory(prefix="threadline-human-recorder-smoke-") as human_profile:
+                human_ctx, human, _ = launch(human_profile)
+                wait_true(human, "() => Array.isArray(window.__manualTrials)")
+                assert human.evaluate("window.__manualSummary().gate") == "INCOMPLETE"
+                human.fill("#ev-manual-operator", "T01")
+                human.check("#ev-manual-nondesign")
+                human.click("#ev-start-manual")
+                wait_true(human, "() => !document.querySelector('#ev-manual-save').disabled")
+                assert human.locator("#ev-text").input_value().startswith("案例 1：线路B")
+                assert human.locator("#ev-run-protocol").is_disabled()
+                human.click("#ev-manual-save")
+                assert "请核对任务要求" in human.locator("#ev-notice").inner_text()
+                assert human.evaluate("window.__manualTrials.length") == 0
+                human.check("#ev-manual-confirm")
+                human.click("#ev-manual-save")
+                wait_true(human, "() => window.__manualTrials.length === 1")
+                first = human.evaluate("window.__manualTrials[0]")
+                assert first["caseType"] == "direct" and first["outcome"] == "committed"
+                assert first["nonDesigner"] and not first["assisted"]
+                assert human.evaluate("window.__manualSummary().thresholdsMet") is False
+                assert human.evaluate("window.__timings.length") == 0, (
+                    "automated performance log must never absorb a human-task observation")
+                human.click("#ev-start-manual")
+                wait_true(human, "() => !document.querySelector('#ev-manual-abandon').disabled")
+                human.click("#ev-manual-abandon")
+                assert human.evaluate("window.__manualTrials[1].outcome") == "abandoned"
+                # Advance only through controlled synthetic UI actions, not a real-person trial.
+                for _ in range(4):  # Cases 3..6
+                    human.click("#ev-start-manual")
+                    human.click("#ev-manual-abandon")
+                human.click("#ev-start-manual")  # Case 7 requires correction
+                assert "线路A转化率4.1%" in human.locator("#ev-text").input_value()
+                human.check("#ev-manual-confirm")
+                human.click("#ev-manual-save")
+                assert "请先修正" in human.locator("#ev-notice").inner_text()
+                assert human.evaluate("window.__manualTrials.length") == 6
+                human.fill("#ev-text", "案例 7：线路B转化率4.1%，高于线路A的3.2%。")
+                human.click("#ev-manual-save")
+                wait_true(human, "() => window.__manualTrials.length === 7")
+                assert human.evaluate("window.__manualTrials[6].outcome") == "committed"
+                for _ in range(2):  # Cases 8..9
+                    human.click("#ev-start-manual")
+                    human.click("#ev-manual-abandon")
+                human.click("#ev-start-manual")  # Case 10 lacks source evidence
+                assert human.locator("#ev-fragments .frag").count() == 0
+                human.check("#ev-manual-confirm")
+                human.click("#ev-manual-save")
+                assert "必须填写" in human.locator("#ev-notice").inner_text()
+                assert human.evaluate("window.__manualTrials.length") == 9
+                human.click("#ev-add-fragment")
+                human.fill('#ev-fragments [data-part="selection"]',
+                    "线路A转化率3.2%，线路B转化率4.1%。")
+                human.click("#ev-manual-save")
+                wait_true(human, "() => window.__manualTrials.length === 10")
+                assert human.evaluate("window.__manualTrials[9].caseType") == "missing_source"
+                assert human.evaluate("window.__manualTrials[9].outcome") == "committed"
+                for _ in range(2):  # Cases 11..12
+                    human.click("#ev-start-manual")
+                    human.click("#ev-manual-abandon")
+                assert human.locator("#ev-start-manual").is_disabled()
+                assert human.evaluate("window.__manualSummary().complete") is True
+                assert human.evaluate("window.__manualSummary().thresholdsMet") is False
+                assert human.evaluate("window.__manualSummary().gate") == "HUMAN_REVIEW_REQUIRED"
+                human.evaluate("""() => {
+                    Object.defineProperty(navigator, 'clipboard', {configurable:true,
+                      value:{writeText:async text=>{window.__manualCopied=text;}}});
+                }""")
+                human.click("#ev-copy-manual")
+                wait_true(human, "() => typeof window.__manualCopied === 'string'")
+                copied = json.loads(human.evaluate("window.__manualCopied"))
+                assert copied["mode"] == "human_self_report"
+                assert copied["summary"]["gate"] == "HUMAN_REVIEW_REQUIRED"
+                assert copied["summary"]["recordedCases"] == 12
+                assert copied["summary"]["eligibleCommitted"] == 3
+                assert copied["summary"]["thresholdsMet"] is False
+                assert "线路A转化率" not in human.evaluate("window.__manualCopied")
+                assert "案例 1：" not in human.evaluate("window.__manualCopied")
+                human_ctx.close()
+            print("PASS: S0a+S1a evidence prototype — 12 SYNTHETIC timed adoptions "
                   f"(median {stats['medianMs']}ms, P90 {stats['p90Ms']}ms), "
                   "single-transaction CAS/idempotency, restart recovery, "
                   "withdraw-with-history, export package, collision refusal, "
