@@ -177,38 +177,14 @@
       if(ThreadLineOrganizeCore.allowedChatUrl(currentRun.url))await chrome.tabs.create({url:currentRun.url,active:true});
     }catch(e){aiStatus("无法打开源对话："+e.message,true);}
   }
-  function node(tag,classes,x,y,w,h,value,parent,opts={}){
-    const n=document.createElement(tag);n.className="map-node "+classes;
-    Object.assign(n.style,{left:`${x}px`,top:`${y}px`,width:`${w}px`,height:`${h}px`});
-    n.textContent=value;
-    if(opts.click){n.setAttribute("aria-expanded",String(!collapsed.has(opts.id)));n.title="展开或收起";n.addEventListener("click",opts.click);}
-    parent.appendChild(n);return n;
-  }
-  function curve(svg,x1,y1,x2,y2){const el=document.createElementNS("http://www.w3.org/2000/svg","path");const mid=Math.round((x2-x1)*.55);el.setAttribute("d",`M ${x1} ${y1} C ${x1+mid} ${y1},${x2-mid} ${y2},${x2} ${y2}`);svg.appendChild(el);}
   function drawMap(){
     if(!brief)return;
-    const groups=brief.mode==="ai"?ThreadLineAI.mapGroups(brief):ThreadLineCaptureCore.mapModel(brief);
-    const rows=groups.map(g=>({...g,expanded:!collapsed.has(g.id),children:collapsed.has(g.id)?0:Math.min(4,g.items.length)}));
-    const padding=30,leafGap=70;
-    let y=padding;
-    for(const r of rows){const height=Math.max(78,r.children*leafGap+12);r.top=y;r.h=height;r.mid=y+height/2;y+=height+22;}
-    const H=Math.max(310,y+20),W=820,c=$("map-canvas");
-    c.replaceChildren();c.style.width=W+"px";c.style.height=H+"px";c.style.zoom=String(zoom);
-    const svg=document.createElementNS("http://www.w3.org/2000/svg","svg");svg.classList.add("map-lines");svg.setAttribute("width",W);svg.setAttribute("height",H);svg.setAttribute("viewBox",`0 0 ${W} ${H}`);c.appendChild(svg);
-    node("div","root",12,H/2-35,160,70,brief.title,c);
-    for(const group of rows){
-      const groupY=group.mid-25;
-      curve(svg,172,H/2,238,group.mid);
-      node("button","group",238,groupY,150,50,`${group.expanded?"−":"＋"} ${group.label}`,c,{id:group.id,click:()=>{if(collapsed.has(group.id))collapsed.delete(group.id);else collapsed.add(group.id);drawMap();}});
-      if(group.expanded){
-        const count=group.children;
-        for(let i=0;i<count;i++){
-          const leafY=group.top+6+i*leafGap;
-          curve(svg,388,group.mid,445,leafY+25);
-          node("div","leaf",445,leafY,350,52,group.items[i],c);
-        }
-      }
-    }
+    ThreadLineResearchMap.draw({canvas:$("map-canvas"),brief,collapsed,zoom,
+      onToggle:id=>{
+        if(collapsed.has(id))collapsed.delete(id);
+        else collapsed.add(id);
+        drawMap();
+      }});
   }
   function modifyZoom(delta){zoom=Math.max(.5,Math.min(1.5,Math.round((zoom+delta)*10)/10));drawMap();}
   async function newChat(deep=false){
