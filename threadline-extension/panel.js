@@ -870,7 +870,9 @@
         }
       });
       content.append(historyButton,historyPanel);
-      if(c.status!=="withdrawn"){
+      if(c.status!=="withdrawn"&&surface!=="library"){
+        // Do not even create edit/withdraw controls for the wide read surface.
+        // The service worker retains the unchanged, exact-panel trust policy.
         const row2=document.createElement("div");row2.className="line";
         const amend=document.createElement("button");amend.type="button";amend.className="secondary evidence-write-action";amend.textContent="修订";
         amend.addEventListener("click",async()=>{
