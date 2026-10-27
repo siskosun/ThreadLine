@@ -543,7 +543,20 @@
       option.textContent = (project.name || project.id)+(project.unavailable?"（需恢复）":"");
       select.appendChild(option);
     }
-    if ([...select.options].some(o => o.value === current)) select.value = current;
+    if(surface==="library"&&librarySelectionPending){
+      librarySelectionPending=false;
+      if(libraryInitialProjectId&&[...select.options].some(o=>o.value===libraryInitialProjectId)){
+        select.value=libraryInitialProjectId;
+      }else{
+        const option=document.createElement("option");option.value="";
+        option.textContent=libraryInitialProjectId
+          ?"原课题不可用，请重新选择":"请选择要查看的课题";
+        select.insertBefore(option,select.firstChild);
+        select.value="";
+        if(libraryInitialProjectId)
+          notifyCritical("资料库找不到原课题；未自动切换到其他课题，请明确选择。");
+      }
+    }else if ([...select.options].some(o => o.value === current)) select.value = current;
     if(select.value!==current)select.dispatchEvent(new Event("change"));
     else await renderEvidenceProject();
   }
