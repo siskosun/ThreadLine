@@ -85,7 +85,7 @@ def run():
             amended=send({"type":"EV_AMEND","conclusionId":con_id,
                 "text":"唯一目标结论（修订）：稀有核查词",
                 "conditions":"仅限合成的第二版",
-                "changeImpact":"wording","expectedVersionId":target["current"]["id"],
+                "changeImpact":"substantive","expectedVersionId":target["current"]["id"],
                 "operationId":"op_uid1_amend_0301"})
             assert amended
 
