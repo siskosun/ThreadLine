@@ -93,6 +93,8 @@ def run():
             panel.get_by_role("tab",name="证据与交接").click()
             panel.wait_for_function("() => document.querySelector('#evidence-project').options.length >= 2")
             panel.locator("#evidence-project").select_option(pid)
+            panel.locator("#evidence-query").fill("稀有核查词")
+            panel.locator("#evidence-filter-status").select_option("active")
             with context.expect_page() as opened:
                 panel.locator("#library-open").click()
             library=opened.value
@@ -108,6 +110,12 @@ def run():
             assert library.locator("#evidence-handoff").is_hidden(), "D1 keeps writes in sidebar"
             library.locator("#evidence-maintenance").wait_for(state="attached")
             assert library.locator("#evidence-maintenance").is_hidden(), "D1 keeps restore and delete in sidebar"
+            assert library.locator("#evidence-query").input_value()=="稀有核查词"
+            assert library.locator("#evidence-filter-status").input_value()=="active"
+            library.wait_for_function(
+                "() => document.querySelector('#evidence-list-count').textContent.includes('匹配 1 / 200')")
+            library.locator("#evidence-query").fill("")
+            library.locator("#evidence-filter-status").select_option("all")
             library.wait_for_function(
                 "() => document.querySelector('#evidence-list-count').textContent.includes('匹配 200 / 200')")
             assert library.get_by_text("匹配 200 / 200 条结论").is_visible()
