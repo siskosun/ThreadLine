@@ -34,14 +34,21 @@ async function page(options={}){
        armed=false;options.failAfterCreate=null;
        throw new Error('SIMULATED_DISPLAY_FAILURE');
      }
-     if(payload.type==='FF_LIST')return [...model.records.values()];
+     if(payload.type==='FF_LIST')return [...model.records.values()]
+       .map(record=>({id:record.id,revision:record.revision,createdAt:record.createdAt,
+         bytes:record.frozen.bytes,branchCount:Object.keys(record.branches).length,
+         taskTitle:F.shortTaskTitle(record.frozen?.p),
+         statuses:Object.fromEntries(Object.entries(record.branches).map(([label,b])=>[label,b.status]))}))
+       .sort((a,b)=>b.createdAt-a.createdAt);
      if(payload.type==='FF_READ')return model.records.get(payload.id);
      throw new Error('unexpected message');
    })().then(data=>cb({ok:true,data}),error=>cb({ok:false,error:error.message}));
  }}};
  vm.runInNewContext(source,{document:{getElementById:$,createElement:element,querySelectorAll:()=>[]},
    sessionStorage:{getItem:k=>model.storage.get(k)??null,setItem:(k,v)=>model.storage.set(k,v),
-     removeItem:k=>model.storage.delete(k)},chrome,ThreadLineFFCore:F,crypto:webcrypto,setTimeout:()=>0,clearTimeout(){}});
+     removeItem:k=>model.storage.delete(k)},chrome,ThreadLineFFCore:F,crypto:webcrypto,
+   navigator:{clipboard:{async writeText(value){model.copied=value;}}},
+   setTimeout:()=>0,clearTimeout(){}});
  await new Promise(resolve=>setImmediate(resolve));
  return {model,$,fill(){for(const [id,value] of [['ff-w0','fictional W'],['ff-p','fictional P']]){
    $(id).value=value;$(id).handlers.input();}},
@@ -86,4 +93,52 @@ test('launch without a selected experiment explains instead of silently doing no
   const btn=ui.$('ff-launch');
   await btn.handlers.click({target:btn,preventDefault(){}});
   assert.match(ui.$('ff-notice').textContent,/请先在下方/);
+});
+
+test("display-only task titles are bounded and reject empty or control-bearing instructions",()=>{
+ assert.equal(F.shortTaskTitle("  研究\n\t任务  "), "研究 任务");
+ assert.equal(F.shortTaskTitle("   "), null);
+ assert.equal(F.shortTaskTitle("含控制\u0001字符"), null);
+ assert.equal(F.shortTaskTitle(null), null);
+ const long="中文😀".repeat(20),title=F.shortTaskTitle(long);
+ assert.equal(Array.from(title).length,43);
+ assert.ok(title.endsWith("…"));
+ assert.ok(long.startsWith(Array.from(title).slice(0,-1).join("")));
+});
+
+test("Fork list shows unique task titles, dates, real K/statuses, and falls back to IDs for duplicates or unsafe titles",async()=>{
+ const model={records:new Map(),storage:new Map(),creates:[]};
+ const add=async(id,p,k,statuses,createdAt)=>{
+   const record=F.newExperiment(await F.freeze("共同材料",p),id,k);
+   record.createdAt=createdAt;
+   for(const [label,status] of Object.entries(statuses))record.branches[label].status=status;
+   model.records.set(id,record);
+ };
+ await add("exp_unique01","唯一任务",2,{A:"done",B:"unknown"},1700000000000);
+ await add("exp_dupe001","重复任务",3,{A:"failed",B:"pending",C:"done"},1700000001000);
+ await add("exp_dupe002","重复任务",4,{A:"unknown",B:"failed",C:"pending",D:"done"},1700000002000);
+ const long="很长的中文任务指令".repeat(8);
+ await add("exp_long001",long,2,{A:"pending",B:"unknown"},1700000003000);
+ await add("exp_ctrl001","危险\u0001任务",2,{A:"failed",B:"unknown"},1700000004000);
+ const ui=await page({model});
+ const buttons=ui.$("ff-list").children;
+ assert.equal(buttons.length,5);
+ const byId=id=>buttons.find(button=>button.dataset.experimentId===id);
+ const unique=byId("exp_unique01");
+ assert.ok(unique.textContent.startsWith("唯一任务 · "));
+ assert.ok(unique.textContent.includes("K=2 · A✓ B?"));
+ assert.ok(unique.textContent.includes(new Date(1700000000000).toLocaleDateString()));
+ for(const id of ["exp_dupe001","exp_dupe002"]){
+   assert.ok(byId(id).textContent.startsWith(id+" · "));
+   assert.match(byId(id).title,/标题重复/);
+ }
+ const longButton=byId("exp_long001");
+ assert.ok(longButton.textContent.startsWith(F.shortTaskTitle(long)+" · "));
+ assert.ok(Array.from(F.shortTaskTitle(long)).length<=43);
+ assert.ok(byId("exp_ctrl001").textContent.startsWith("exp_ctrl001 · "));
+ await longButton.handlers.click();
+ assert.ok(ui.$("ff-text").textContent.includes(long),"full frozen task instruction remains available in detail");
+ await ui.$("ff-copy-id").handlers.click();
+ assert.equal(model.copied,"exp_long001");
+ assert.match(ui.$("ff-notice").textContent,/已复制完整实验 ID/);
 });

@@ -74,11 +74,42 @@ def run():
             assert len(ctx.pages) == before, "Fork P1 must not open ChatGPT tabs"
             assert chat.evaluate("window.submitCount") == 0, "Fork P1 must never send"
             first = message({"type":"FF_LIST"})["data"][0]["id"]
+            first_button = page.locator(f'#ff-list button[data-experiment-id="{first}"]')
+            assert first_button.inner_text().startswith("回答问题 · ")
+            assert "K=2 · A… B…" in first_button.inner_text()
             record = message({"type":"FF_READ","id":first})
             assert record["ok"], record
             assert record["data"]["frozen"]["w0"] == evil
             assert len(record["data"]["frozen"]["textHashes"]["frozen"]) == 64
             assert record["data"]["branches"]["A"]["isolation"]["checks"]["model"] == "unknown"
+
+            # Duplicate task instructions fall back to stable IDs, while a long
+            # Chinese title is shortened only in the list; full frozen P stays intact.
+            duplicate = message({"type":"FF_CREATE","operationId":"op_duplicate001",
+                "w0":evil,"p":"回答问题","branchCount":3})
+            long_prompt = "很长的中文任务指令" * 10
+            long_record = message({"type":"FF_CREATE","operationId":"op_longtitle001",
+                "w0":evil,"p":long_prompt,"branchCount":4})
+            control_record = message({"type":"FF_CREATE","operationId":"op_controltitle01",
+                "w0":evil,"p":"危险\u0001任务","branchCount":2})
+            assert duplicate["ok"] and long_record["ok"] and control_record["ok"]
+            page.click("#ff-refresh")
+            page.wait_for_function("() => document.querySelectorAll('#ff-list button[data-experiment-id]').length === 4")
+            for experiment_id in [first,duplicate["data"]["id"]]:
+                button = page.locator(f'#ff-list button[data-experiment-id="{experiment_id}"]')
+                assert button.inner_text().startswith(experiment_id + " · ")
+            long_button = page.locator(f'#ff-list button[data-experiment-id="{long_record["data"]["id"]}"]')
+            short_title = page.evaluate("p => ThreadLineFFCore.shortTaskTitle(p)", long_prompt)
+            assert long_button.inner_text().startswith(short_title + " · ")
+            control_button = page.locator(f'#ff-list button[data-experiment-id="{control_record["data"]["id"]}"]')
+            assert control_button.inner_text().startswith(control_record["data"]["id"] + " · ")
+            long_button.click()
+            expect(page.locator("#ff-text")).to_contain_text(long_prompt)
+            page.evaluate("""() => {window.__copied=[]; Object.defineProperty(navigator,'clipboard',
+                {value:{writeText:async text=>window.__copied.push(text)},configurable:true});}""")
+            page.click("#ff-copy-id")
+            expect(page.locator("#ff-notice")).to_contain_text("已复制完整实验 ID")
+            assert page.evaluate("window.__copied") == [long_record["data"]["id"]]
 
             start = {"type":"FF_RECORD","experimentId":first,"branch":"A",
                      "expectedRevision":0,"operationId":"op_repeat001",
@@ -192,7 +223,7 @@ def run():
             reopened.goto(f"chrome-extension://{eid2}/ff.html")
             expect(reopened.locator("#ff-enable")).to_be_checked()
             rows = reopened.evaluate("() => chrome.runtime.sendMessage({type:'FF_LIST'})")
-            assert rows["ok"] and len(rows["data"]) == 2, rows
+            assert rows["ok"] and len(rows["data"]) == 5, rows
             after = reopened.evaluate("(id) => chrome.runtime.sendMessage({type:'FF_READ',id})", first)
             assert after["ok"] and after["data"]["revision"] == 3, after
             assert after["data"]["branches"]["A"]["attempts"][0]["status"] == "unknown"
@@ -231,7 +262,7 @@ def run():
             assert lost_op and len(lost_op) >= 6
             saved_once = reopened.evaluate(
                 "() => chrome.runtime.sendMessage({type:'FF_LIST'})")
-            assert saved_once["ok"] and len(saved_once["data"]) == 3, saved_once
+            assert saved_once["ok"] and len(saved_once["data"]) == 6, saved_once
             prior_ids = sorted(x["id"] for x in saved_once["data"])
             assert "ff_" + lost_op in prior_ids
             stored_lease = reopened.evaluate(
@@ -253,7 +284,7 @@ def run():
                 "已冻结并保存", timeout=10000)
             after_retry = reopened.evaluate(
                 "() => chrome.runtime.sendMessage({type:'FF_LIST'})")
-            assert after_retry["ok"] and len(after_retry["data"]) == 3, (
+            assert after_retry["ok"] and len(after_retry["data"]) == 6, (
                 "same manual retry after lost ACK created a duplicate",
                 after_retry)
             assert sorted(x["id"] for x in after_retry["data"]) == prior_ids
@@ -263,7 +294,7 @@ def run():
 
             # A real successful CREATE receipt followed by a display error is
             # still the same intent, including after reloading this tab.
-            expected_rows = 3
+            expected_rows = 6
             for failed_type in ["FF_LIST", "FF_READ"]:
                 for reload_before_retry in [False, True]:
                     reopened.reload(wait_until="domcontentloaded")
@@ -310,7 +341,7 @@ def run():
                         "display recovery created another experiment", failed_type, reload_before_retry)
                     assert reopened.evaluate("sessionStorage.getItem('tl_ff_create_intent_v1')") is None
 
-            assert expected_rows == 7
+            assert expected_rows == 10
 
             # An unreadable lease is an UNKNOWN create result, never a reason
             # to allocate another random ID and silently duplicate the record.
@@ -507,7 +538,7 @@ def run():
             assert mapping["X"] in ("A", "B") and mapping["Y"] != mapping["X"]
             # UI: X/Y columns visible WITHOUT the branch labels before the verdict.
             reopened.reload(wait_until="domcontentloaded")
-            reopened.locator("#ff-list button", has_text=p2id).click()
+            reopened.locator(f'#ff-list button[data-experiment-id="{p2id}"]').click()
             expect(reopened.locator("#ff-reply-X")).to_be_visible(timeout=15000)
             expect(reopened.locator("#ff-reply-Y")).to_be_visible(timeout=15000)
             assert reopened.locator("#ff-reply-X").text_content() == "好的，OK。"
@@ -521,7 +552,7 @@ def run():
                 "已通过", timeout=10000)
             page_errors = []
             reopened.on("pageerror", lambda e: page_errors.append(str(e)[:120]))
-            reopened.locator("#ff-list button", has_text=p2id).click()
+            reopened.locator(f'#ff-list button[data-experiment-id="{p2id}"]').click()
             reopened.wait_for_timeout(2000)
             print("PAGE-ERRORS:", page_errors,
                   "STATE:", reopened.evaluate(

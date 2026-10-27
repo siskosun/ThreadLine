@@ -64,6 +64,13 @@
 - 新增 Node 模拟及一次性 Chromium MV3：两个关联对话、单来源更新、另一分支待核对 1、人工核对后清零、启动时从本地状态重建。真实登录 ChatGPT、用户存量数据和实际使用无障碍尚未执行；不合并发布、不改 `docs/PLAN.md` 机器状态。PR 准确 HEAD/CI 另登记。
 
 
+## 2026-10-26 UX-07：Fork 列表任务标题与进度（独立候选）
+
+- 在 `ff-core.js` 新增纯显示函数，从冻结的 P 派生最多 42 个 Unicode 码点的标题；空指令或非空白控制字符返回无标题。普通换行/制表符折叠为空格。标题不写入实验记录，不参与哈希、revision、分支映射、裁决或导入导出。
+- `FF_LIST` 仅返回派生短标题，不返回完整任务正文；列表展示标题、日期、真实 K 和各分支状态。重复标题、无效标题回退到完整实验 ID；详情保留完整冻结文本并新增显式复制实验 ID 按钮。
+- Node 与合成 Chromium 测试覆盖 K=2/3/4、done/failed/unknown/pending、同名任务、长中文截断后完整指令可读、控制字符回退和复制 ID。代码 HEAD `fb53abdf919b8d22ef8ff5f65b5d8450124de761` 的 [Linux CI](https://github.com/siskosun/ThreadLine/actions/runs/40342294400)（`npm run verify` 与合成 Chromium `test:e2e`）和 [Windows CI](https://github.com/siskosun/ThreadLine/actions/runs/40342294457) 均 success；本记录更新仍需以新的准确 HEAD 复验。真实用户、读屏器和完整 WCAG 未执行，未做独立人工签署。
+
+
 
 ## 2026-10-26 UX-08：重要错误持续显示与分支表单（独立候选）
 
@@ -73,6 +80,7 @@
 - 异步重渲染移除原触发按钮时，表单关闭后优先恢复到同一分支操作；找不到时回到当前工作区标签。重要错误导致焦点丢失时将焦点交给关闭提示按钮。通用变更响应带选择版本号，延迟回包不得覆盖用户之后切换的课题。
 - Node 源码护栏和合成 MV3 Chromium E2E 覆盖：名称/进度成功、失败时输入保留、关键错误超过 toast 生命周期、无自动重放、撤回取消不写入、撤回失败持久显示、错误手动关闭、创建课题重复点击与迟到回执不清空输入、撤回忙碌锁及跨课题迟到回执不覆盖当前页。
 - 代码 HEAD `340720b0a93987f8832149f898140bc1ef6a511a` 的 [Linux CI](https://github.com/siskosun/ThreadLine/actions/runs/40437147371)（`npm run verify` 和合成 Chromium `test:e2e`）与 [Windows CI](https://github.com/siskosun/ThreadLine/actions/runs/40437147131) 均 success；本记录更新后仍须以新的准确 HEAD 复验。真实登录 ChatGPT 页面、真人体验、读屏器与完整 WCAG 尚未执行。
+
 
 ## 2026-10-26 #47 主线同步与文档无变更守卫修复
 
@@ -410,3 +418,11 @@
 - 基于已合并 PR #59、#60、#68、#69 的 main `8e3e315f`；仅调整 `evidence-maintenance-ui.js` 与对应 Node/合成 Chromium 测试，不把历史候选截图当成产品能力。
 - 维护区首次进入优先选中当前查看的有效证据课题，用户仍可主动选择其他课题；明确显示维护对象及其是否与当前查看课题一致。主视图切换时尝试对齐，但未结束的删除/恢复预览或忙碌操作保持原操作绑定，避免覆盖操作身份。
 - 后台权限、备份/删除/恢复事务、未知结果重试、证据原文及 schema 不变。真实用户、读屏器、完整 WCAG 与真实危险操作现场验收尚未执行。
+
+## 2026-10-26 UX-05：按需读取不可变证据版本历史（独立候选）
+
+- 基于已合并 UX-01/02/03/09、UX-04、UX-06 的当前 main；新增只读 `EV_HISTORY`，仅允许可信研线面板请求。读取时同时校验有效课题和结论归属，未知 ID 与跨课题 ID 返回同一错误；不调用采集缓存、不写证据库、不触发摘要投影。
+- 返回限定字段：版本完整正文、适用条件、时间、变更类型/影响、前一版本 ID、来源连接及可用来源片段。按不可变 predecessor 链排序，时间戳相同不打乱版本顺序；缺失来源显示不可用占位，不伪造原文。
+- 面板按需读取并展开版本历史；历史正文与来源使用 `textContent`，不执行 Markdown/HTML。没有改 evidence schema、采纳/撤回 CAS、操作幂等、权限之外的消息契约或发送行为。
+- 合成 Chromium E2E 覆盖单版本、多版本、条件变化、撤回后保留历史、来源不可定位时降级为片段、跨课题/未知 ID 等价错误、非面板拒绝与查询只读性。另经 Node 测试验证：打开历史不会意外执行其他课题待清理的删除/恢复操作，也不会改变存储快照。真正缺失的来源记录仍由权威库完整性门禁拒绝；不会绕过门禁伪装成可读历史。
+- 代码 HEAD `ac2da3f66f7b8cb3454851ac9bbc3ecbd6505842` 的 [Linux CI](https://github.com/siskosun/ThreadLine/actions/runs/40437414538)（`npm run verify` 与合成 Chromium `test:e2e`）及 [Windows CI](https://github.com/siskosun/ThreadLine/actions/runs/40437414500) 均 success；本记录提交仍需以新 HEAD 复验。真实用户查找效率、真实账号、读屏器和完整 WCAG 未执行。

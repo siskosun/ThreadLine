@@ -34,6 +34,14 @@ button{min-height:36px}.primary{min-height:40px}button[aria-busy=true]{cursor:wa
 #evidence-list>.evidence-item>summary{cursor:pointer;font-size:14px;line-height:1.65;font-weight:650;color:#23384f;padding:6px 0;min-height:36px;overflow-wrap:anywhere}
 #evidence-list>.evidence-item>summary:focus-visible{outline:3px solid #8eb7e7;outline-offset:2px}
 #evidence-list>.evidence-item>.evidence-item-body{border-top:1px solid #e5eaf1;margin-top:8px;padding-top:8px}
+.evidence-history-toggle{margin:8px 0;min-height:36px}
+.evidence-history[hidden]{display:none}
+.evidence-history{border-left:3px solid #d5e2f0;padding:8px 0 8px 10px;min-width:0}
+.evidence-history-version,.evidence-history-source{border-top:1px solid #e2e9f1;margin-top:8px;padding-top:6px;min-width:0}
+.evidence-history-version>summary,.evidence-history-source>summary{font-size:13px;line-height:1.65;cursor:pointer;overflow-wrap:anywhere;padding:5px 0}
+.evidence-history-version-body{min-width:0;padding:4px 0 8px}
+.evidence-history-fulltext{white-space:pre-wrap;overflow-wrap:anywhere;max-width:100%;max-height:360px;overflow:auto;border:1px solid #e2e8f0;border-radius:7px;background:#f8fafc;padding:10px;font:13px/1.7 system-ui,"Microsoft YaHei",sans-serif}
+.evidence-history-warning{color:#8b3b2f;font-size:12px;line-height:1.7;overflow-wrap:anywhere}
 .evidence-item-body>p:first-child{font-size:14px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere;color:#23384f}
 .evidence-item{border:1px solid #dce5ef;background:#fff;border-radius:12px;padding:13px;margin:12px 0;overflow-wrap:anywhere}
 .evidence-item>p:first-child{font-weight:650;font-size:14px;line-height:1.8;margin:0 0 10px;white-space:pre-wrap}
@@ -85,7 +93,11 @@ button{min-height:36px}.primary{min-height:40px}button[aria-busy=true]{cursor:wa
 #ff-columns>div{min-width:0;border:1px solid #dbe4ee;border-radius:10px;padding:14px;background:#f9fbfd}
 #ff-columns pre{white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.7 system-ui,"Microsoft YaHei",sans-serif;max-height:520px;overflow:auto}
 #ff-branch-boxes>div{border:1px solid #e0e7f0;border-radius:10px;padding:13px;margin:12px 0;background:#fafcfe}
+#ff-list{display:grid;gap:8px;min-width:0}
+#ff-list button{width:100%;min-width:0;text-align:left;white-space:normal;overflow-wrap:anywhere;line-height:1.65}
 #ff-list button[aria-pressed=true]{outline:2px solid #5488bd;background:#e5eff9}
+#ff-meta{overflow-wrap:anywhere}
+#ff-copy-id{margin:4px 0 12px;min-height:40px}
 #ff-local select{border:1px solid var(--ui-border);border-radius:8px;background:#fff;padding:8px;font:inherit;max-width:100%}
 #ff-local input[type=file]{max-width:100%;font:inherit;line-height:1.8}
 #ff-verdict-form textarea{min-height:90px}
