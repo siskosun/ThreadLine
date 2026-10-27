@@ -119,8 +119,14 @@
   function relatedTabs(key) {return tabs.filter(t=>getKey(t)===key);}
   function bestTab(chat) {return relatedTabs(chat.key)[0]||null;}
   function isGenerating(tab) {
-    const live = liveByTab[tab.id];
+    const live = liveByTab[tab?.id];
     return !!(live?.key===getKey(tab) && live.streaming && Date.now()-live.updatedAt<18000);
+  }
+  function recentlyObservedAnswer(tab) {
+    const live=liveByTab[tab?.id],now=Date.now();
+    return !!(tab?.id && live?.key===getKey(tab)&&!live.streaming&&
+      Number.isSafeInteger(live.replyObservedAt)&&
+      now-live.replyObservedAt>=0&&now-live.replyObservedAt<180_000);
   }
   function shortDate(ts) {
     if (!ts) return "";
@@ -268,7 +274,7 @@
         ${project.decision ? `<div class="current-summary"><strong>当前有效结论：</strong>${escape(project.decision)}</div>` : '<div class="current-summary">尚未登记权威结论。分支的 AI 回答不代表课题已经完成。</div>'}
         ${closed ? `<div class="current-closed">课题已收口。旧分支继续发送前会有确认提醒。</div>` : ""}
         ${stale ? `<div class="current-risk"><strong>版本待核对：</strong>本分支已核对 v${chat.seenVersion||0}，课题当前 v${version}。${escape(changeDescriptions(project,chat.seenVersion))}。请先阅读新结论。</div>` : ""}
-        <div class="current-actions">${isGenerating(tab) ? '<span class="badge review">AI 正在回答</span>' : ''}
+        <div class="current-actions">${isGenerating(tab) ? '<span class="badge review">AI 正在回答</span>' : recentlyObservedAnswer(tab)?'<span class="badge done">检测到回复停止 · 请核对</span>':''}
           ${stale ? `<button class="primary" data-action="ack-current" data-key="${escape(key)}">已核对最新状态</button>` : `<span class="badge muted">版本 v${version} 已同步</span>`}
           <button data-action="view-project" data-id="${escape(project.id)}">管理课题</button>
           <button data-action="open-research">采集 / 分析</button>
@@ -297,10 +303,12 @@
       const opened=bestTab(c),self=c.key===chat.key;
       const stale=ThreadLineCore.isOutdated(state,c);
       const status = self ? "当前窗口" : stale ? `待同步 v${project.knowledgeVersion}` : stageLabels[c.stage];
-      const presence=opened?(isGenerating(opened)?"AI 正在回答":"标签页已打开"):(c.key.startsWith("tab:")?"临时标签已关闭":"点击重新打开");
+      const presence=opened?(isGenerating(opened)?"AI 正在回答":
+        recentlyObservedAnswer(opened)?"检测到回复停止，待核对":"标签页已打开"):
+        (c.key.startsWith("tab:")?"临时标签已关闭":"点击重新打开");
       return `<button type="button" class="quick-chat ${self?"current-chat":""}" data-action="quick-open-chat" data-key="${escape(c.key)}" ${self||(!opened&&c.key.startsWith("tab:"))?"disabled":""} title="${escape(c.label||c.title)}">
         <span class="quick-chat-main"><span class="quick-chat-name">${escape(c.label||c.title)}</span><span class="quick-chat-note">${escape(c.note||presence)}</span></span>
-        <span class="quick-chat-status"><span class="${stale?"needs-sync":isGenerating(opened||{})?"live-working":""}">${escape(status)}</span>${isGenerating(opened||{})&&!self?'<br>回答中':''}</span><span class="quick-chat-arrow" aria-hidden="true">${self?"●":"›"}</span>
+        <span class="quick-chat-status"><span class="${stale?"needs-sync":isGenerating(opened||{})?"live-working":""}">${escape(status)}</span>${isGenerating(opened||{})&&!self?'<br>回答中':recentlyObservedAnswer(opened||{})?'<br>回复停止 · 待核对':''}</span><span class="quick-chat-arrow" aria-hidden="true">${self?"●":"›"}</span>
       </button>`;
     }).join("");
   }
@@ -334,7 +342,7 @@
     const branchMarkup=branches.map(c=>{
       const tab=bestTab(c);
       return `<article class="branch-card"><div class="branch-top"><div class="branch-name">${escape(c.label||c.title)}</div><span class="badge ${c.stage==='done'?'done':c.stage==='review'?'review':''}">${stageLabels[c.stage]}</span></div>
-      <div class="branch-mini">${tab?(isGenerating(tab)?"● 正在回答":"● 标签页已打开"):"○ 标签页未打开"}${c.note?" · "+escape(c.note):""}</div>
+      <div class="branch-mini">${tab?(isGenerating(tab)?"● 正在回答":recentlyObservedAnswer(tab)?"● 检测到回复停止（需核对）":"● 标签页已打开"):"○ 标签页未打开"}${c.note?" · "+escape(c.note):""}</div>
       ${ThreadLineCore.isOutdated(state,c)?`<div class="branch-version">待核对：分支 v${c.seenVersion||0} → 课题 v${p.knowledgeVersion||0}<div class="diff-preview">${escape(changeDescriptions(p,c.seenVersion))}</div></div>`:""}
       <div class="branch-actions">
         <button data-action="go-chat" data-key="${escape(c.key)}" ${(!tab && c.key.startsWith('tab:'))?'disabled':''}>打开对话</button>
