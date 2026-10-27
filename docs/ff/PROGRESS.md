@@ -71,6 +71,17 @@
 - Node 与合成 Chromium 测试覆盖 K=2/3/4、done/failed/unknown/pending、同名任务、长中文截断后完整指令可读、控制字符回退和复制 ID。代码 HEAD `fb53abdf919b8d22ef8ff5f65b5d8450124de761` 的 [Linux CI](https://github.com/siskosun/ThreadLine/actions/runs/40342294400)（`npm run verify` 与合成 Chromium `test:e2e`）和 [Windows CI](https://github.com/siskosun/ThreadLine/actions/runs/40342294457) 均 success；本记录更新仍需以新的准确 HEAD 复验。真实用户、读屏器和完整 WCAG 未执行，未做独立人工签署。
 
 
+
+## 2026-10-26 UX-08：重要错误持续显示与分支表单（独立候选）
+
+- 在 panel 顶部增加可关闭、`role=alert` / `aria-live=assertive` 的持久错误区，与 3.1 秒普通 toast 分离。关键读取失败、课题/分支写入结果未确认、证据修订/撤回、交接预览/复制/已读记录失败会提示核对范围、刷新和是否可手动重试；不自动重放任何未知操作。
+- 分支名称和进度由 `prompt` 改为既有 `ThreadLineDialogs.form`，限制 80/300 字符、失败保留输入；带 `expectedRevision`，过期窗口的保存被拒绝。通用表单错误改成“提交失败或结果未确认”，避免把未知结果误说成未保存。
+- 证据撤回由阻塞式 `confirm` / `alert` 改为原生 `dialog` 确认和持久错误区；撤回失败后刷新并提示核对，成功回执但刷新失败时不再显示笼统成功 toast。
+- 异步重渲染移除原触发按钮时，表单关闭后优先恢复到同一分支操作；找不到时回到当前工作区标签。重要错误导致焦点丢失时将焦点交给关闭提示按钮。通用变更响应带选择版本号，延迟回包不得覆盖用户之后切换的课题。
+- Node 源码护栏和合成 MV3 Chromium E2E 覆盖：名称/进度成功、失败时输入保留、关键错误超过 toast 生命周期、无自动重放、撤回取消不写入、撤回失败持久显示、错误手动关闭、创建课题重复点击与迟到回执不清空输入、撤回忙碌锁及跨课题迟到回执不覆盖当前页。
+- 代码 HEAD `340720b0a93987f8832149f898140bc1ef6a511a` 的 [Linux CI](https://github.com/siskosun/ThreadLine/actions/runs/40437147371)（`npm run verify` 和合成 Chromium `test:e2e`）与 [Windows CI](https://github.com/siskosun/ThreadLine/actions/runs/40437147131) 均 success；本记录更新后仍须以新的准确 HEAD 复验。真实登录 ChatGPT 页面、真人体验、读屏器与完整 WCAG 尚未执行。
+
+
 ## 2026-10-26 #47 主线同步与文档无变更守卫修复
 
 - 以已合并 #46、#48、#50、#52 的 main `c4e8696f2` 为基线重新组合独立发布守卫；已确认 K=4 精确 tabId 断言与当前主分支相同，保留原实现。

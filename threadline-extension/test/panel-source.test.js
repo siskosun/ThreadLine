@@ -2,6 +2,10 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
 const Core=require('../core.js'),CaptureCore=require('../capture-core.js');
+const panelJS=fs.readFileSync(path.join(__dirname,'..','panel.js'),'utf8');
+const panelHTML=fs.readFileSync(path.join(__dirname,'..','panel.html'),'utf8');
+const dialogJS=fs.readFileSync(path.join(__dirname,'..','ui-dialogs.js'),'utf8');
+
 const ID='source-test-extension',PANEL=`chrome-extension://${ID}/panel.html`;
 const ORIGIN=`chrome-extension://${ID}`,DOC='00000000-0000-4000-8000-000000000001';
 const panel=(patch={})=>({id:ID,url:PANEL,origin:ORIGIN,frameId:0,documentId:DOC,...patch});
@@ -121,4 +125,24 @@ test('every privileged panel operation rejects an unauthenticated no-tab source'
   const s=system();const r=await s.send({}, {type});
   assert.equal(r.ok,false,type);assert.equal(r.code,'PANEL_SOURCE_REJECTED',type);noEffects(s);
  }
+});
+
+test('UX-08 uses editable accessible branch forms and never blocking prompt/alert for these actions',()=>{
+ assert.ok(!panelJS.includes('prompt('));
+ assert.ok(!panelJS.includes('alert('));
+ assert.match(panelJS,/ThreadLineDialogs\.form\(/);
+ assert.match(panelJS,/expectedRevision:baseRevision/);
+ assert.match(panelJS,/ThreadLineDialogs\.confirm\(/);
+ assert.match(panelJS,/notifyCritical\("撤回失败或结果未确认/);
+ assert.match(dialogJS,/function confirm\(/);
+ assert.match(dialogJS,/dialog\.addEventListener\("cancel"/);
+ assert.match(dialogJS,/提交失败或结果未确认/);
+});
+
+test('UX-08 critical failures use a dismissible assertive live region separate from transient toast',()=>{
+ assert.match(panelHTML,/id="critical-notice" role="alert" aria-live="assertive" aria-atomic="true" hidden/);
+ assert.match(panelHTML,/id="critical-notice-dismiss"/);
+ assert.match(panelJS,/function notifyCritical\(/);
+ assert.match(panelJS,/critical-notice-dismiss/);
+ assert.match(panelJS,/研线未自动重放/);
 });

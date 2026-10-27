@@ -227,6 +227,123 @@ def run():
             assert "匹配 1 / 1 条结论" in panel.locator("#evidence-list-count").inner_text()
             assert panel.locator("#evidence-list button", has_text="修订").count() == 1
             assert panel.locator("#evidence-list button", has_text="撤回").count() == 1
+            # Accessible withdrawal confirmation and durable error feedback.
+            withdraw_button = panel.locator("#evidence-list button", has_text="撤回")
+            withdraw_button.click()
+            panel.locator("dialog.tl-confirm-dialog").wait_for()
+            panel.locator("dialog.tl-confirm-dialog button", has_text="取消").click()
+            assert panel.locator("dialog.tl-confirm-dialog").count() == 0
+            still_adopted = send(panel, {"type":"EV_LIST","projectId":project_id})["data"]["rows"][0]
+            assert still_adopted["conclusion"]["status"] == "adopted"
+            panel.evaluate("""() => {
+                const original=chrome.runtime.sendMessage.bind(chrome.runtime);
+                window.__restoreWithdrawMessage=()=>{chrome.runtime.sendMessage=original;};
+                window.__withdrawCalls=0;
+                chrome.runtime.sendMessage=(payload,callback)=>{
+                    if(payload?.type==="EV_WITHDRAW"){
+                        window.__withdrawCalls++;
+                        callback({ok:false,error:"SIMULATED_WITHDRAW_FAILURE"});
+                        return;
+                    }
+                    return original(payload,callback);
+                };
+            }""")
+            panel.locator("#evidence-list button", has_text="撤回").click()
+            panel.locator("dialog.tl-confirm-dialog button", has_text="撤回结论").click()
+            panel.wait_for_function("() => document.querySelector('#critical-notice')?.hidden===false")
+            assert "SIMULATED_WITHDRAW_FAILURE" in panel.locator("#critical-notice-text").inner_text()
+            panel.wait_for_timeout(3300)
+            assert panel.locator("#critical-notice").is_visible(), "withdraw error must outlive transient toast"
+            assert panel.evaluate("window.__withdrawCalls") == 1, "withdraw must not auto-replay"
+            after_failed_withdraw = send(panel, {"type":"EV_LIST","projectId":project_id})["data"]["rows"][0]
+            assert after_failed_withdraw["conclusion"]["status"] == "adopted"
+            panel.evaluate("window.__restoreWithdrawMessage()")
+            panel.locator("#critical-notice-dismiss").click()
+            assert panel.locator("#critical-notice").is_hidden()
+
+            # Successful withdrawal returns keyboard focus to the same conclusion,
+            # now visibly marked withdrawn, without changing the selected topic.
+            success_project_id = "ux08-success"
+            ensured_success = send(page, {"type":"EV_ENSURE","projectId":success_project_id})
+            assert ensured_success["ok"], ensured_success
+            adopted_success = send(page, {"type":"EV_ADOPT","projectId":success_project_id,
+                "text":"成功撤回焦点验收","conditions":"仅用于合成测试",
+                "fragments":[{"selection":"撤回后保留的来源片段"}],
+                "operationId":"op_ux08success001"})
+            assert adopted_success["ok"], adopted_success
+            panel.evaluate("() => window.dispatchEvent(new Event('threadline-evidence-changed'))")
+            panel.wait_for_function("id => [...document.querySelector('#evidence-project').options].some(o=>o.value===id)",
+                arg=success_project_id)
+            panel.select_option("#evidence-project",success_project_id)
+            panel.wait_for_function("id => [...document.querySelectorAll('#evidence-list .evidence-item')].some(n=>n.dataset.conclusionId===id)",
+                arg=adopted_success["data"]["conclusionId"])
+            panel.locator("#evidence-list button", has_text="撤回").click()
+            panel.locator("dialog.tl-confirm-dialog button", has_text="撤回结论").click()
+            panel.wait_for_function("id => [...document.querySelectorAll('#evidence-list .evidence-item')].some(n=>n.dataset.conclusionId===id&&n.textContent.includes('已撤回'))",
+                arg=adopted_success["data"]["conclusionId"])
+            assert panel.evaluate("id => document.activeElement?.closest('.evidence-item')?.dataset?.conclusionId===id",
+                adopted_success["data"]["conclusionId"])
+            success_listing = send(panel, {"type":"EV_LIST","projectId":success_project_id})
+            assert success_listing["ok"], success_listing
+            success_row = next(row for row in success_listing["data"]["rows"]
+                if row["conclusion"]["id"] == adopted_success["data"]["conclusionId"])
+            assert success_row["conclusion"]["status"] == "withdrawn"
+            panel.select_option("#evidence-project",project_id)
+            panel.wait_for_function("id => document.querySelector('#evidence-project').value===id",arg=project_id)
+            panel.wait_for_function("id => [...document.querySelectorAll('#evidence-list .evidence-item')].some(n=>n.dataset.conclusionId===id)",
+                arg=adopted2["data"]["conclusionId"])
+            # A late withdrawal acknowledgement must not replace the project
+            # the user switched to while the original operation was pending.
+            delayed_project_id = "ux08-delayed"
+            ensured_delayed = send(page, {"type":"EV_ENSURE","projectId":delayed_project_id})
+            assert ensured_delayed["ok"], ensured_delayed
+            adopted_delayed = send(page, {"type":"EV_ADOPT","projectId":delayed_project_id,
+                "text":"延迟撤回范围验收","conditions":"仅用于合成测试",
+                "fragments":[{"selection":"延迟撤回保留的来源"}],
+                "operationId":"op_ux08delayed001"})
+            assert adopted_delayed["ok"], adopted_delayed
+            panel.evaluate("() => window.dispatchEvent(new Event('threadline-evidence-changed'))")
+            panel.wait_for_function("id => [...document.querySelector('#evidence-project').options].some(o=>o.value===id)",
+                arg=delayed_project_id)
+            panel.select_option("#evidence-project",delayed_project_id)
+            panel.wait_for_function("id => [...document.querySelectorAll('#evidence-list .evidence-item')].some(n=>n.dataset.conclusionId===id)",
+                arg=adopted_delayed["data"]["conclusionId"])
+            panel.evaluate("""() => {
+                const original=chrome.runtime.sendMessage.bind(chrome.runtime);
+                window.__restoreDelayedWithdraw=()=>{chrome.runtime.sendMessage=original;};
+                window.__releaseDelayedWithdraw=null;
+                window.__delayedWithdrawCalls=0;
+                chrome.runtime.sendMessage=(payload,callback)=>{
+                    if(payload?.type==="EV_WITHDRAW"){
+                        window.__delayedWithdrawCalls++;
+                        return original(payload,response=>{
+                            window.__delayedWithdrawResponse=response;
+                            window.__releaseDelayedWithdraw=()=>callback(response);
+                        });
+                    }
+                    return original(payload,callback);
+                };
+            }""")
+            panel.locator("#evidence-list button", has_text="撤回").click()
+            panel.locator("dialog.tl-confirm-dialog button", has_text="撤回结论").click()
+            panel.wait_for_function("() => typeof window.__releaseDelayedWithdraw === 'function'")
+            assert panel.locator("#evidence-list button", has_text="撤回").is_disabled()
+            assert panel.evaluate("window.__delayedWithdrawCalls")==1
+            panel.select_option("#evidence-project",project_id)
+            panel.wait_for_function("id => document.querySelector('#evidence-project').value===id",arg=project_id)
+            panel.wait_for_function("id => [...document.querySelectorAll('#evidence-list .evidence-item')].some(n=>n.dataset.conclusionId===id)",
+                arg=adopted2["data"]["conclusionId"])
+            panel.evaluate("() => window.__releaseDelayedWithdraw()")
+            panel.wait_for_timeout(100)
+            assert panel.locator("#evidence-project").input_value()==project_id
+            assert panel.locator("#evidence-list .evidence-item").first.get_attribute("data-conclusion-id")==adopted2["data"]["conclusionId"]
+            delayed_listing = send(panel, {"type":"EV_LIST","projectId":delayed_project_id})
+            assert delayed_listing["ok"], delayed_listing
+            delayed_row = next(row for row in delayed_listing["data"]["rows"]
+                if row["conclusion"]["id"] == adopted_delayed["data"]["conclusionId"])
+            assert delayed_row["conclusion"]["status"] == "withdrawn"
+            assert panel.evaluate("window.__delayedWithdrawCalls")==1
+            panel.evaluate("window.__restoreDelayedWithdraw()")
             first = panel.locator("#evidence-list .evidence-item").first
             assert first.get_attribute("open") is not None
             summary = first.locator(":scope > summary")
