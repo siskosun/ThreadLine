@@ -952,8 +952,10 @@ function evidenceUnavailable(detail) {
 /* Only call Locked functions inside serialize. Never acquire the queue twice.
  * Persisted summaries and topic markers detect a missing/replaced authority
  * store; they are never used to reconstruct evidence or permit legacy edits. */
-async function loadEvidenceAuthorityLocked() {
-  await evidenceWorkflows().cleanupPending();
+async function loadEvidenceAuthorityLocked({skipCleanup=false}={}) {
+  // On-demand history is a strict read: pending delete/restore recovery must
+  // not run as a side effect of merely opening the history panel.
+  if(!skipCleanup)await evidenceWorkflows().cleanupPending();
   const db = await evidenceDb();
   const state = await ThreadLineEvidenceDB.snapshot(db);
   const local = await chrome.storage.local.get(null);
@@ -1082,6 +1084,95 @@ async function handleEvidence(payload, sender) {
   else if(sender.tab?.url && sender.tab.url !== sender.url)
     throw new Error("证据消息来源标签与扩展页面不一致");
   const Core = ThreadLineEvidenceCore;
+  if (payload.type === "EV_HISTORY") {
+    // Historical full text is exposed only through the trusted research panel.
+    // Never resolve a conclusion by ID alone: the project boundary is part of
+    // the lookup, so a foreign or unknown ID has the same response.
+    if (sender.url !== chrome.runtime.getURL("panel.html"))
+      throw new Error("版本历史仅限研线面板读取");
+    if (!Core.validProjectId(payload.projectId))
+      throw new Error("课题 ID 无效或缺失");
+    if (typeof payload.conclusionId !== "string" ||
+        payload.conclusionId.length < 4 || payload.conclusionId.length > 128)
+      throw new Error("该课题下不存在该结论");
+    return serialize(async () => {
+      const authority = await loadEvidenceAuthorityLocked({skipCleanup:true});
+      const state = authority.state;
+      const projectId = payload.projectId;
+      const project = state.projects[projectId];
+      const conclusion = Object.values(state.conclusions).find(record =>
+        record.id === payload.conclusionId && record.projectId === projectId);
+      if (!project || project.deleted || !conclusion)
+        throw new Error("该课题下不存在该结论");
+      const versions = Object.values(state.versions)
+        .filter(version => version.conclusionId === conclusion.id);
+      if (!versions.length || versions.length > Core.LIMITS.versionsPerConclusion)
+        throw new Error("该课题下不存在有效版本历史");
+      // Timestamps can share a millisecond. Prefer the immutable predecessor
+      // chain for ordering; use time/ID only as a deterministic corruption fallback.
+      const timeOrder = (a,b) => (a.createdAt || 0) - (b.createdAt || 0) ||
+        String(a.id).localeCompare(String(b.id));
+      const byId = new Map(versions.map(version => [version.id,version]));
+      const childByPredecessor = new Map();
+      for (const version of versions)
+        if (byId.has(version.predecessorId)) childByPredecessor.set(version.predecessorId,version);
+      const ordered = [], used = new Set();
+      for (const root of versions.filter(version => !byId.has(version.predecessorId)).sort(timeOrder)) {
+        let cursor = root;
+        while (cursor && !used.has(cursor.id)) {
+          ordered.push(cursor);used.add(cursor.id);
+          cursor = childByPredecessor.get(cursor.id);
+        }
+      }
+      for (const version of versions.slice().sort(timeOrder))
+        if (!used.has(version.id)) ordered.push(version);
+      const history = ordered.map(version => {
+        const links = Object.values(state.links)
+          .filter(link => link.versionId === version.id)
+          .sort((a,b) => String(a.id).localeCompare(String(b.id)));
+        const fragments = links.map(link => {
+          const source = state.sources[link.sourceId];
+          if (!source) return {
+            sourceId:link.sourceId, relation:link.relation, available:false
+          };
+          return {
+            sourceId:link.sourceId, relation:link.relation, available:true,
+            kind:typeof source.kind === "string" ? source.kind : null,
+            conversationId:typeof source.conversationId === "string" ? source.conversationId : null,
+            messageId:typeof source.messageId === "string" ? source.messageId : null,
+            url:typeof source.url === "string" ? source.url : null,
+            sourceRole:typeof source.sourceRole === "string" ? source.sourceRole : null,
+            capturedAt:Number.isSafeInteger(source.capturedAt) ? source.capturedAt : null,
+            selection:typeof source.selection === "string" ? source.selection : "",
+            before:typeof source.before === "string" ? source.before : "",
+            after:typeof source.after === "string" ? source.after : "",
+            completeness:typeof source.completeness === "string" ? source.completeness : "unknown"
+          };
+        });
+        return {
+          id:version.id,
+          createdAt:Number.isSafeInteger(version.createdAt) ? version.createdAt : null,
+          creator:typeof version.creator === "string" ? version.creator : null,
+          changeType:typeof version.changeType === "string" ? version.changeType : "unknown",
+          changeImpact:typeof version.changeImpact === "string" ? version.changeImpact : null,
+          carryForward:version.carryForward === true,
+          predecessorId:typeof version.predecessorId === "string" ? version.predecessorId : null,
+          text:typeof version.text === "string" ? version.text : "",
+          conditions:typeof version.conditions === "string" ? version.conditions : "",
+          sourceCount:links.length,
+          recordedSourceCount:Number.isSafeInteger(version.sourceCount) ? version.sourceCount : null,
+          fragments
+        };
+      });
+      return {
+        projectId, conclusionId:conclusion.id, status:conclusion.status,
+        currentVersionId:conclusion.currentVersionId,
+        withdrawnAt:Number.isSafeInteger(conclusion.withdrawnAt) ? conclusion.withdrawnAt : null,
+        withdrawalReason:typeof conclusion.withdrawalReason === "string" ? conclusion.withdrawalReason : null,
+        versions:history
+      };
+    });
+  }
   const advanced = await evidenceWorkflows().handle(payload);
   if (advanced !== undefined) return advanced;
   if (payload.type === "EV_ENSURE") {

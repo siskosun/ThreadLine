@@ -143,6 +143,28 @@ test('first adoption takes over, captures legacy note, projects summary to stora
   assert.equal(project.projectionRevision, 1);
 });
 
+test('UX-05 history is strictly read-only even when deferred cleanup exists', async () => {
+  const s=system();
+  const adopted=await s.message(adoption('p-taken','历史读取不应清理其他课题'));
+  // Drain the write-side projection through the normal authoritative read
+  // before introducing a separate pending-cleanup marker. The assertion then
+  // measures only the EV_HISTORY request, not the preceding adoption.
+  await s.message({type:'EV_SUMMARY',projectId:'p-taken'});
+  const deleted={projectId:'ghost-deleted',deleted:true,cleanupPending:true,evidenceRevision:1};
+  s.evidence.projects.set(deleted.projectId,deleted);
+  // The service-worker VM and Node host have different object prototypes.
+  // Compare complete serialized state, not realm-specific prototypes.
+  const prior=JSON.stringify(Object.fromEntries(s.local));
+  const history=await s.message({type:'EV_HISTORY',projectId:'p-taken',
+    conclusionId:adopted.conclusionId},s.panelSender);
+  assert.equal(history.versions.length,1);
+  assert.equal(history.versions[0].text,'历史读取不应清理其他课题');
+  assert.equal(s.evidence.projects.get(deleted.projectId).cleanupPending,true,
+    'history read must not finish an unrelated pending delete');
+  assert.equal(JSON.stringify(Object.fromEntries(s.local)),prior,
+    'read did not change local topic snapshots, summaries or records');
+});
+
 test('sealed project: decision edits refused at message level, other fields still editable', async () => {
   const s = system();
   await s.message({ type: 'EV_ENSURE', projectId: 'p-taken' });
