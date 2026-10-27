@@ -207,7 +207,10 @@ def run():
                 "() => document.querySelector('#evidence-list-count').textContent.includes('匹配 1 / 1')")
             assert "另一个课题专属结论" in library.locator("#evidence-list").inner_text()
             library.get_by_role("tab",name="课题与对话").click()
-            library.locator(f'[data-action="select-project"][data-id="{other}"]').click()
+            library.wait_for_function(
+                "id => [...document.querySelectorAll('#topic-list [data-id]')].some(n=>n.dataset.id===id && n.getAttribute('aria-pressed')==='true')",arg=other)
+            # The navigation sync has already selected B. Clicking B again would
+            # intentionally collapse its detail, not open it.
             library.wait_for_function(
                 "() => document.querySelector('#detail-section').hidden===false")
             library.reload(wait_until="domcontentloaded")
