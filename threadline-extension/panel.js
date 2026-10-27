@@ -11,6 +11,7 @@
   let workspace = "switch"; // normal panel retains three workspaces
   let surface="sidebar",librarySourceTabId=null,librarySourceChatKey=null;
   let libraryInitialProjectId=null,librarySelectionPending=false,libraryTabId=null;
+  let libraryWindowId=null;
   let libraryViewWarningShown=false;
   let state = ThreadLineCore.emptyState();
   let tabs = [];
@@ -170,6 +171,18 @@
       if(search!==query)notify("检索词超过160字，未带入宽页；请在宽页重新输入。");
     }
     catch(error){notifyCritical("打开资料库失败："+error.message+"。原侧栏数据未改变。");}
+  }
+  async function openSidebar() {
+    if(!Number.isSafeInteger(libraryWindowId)||libraryWindowId<0){
+      notifyCritical("无法确认资料库所属浏览器窗口；请通过浏览器扩展图标打开研线侧栏。");
+      return;
+    }
+    try{
+      // Called directly from a user click: Chrome requires a user gesture.
+      await chrome.sidePanel.open({windowId:libraryWindowId});
+    }catch(error){
+      notifyCritical("打开侧栏失败："+error.message+"。请通过浏览器扩展图标打开研线。");
+    }
   }
   async function returnToSource() {
     if(!librarySourceTabId){notify("没有绑定来源对话，请自行切回 ChatGPT");return;}
@@ -444,6 +457,7 @@
     const f=event.target.closest("[data-filter]");
     if (f){filter=f.dataset.filter;renderTopics();return;}
     if(event.target.id==="library-open"){await openLibrary();return;}
+    if(event.target.id==="library-open-sidebar"){await openSidebar();return;}
     if(event.target.id==="library-return"){await returnToSource();return;}
     if (event.target.id==='backup-export')return exportBackup();
     if (event.target.id==='backup-import')return importBackup();
@@ -992,6 +1006,7 @@
     };
     surface="library";
     libraryTabId=tab.id;
+    libraryWindowId=tab.windowId;
     librarySourceTabId=view.sourceTabId;
     librarySourceChatKey=view.sourceChatKey;
     libraryInitialProjectId=view.viewProjectId;
