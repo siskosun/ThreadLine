@@ -109,8 +109,18 @@ button{min-height:36px}.primary{min-height:40px}button[aria-busy=true]{cursor:wa
 
 /* UI-D1: opt-in wide library rendered by the exact trusted panel.html.
  * The normal narrow side panel and its three tabs are deliberately unchanged. */
-.library-launch{display:flex;justify-content:flex-end;margin:-8px 0 12px}
-.library-launch button{font-size:12px;min-height:36px;text-decoration:underline;text-underline-offset:3px}
+/* UI-D1 preview discoverability: ensure the entry is in the first sidebar viewport,
+ * clearly a button, and distinguishable from the v0.8.2 public release. */
+.preview-build-marker{color:#225a83!important;font-size:12px!important;font-weight:700}
+.library-launch{display:block;margin:0 0 14px}
+.library-launch .library-open-button{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  width:100%;min-height:44px;padding:11px 14px;border:1px solid #9dbbda;
+  border-radius:11px;background:#eaf3fe;color:#224e79;font-size:14px;font-weight:720;
+  box-shadow:0 2px 7px #1f35500d
+}
+.library-launch .library-open-button:hover:not(:disabled){background:#dcecff;border-color:#6891c0}
+.library-launch .library-open-button:focus-visible{outline:3px solid #8eb7e7;outline-offset:2px}
 .library-header{display:flex;gap:18px;align-items:flex-start;justify-content:space-between;
   border:1px solid #ccd9e8;border-radius:13px;background:#f4f8fd;padding:16px 18px;margin:0 0 20px}
 .library-header h2{font-size:19px;line-height:1.4;margin:0 0 5px;color:var(--ui-text)}
