@@ -1,10 +1,16 @@
-# ThreadLine v0.8.2 · 完整使用说明
+# ThreadLine UI-D1 试用版（PR #78） · 操作说明
 
-[从 GitHub 下载安装包](https://github.com/siskosun/ThreadLine/releases/download/v0.8.2/ThreadLine-v0.8.2.zip) · [返回仓库首页](https://github.com/siskosun/ThreadLine)
+**[下载包含宽页入口的 UI-D1 分支 ZIP](https://github.com/siskosun/ThreadLine/archive/refs/heads/feat/ui-d1-library-surface-20261027.zip)** · [安装与旧版辨识说明](INSTALL_UI_D1_PREVIEW.md) · [返回仓库](https://github.com/siskosun/ThreadLine)
 
-## 安装
+> 注意：[正式 v0.8.2 Release 包](https://github.com/siskosun/ThreadLine/releases/download/v0.8.2/ThreadLine-v0.8.2.zip) **没有**宽页入口。如果下载或安装了该 Release 包，无法通过重新加载得到 UI-D1 功能。
 
-解压 ZIP，在 Chrome/Edge 的扩展管理页面启用开发人员模式，选择含 `manifest.json` 的 `threadline-extension` 目录。无需安装 Node、GitHub 插件或本地服务。
+## 安装 UI-D1 测试版
+
+下载**本分支** ZIP，完整解压。在 Chrome/Edge 的扩展管理页面启用开发人员模式，选择解压后的 `ThreadLine-feat-ui-d1-library-surface-20261027/threadline-extension` 文件夹（其中直接包含 `manifest.json` 和 `library-surface.js`）。**不要选择以前 v0.8.2 的解压目录**。
+
+正常安装和重新加载后，侧栏标题下应有“UI-D1 试用版 · PR #78”，三个标签下方应有“在宽页打开资料库 ↗”按钮。两个版本基础扩展号都显示 `0.8.2`，不能靠这一字段判断是否装对。若未出现，请检查是否同时启用两个同名研线，并关闭旧侧栏重新打开。
+
+无需 Node、GitHub 插件或本地服务。旧版扩展不要卸载或清数据；不同加载目录可能产生不同扩展 ID，存储也互不共享。请先在独立浏览器配置用虚构材料测试。
 
 从 v0.5.0 升级必须保留原扩展目录路径或先导出备份：保持相同目录升级通常沿用已有扩展 ID。**v0.6.0 未更改 manifest key**，这是为避免在还没准备迁移时改变 ID；扩展 ID 并非跨任意目录固定。
 

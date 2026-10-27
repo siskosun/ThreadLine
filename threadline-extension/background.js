@@ -888,7 +888,8 @@ chrome.tabs.onUpdated.addListener(async(tabId,change)=>{
 });
 chrome.tabs.onRemoved.addListener((tabId) => {
   recoverCaptures(tabId).catch(()=>{});
-  chrome.storage.session.remove([`tl_live_${tabId}`,`tl_handoff_${tabId}`]).catch(() => {});
+  chrome.storage.session.remove([`tl_live_${tabId}`,`tl_handoff_${tabId}`,
+    `tl_library_open_v1_${tabId}`,`tl_library_intent_v1_${tabId}`]).catch(() => {});
   for(const [id,owner] of captureOwners)if(owner===tabId)captureOwners.delete(id);
   // A closed Fork branch tab becomes an unknown branch. Never auto-replays.
   serialize(async () => {

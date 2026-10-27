@@ -8,7 +8,11 @@
     if(selectedId!==value){selectedId=value;selectionRevision++;}
   };
   let filter = "all";
-  let workspace = "switch"; // every newly opened panel starts with the main workflow
+  let workspace = "switch"; // normal panel retains three workspaces
+  let surface="sidebar",librarySourceTabId=null,librarySourceChatKey=null;
+  let libraryInitialProjectId=null,librarySelectionPending=false,libraryTabId=null;
+  let libraryWindowId=null;
+  let libraryViewWarningShown=false,libraryOpening=false;
   let state = ThreadLineCore.emptyState();
   let tabs = [];
   let activeTabId = null;
@@ -128,6 +132,87 @@
     $("#stat-chats").textContent=Object.keys(state.chats).length;
     $("#clear-closed").disabled=!state.projects.some(p=>p.stage==="closed");
   }
+  function saveLibraryView() {
+    if(surface!=="library")return;
+    const header=$("#library-view-project");
+    if(librarySelectionPending){
+      header.textContent="查看课题：正在确认…";
+      return;
+    }
+    const selection=$("#evidence-project");
+    const projectId=selection?.value||null;
+    const project=state.projects.find(p=>p.id===projectId);
+    const name=project?.name||(projectId?selection?.selectedOptions[0]?.textContent:"尚未选择");
+    header.textContent="查看课题："+(name||"尚未选择")+"（仅浏览，不改变来源关联）";
+    if(!libraryTabId)return;
+    const query=$("#evidence-query")?.value||"";
+    // Very long or control-character queries are not copied into sessionStorage.
+    // The current search continues to work; only reload fallback loses the query.
+    try{
+      ThreadLineLibrarySurface.saveView(libraryTabId,{
+        viewProjectId:$("#evidence-project")?.value||null,
+        topicProjectId:selectedId,
+        sourceTabId:librarySourceTabId,sourceChatKey:librarySourceChatKey,
+        workspace,filter:$("#evidence-filter-status")?.value||"all",
+        query:query.length<=160?query:""
+      });
+    }catch(error){
+      if(!libraryViewWarningShown){
+        libraryViewWarningShown=true;
+        notifyCritical("资料库当前阅读位置无法保存到本标签页："+error.message+
+          "。刷新后可能需要重新选择；现有课题和结论未改变。");
+      }
+    }
+  }
+  async function openLibrary() {
+    const picked=workspace==="research"
+      ? tabs.find(t=>String(t.id)===$("#capture-source")?.value) : activeTab();
+    const key=picked&&ThreadLineCore.isChatURL(picked.url)?getKey(picked):null;
+    const sourceChatKey=key?.startsWith("chat:")?key:null;
+    const sourceTabId=sourceChatKey?picked.id:null;
+    const viewProjectId=workspace==="evidence"
+      ? ($("#evidence-project")?.value||null)
+      : workspace==="switch" ? (selectedId||chatForTab(picked)?.projectId||null)
+      : (chatForTab(picked)?.projectId||null);
+    const search=workspace==="evidence"?$("#evidence-query")?.value||"":"";
+    const filter=workspace==="evidence"?$("#evidence-filter-status")?.value||"all":"all";
+    const query=search.length<=160?search:"";
+    if(libraryOpening)return;
+    libraryOpening=true;
+    const button=$("#library-open");button.disabled=true;
+    try{
+      const win=await chrome.windows.getCurrent();
+      const result=await ThreadLineLibrarySurface.open({
+        viewProjectId,sourceTabId,sourceChatKey,filter,query,windowId:win.id
+      });
+      if(result.reused)notify("已切回原资料库标签页，原有查看位置不会重置。");
+      else if(search!==query)notify("检索词超过160字，未带入宽页；请在宽页重新输入。");
+    }catch(error){notifyCritical("打开资料库失败："+error.message+"。原侧栏数据未改变。");}
+    finally{libraryOpening=false;button.disabled=false;}
+  }
+  async function openSidebar() {
+    if(!Number.isSafeInteger(libraryWindowId)||libraryWindowId<0){
+      notifyCritical("无法确认资料库所属浏览器窗口；请通过浏览器扩展图标打开研线侧栏。");
+      return;
+    }
+    try{
+      // Called directly from a user click: Chrome requires a user gesture.
+      await chrome.sidePanel.open({windowId:libraryWindowId});
+    }catch(error){
+      notifyCritical("打开侧栏失败："+error.message+"。请通过浏览器扩展图标打开研线。");
+    }
+  }
+  async function returnToSource() {
+    if(!librarySourceTabId){notify("没有绑定来源对话，请自行切回 ChatGPT");return;}
+    const source=await chrome.tabs.get(librarySourceTabId).catch(()=>null);
+    if(!source||!ThreadLineCore.isChatURL(source.url)||getKey(source)!==librarySourceChatKey){
+      notifyCritical("原来源标签已关闭或不再是 ChatGPT 对话，请自行选择正确的来源。");return;
+    }
+    try{
+      await chrome.tabs.update(source.id,{active:true});
+      await chrome.windows.update(source.windowId,{focused:true});
+    }catch(error){notifyCritical("无法切回来源对话："+error.message);}
+  }
   function setWorkspace(next, focusCapture=false) {
     workspace = ["switch","research","evidence"].includes(next) ? next : "switch";
     document.querySelectorAll("[data-workspace]").forEach(button => {
@@ -145,6 +230,7 @@
       if (tab && Array.from(select.options).some(o => o.value === String(tab.id))) select.value = String(tab.id);
     }
     if(workspace==="evidence")renderEvidence().catch(error=>notify(error.message,true));
+    saveLibraryView();
     window.scrollTo(0,0);
   }
   function activeSourceKey(projectId) {
@@ -276,7 +362,16 @@
       <div class="end-actions"><button class="text-button danger" data-action="delete-project">删除此临时课题</button></div>
       <p class="caption">收口后所有已关联窗口立即共享状态。修改分支状态不会自动打开或关闭整个课题。</p>`;
   }
-  function render() {renderStats();renderCurrent();renderQuickBranches();renderTopics();renderDetails();}
+  function render() {
+    renderStats();renderCurrent();renderQuickBranches();renderTopics();renderDetails();
+    if(surface==="library") {
+      // Read-focused UI only: the trusted panel retains its original backend
+      // authority; do not claim CSS hiding is a security permission boundary.
+      document.querySelectorAll('#workspace-switch #edit-form input, #workspace-switch #edit-form textarea, #workspace-switch .branch-actions select')
+        .forEach(control=>{control.disabled=true;});
+      saveLibraryView();
+    }
+  }
   function updatePayload(extra={}) {
     const patch = {name:$("#edit-name")?.value || "",goal:$("#edit-goal")?.value || "",...extra};
     if (!$("#edit-decision")?.readOnly) patch.decision = $("#edit-decision")?.value || "";
@@ -340,8 +435,14 @@
   }
   function formatHealthTime(value){return value?new Date(value).toLocaleString('zh-CN',{hour12:false}):'尚无已验证成功记录';}
   async function runHealth(){
-    const current=activeTab();const host=$('#health-result');
-    if(!current)return host.textContent='请先打开要检查的 ChatGPT 标签页。';
+    const host=$('#health-result');
+    const current=surface==="library"
+      ? (librarySourceTabId?await chrome.tabs.get(librarySourceTabId).catch(()=>null):null)
+      : activeTab();
+    if(!current||!ThreadLineCore.isChatURL(current.url)||
+      (surface==="library"&&getKey(current)!==librarySourceChatKey)){
+      host.textContent='请选择有效的 ChatGPT 来源标签页；不会检查资料库自身。';return;
+    }
     host.textContent='正在执行只读自检…';
     try {
       const data=await message({type:'HEALTH_CHECK',tabId:current.id});
@@ -373,6 +474,9 @@
     if (nav){setWorkspace(nav.dataset.workspace);return;}
     const f=event.target.closest("[data-filter]");
     if (f){filter=f.dataset.filter;renderTopics();return;}
+    if(event.target.id==="library-open"){await openLibrary();return;}
+    if(event.target.id==="library-open-sidebar"){await openSidebar();return;}
+    if(event.target.id==="library-return"){await returnToSource();return;}
     if (event.target.id==='backup-export')return exportBackup();
     if (event.target.id==='backup-import')return importBackup();
     if (event.target.id==='backup-rollback')return rollbackBackup();
@@ -384,6 +488,12 @@
     const btn=event.target.closest("[data-action]");
     if (!btn) return;
     const action=btn.dataset.action,key=btn.dataset.key,id=btn.dataset.id;
+    if(surface==="library"&&!["select-project","view-project","collapse-details","go-chat"].includes(action)){
+      // Read-only behavior for the normal library UI. The background still
+      // trusts the same panel.html, so this is not an authorization boundary.
+      notifyCritical("宽页资料库当前只支持查阅；请打开研线侧栏再修改课题或分支。");
+      return;
+    }
     if (action==="open-research") {setWorkspace("research",true);return;}
     if (action==="start-new-topic") {
       setWorkspace("switch");
@@ -409,7 +519,23 @@
     }
     if (action==="collapse-details") {setSelectedId(null);render();return;}
     if (action==="select-project" || action==="view-project") {
-      setSelectedId((action==="select-project" && selectedId===id)?null:id);filter='all';setWorkspace("switch");render();
+      setSelectedId((action==="select-project" && selectedId===id)?null:id);
+      if(surface==="library"&&selectedId){
+        const evidenceSelect=ev$("evidence-project");
+        if([...evidenceSelect.options].some(option=>option.value===selectedId)){
+          if(evidenceSelect.value!==selectedId){
+            evidenceSelect.value=selectedId;
+            evidenceSelect.dispatchEvent(new Event("change"));
+          }
+        }else{
+          // The topics snapshot can outrun the evidence directory. Keep the
+          // requested project explicit; never silently read a different one.
+          libraryInitialProjectId=selectedId;
+          librarySelectionPending=true;
+          renderEvidence().catch(error=>notifyCritical("无法载入所选课题的证据："+error.message));
+        }
+      }
+      filter='all';setWorkspace("switch");render();
       if (selectedId) $("#detail-section").scrollIntoView({block:"start",behavior:"smooth"});
       return;
     }
@@ -515,20 +641,56 @@
       option.textContent = (project.name || project.id)+(project.unavailable?"（需恢复）":"");
       select.appendChild(option);
     }
-    if ([...select.options].some(o => o.value === current)) select.value = current;
-    if(select.value!==current)select.dispatchEvent(new Event("change"));
-    else await renderEvidenceProject();
+    const restoringLibraryView=surface==="library"&&librarySelectionPending;
+    if(restoringLibraryView){
+      librarySelectionPending=false;
+      if(libraryInitialProjectId&&[...select.options].some(o=>o.value===libraryInitialProjectId)){
+        select.value=libraryInitialProjectId;
+      }else{
+        const option=document.createElement("option");option.value="";
+        option.textContent=libraryInitialProjectId
+          ?"原课题不可用，请重新选择":"请选择要查看的课题";
+        select.insertBefore(option,select.firstChild);
+        select.value="";
+        if(libraryInitialProjectId)
+          notifyCritical("资料库找不到原课题；未自动切换到其他课题，请明确选择。");
+      }
+    }else if ([...select.options].some(o => o.value === current)) select.value = current;
+    else if(surface==="library"){
+      // When the selected project is missing or no project was chosen, never
+      // allow the native select element to silently pick another project.
+      const option=document.createElement("option");option.value="";
+      option.textContent=current?"所选课题已不可用，请重新选择":"请选择要查看的课题";
+      select.insertBefore(option,select.firstChild);
+      select.value="";
+      if(current)notifyCritical("当前查看课题已不可用；未自动切换到其他课题，请明确选择。");
+    }
+    if(restoringLibraryView){
+      // Initial wide-page project is a *navigation* choice. Keep the topic
+      // detail tab on the same project without changing chat associations.
+      setSelectedId(select.value||null);
+      render();
+    }
+    if(select.value!==current&&!restoringLibraryView)
+      select.dispatchEvent(new Event("change"));
+    else await renderEvidenceProject(); // restoration is not a user project switch
+    saveLibraryView();
   }
 
   function createEvidenceNext(action,label) {
     const next=document.createElement("button");
     next.type="button";next.className="secondary evidence-next";next.dataset.action=action;next.textContent=label;
+    if(surface==="library") {
+      const hint=document.createElement("p");hint.className="subtle";
+      hint.textContent="当前资料库以查阅为主；请在研线侧栏执行创建、采纳或整理操作。";
+      return hint;
+    }
     return next;
   }
 
   async function renderEvidenceProject() {
     const request=++evidenceRequest,projectId = ev$("evidence-project").value;
-    if (!projectId) { evidenceListCache=null;evidenceHasRows=false;ev$("evidence-handoff").disabled=true;ev$("evidence-summary").textContent="暂无课题。先创建课题，再从整理结果逐条采纳。";ev$("evidence-list-count").textContent="";ev$("evidence-more").hidden=true;ev$("evidence-list").replaceChildren(createEvidenceNext("start-new-topic","创建课题"));return true; }
+    if (!projectId) { evidenceListCache=null;evidenceHasRows=false;ev$("evidence-handoff").disabled=true;ev$("evidence-summary").textContent=surface==="library"?"请选择要查看的课题；创建、采纳及修订仍在研线侧栏进行。":"暂无课题。先创建课题，再从整理结果逐条采纳。";ev$("evidence-list-count").textContent="";ev$("evidence-more").hidden=true;ev$("evidence-list").replaceChildren(createEvidenceNext("start-new-topic","创建课题"));return true; }
     let data;
     try { data = await evSend({ type: "EV_LIST", projectId }); }
     catch (e) {
@@ -735,9 +897,11 @@
         }
       });
       content.append(historyButton,historyPanel);
-      if(c.status!=="withdrawn"){
+      if(c.status!=="withdrawn"&&surface!=="library"){
+        // Do not even create edit/withdraw controls for the wide read surface.
+        // The service worker retains the unchanged, exact-panel trust policy.
         const row2=document.createElement("div");row2.className="line";
-        const amend=document.createElement("button");amend.type="button";amend.className="secondary";amend.textContent="修订";
+        const amend=document.createElement("button");amend.type="button";amend.className="secondary evidence-write-action";amend.textContent="修订";
         amend.addEventListener("click",async()=>{
           let signature=null,operationId=null;
           const result=await ThreadLineDialogs.form({title:"修订结论",description:"保存后生成新版本，原有正文和依据保留。",submitLabel:"保存新版本",fields:[
@@ -764,7 +928,7 @@
             else notifyCritical("新版本已保存回执已收到，但当前证据列表刷新失败。请刷新核对，不要重复提交。");
           }
         });
-        const withdraw=document.createElement("button");withdraw.type="button";withdraw.className="secondary";withdraw.textContent="撤回";
+        const withdraw=document.createElement("button");withdraw.type="button";withdraw.className="secondary evidence-write-action";withdraw.textContent="撤回";
         let withdrawPending=false;
         withdraw.addEventListener("click",async()=>{
           if(withdrawPending)return;
@@ -815,8 +979,12 @@
   }
 
   ev$("evidence-refresh").addEventListener("click", () => renderEvidenceProject());
-  ev$("evidence-query").addEventListener("input",()=>{evidenceVisibleLimit=ThreadLineEvidenceList.PAGE_SIZE;renderEvidenceRows();});
-  ev$("evidence-filter-status").addEventListener("change",()=>{evidenceVisibleLimit=ThreadLineEvidenceList.PAGE_SIZE;renderEvidenceRows();});
+  ev$("evidence-query").addEventListener("input",()=>{
+    evidenceVisibleLimit=ThreadLineEvidenceList.PAGE_SIZE;renderEvidenceRows();saveLibraryView();
+  });
+  ev$("evidence-filter-status").addEventListener("change",()=>{
+    evidenceVisibleLimit=ThreadLineEvidenceList.PAGE_SIZE;renderEvidenceRows();saveLibraryView();
+  });
   ev$("evidence-more").addEventListener("click",()=>{
     evidenceVisibleLimit+=ThreadLineEvidenceList.PAGE_SIZE;renderEvidenceRows();
     const more=ev$("evidence-more");
@@ -825,6 +993,12 @@
   });
   ev$("evidence-handoff-view").addEventListener("input",()=>{++handoffEdits;});
   ev$("evidence-project").addEventListener("change",()=>{
+    if(surface==="library"&&!librarySelectionPending){
+      // Evidence and topic sections share a navigation default, not a write
+      // target, capture source or global cross-window selection.
+      setSelectedId(ev$("evidence-project").value||null);
+      render();
+    }
     evidenceListCache=null;evidenceVisibleLimit=ThreadLineEvidenceList.PAGE_SIZE;
     ev$("evidence-query").value="";ev$("evidence-filter-status").value="all";renderEvidenceRows();
     const view=ev$("evidence-handoff-view");
@@ -833,6 +1007,7 @@
     const saved=handoffDrafts.get(handoffProject);view.value=saved?.text||"";view.hidden=!saved;evidenceHandoffStamp=saved?.stamp||null;
     for(const id of ["evidence-handoff-copy","evidence-handoff-read"]){ev$(id).hidden=!saved;ev$(id).disabled=!saved?.stamp;}
     renderEvidenceProject();
+    saveLibraryView();
   });
   ev$("evidence-handoff").addEventListener("click",async()=>{
     const projectId=ev$("evidence-project").value;if(!projectId||handoffPending)return;
@@ -875,14 +1050,76 @@
     } catch(e){notifyCritical("交接已读记录失败或结果未确认："+e.message+"。请核对当前课题的交接历史后再决定是否重试。");}
   });
   window.addEventListener("threadline-evidence-changed",()=>{renderEvidence().catch(e=>notifyCritical("证据课题列表读取失败："+e.message));refresh(true);});
-  renderEvidence().catch(error=>notifyCritical("证据课题列表读取失败："+error.message));
+  async function initializeSurface() {
+    let tab=null,intent=null,saved=null;
+    try{tab=await chrome.tabs.getCurrent();}catch{}
+    if(tab?.id){
+      try{intent=await ThreadLineLibrarySurface.consume(tab.id);}
+      catch(error){notifyCritical("资料库导航意图读取失败："+error.message+"；已恢复原始侧栏布局。");}
+      if(!intent){
+        try{saved=ThreadLineLibrarySurface.loadView(tab.id);}
+        catch(error){notifyCritical("资料库上次阅读位置不可用："+error.message+"；已恢复原始侧栏布局。");}
+      }
+    }
+    if(!intent&&!saved)return; // ordinary side panel and direct panel.html remain unchanged
+    const view=saved||{
+      viewProjectId:intent.viewProjectId,topicProjectId:null,
+      sourceTabId:intent.sourceTabId,sourceChatKey:intent.sourceChatKey,
+      workspace:"evidence",filter:intent.filter,query:intent.query
+    };
+    surface="library";
+    libraryTabId=tab.id;
+    libraryWindowId=tab.windowId;
+    // Registry only marks that this top-level tab really initialized as a
+    // library; it never grants any extra background data permissions.
+    try{await ThreadLineLibrarySurface.registerOpen(tab);}
+    catch(error){notifyCritical("资料库标签登记失败："+error.message+"，返回入口可能打开重复标签。");}
+    librarySourceTabId=view.sourceTabId;
+    librarySourceChatKey=view.sourceChatKey;
+    libraryInitialProjectId=view.viewProjectId;
+    librarySelectionPending=true;
+    if(saved)setSelectedId(view.topicProjectId);
+    $("#evidence-query").value=view.query;
+    $("#evidence-filter-status").value=view.filter;
+    document.documentElement.dataset.surface="library";
+    $("#library-launch").hidden=true;
+    $("#library-header").hidden=false;
+    $("#nav-research").hidden=true;
+    $("#nav-research").tabIndex=-1;
+    $("#nav-switch").lastChild.textContent=" 课题与对话";
+    $("#nav-evidence").lastChild.textContent=" 结论与依据";
+    $("#manage-accordion").open=true;
+    const manageLabel=document.querySelector("#manage-accordion > summary > span");
+    if(manageLabel)manageLabel.textContent="课题与对话（只读）";
+    const manageDesc=document.querySelector("#manage-accordion .manage-desc");
+    if(manageDesc)manageDesc.textContent="查看";
+    const context=$("#library-context-text");
+    if(librarySourceTabId){
+      const source=await chrome.tabs.get(librarySourceTabId).catch(()=>null);
+      if(source&&ThreadLineCore.isChatURL(source.url)&&getKey(source)===librarySourceChatKey)
+        context.textContent="来源对话："+(source.title||"未命名")+
+          "。查看别的课题不会改变此来源或任何采集任务。";
+      else{
+        librarySourceTabId=null;librarySourceChatKey=null;
+        context.textContent="原来源对话已关闭或改变；请明确选择课题，不能据此运行网页自检。";
+      }
+    }else context.textContent="来源对话未指定；只浏览研究资料，操作目标由当前选中的课题决定。";
+    $("#library-return").hidden=!librarySourceTabId;
+    setWorkspace(view.workspace);
+    if(view.workspace==="switch")
+      renderEvidence().catch(error=>notifyCritical("证据课题列表读取失败："+error.message));
+  }
   document.querySelector(".workspace-tabs").addEventListener("keydown", e => {
     if (!["ArrowLeft","ArrowRight","Home","End"].includes(e.key)) return;
     e.preventDefault();
-    const names=["switch","research","evidence"],index=names.indexOf(workspace);
+    const names=surface==="library"?["switch","evidence"]:["switch","research","evidence"];
+    const index=names.indexOf(workspace);
     const next=e.key==="Home"?names[0]:e.key==="End"?names.at(-1):names[(index+(e.key==="ArrowLeft"?-1:1)+names.length)%names.length];
     setWorkspace(next);$("#nav-"+next).focus();
   });
-  setWorkspace("switch");
+  setWorkspace("switch"); // original eager navigation: no async blank panel
+  renderEvidence().catch(error=>notifyCritical("证据课题列表读取失败："+error.message));
+  initializeSurface().catch(error=>
+    notifyCritical("资料库初始化失败："+error.message+"。请重新打开面板核对。"));
   refresh(true);
 })();
