@@ -21,13 +21,16 @@ function fakeApi({failUpdate=false,failSet=false}={}){
 }
 test("UI-D1 source and target are handed to one exact tab before navigation",async()=>{
   const fake=fakeApi(),now=100000;
-  await Surface.open({viewProjectId:"tp_projectA",sourceTabId:4,sourceChatKey:"chat:original-a"},fake.api,now);
+  await Surface.open({viewProjectId:"tp_projectA",sourceTabId:4,sourceChatKey:"chat:original-a",
+    query:"目标结论",filter:"withdrawn"},fake.api,now);
   assert.equal(fake.events[0],"create:about:blank");
   assert.equal(fake.events[1],"store");
   assert.equal(fake.events[2],"navigate:41");
   const token=Surface.key(41);
   assert.equal(fake.store[token].viewProjectId,"tp_projectA");
   assert.equal(fake.store[token].sourceChatKey,"chat:original-a");
+  assert.equal(fake.store[token].query,"目标结论");
+  assert.equal(fake.store[token].filter,"withdrawn");
   assert.ok(!JSON.stringify(fake.store).includes("https://"));
   const item=await Surface.consume(41,fake.api,now+300);
   assert.equal(item.viewProjectId,"tp_projectA");
@@ -44,10 +47,11 @@ test("UI-D1 intent cannot be consumed by another tab or after deadline",async()=
 });
 test("UI-D1 forged and cross-tab intents fail closed",()=>{
   const base={schema:1,tabId:9,viewProjectId:"tp_A",sourceTabId:3,
-    sourceChatKey:"chat:one",createdAt:100};
+    sourceChatKey:"chat:one",filter:"active",query:"test",createdAt:100};
   for(const patch of [{tabId:10},{schema:2},{viewProjectId:"a\nunsafe"},
     {sourceTabId:3,sourceChatKey:null},{sourceTabId:null,sourceChatKey:"chat:one"},
-    {sourceTabId:0},{sourceChatKey:"bad\u0001id"}]){
+    {sourceTabId:0},{sourceChatKey:"bad\u0001id"},
+    {filter:"invalid"},{query:"forbidden\nquery"},{query:"x".repeat(161)}]){
     assert.equal(Surface.validIntent({...base,...patch},9,150),false,JSON.stringify(patch));
   }
   assert.equal(Surface.validIntent(base,9,99),false);
@@ -56,7 +60,8 @@ test("UI-D1 forged and cross-tab intents fail closed",()=>{
 });
 test("UI-D1 invalid inputs create no tabs and navigate nowhere",async()=>{
   for(const args of [{sourceTabId:7}, {sourceChatKey:"chat:one"},
-    {sourceTabId:7,sourceChatKey:"bad\nkey"}, {viewProjectId:"bad\u0000project"}]){
+    {sourceTabId:7,sourceChatKey:"bad\nkey"}, {viewProjectId:"bad\u0000project"},
+    {query:"x".repeat(161)},{filter:"invalid"}]){
     const fake=fakeApi();
     await assert.rejects(()=>Surface.open(args,fake.api,200),/无效/);
     assert.deepEqual(fake.events,[]);
