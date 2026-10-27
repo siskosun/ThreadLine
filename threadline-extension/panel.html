@@ -132,8 +132,8 @@
             <div class="ai-field" id="ai-key-row" hidden><label for="ai-api-key">API Key（仅当前面板内存，不保存）</label><input id="ai-api-key" type="password" spellcheck="false" autocomplete="off" placeholder="sk-…"/></div>
             <p class="ai-help" id="ai-endpoint-note"></p>
             <div class="ai-actions"><button class="primary" id="ai-run">使用 ChatGPT 网页分析并更新导图</button><button id="ai-stop" hidden>停止分析</button></div>
-            <div class="ai-actions"><button id="ai-open-webtab" hidden>查看专用分析标签页（不会重复发送）</button></div>
           </div>
+          <div class="ai-actions"><button id="ai-open-webtab" hidden>查看专用分析标签页（不会重复发送）</button></div>
           <div class="ai-actions"><button id="ai-copy-prompt">复制整理提示（需手动发送）</button><button id="ai-import-clipboard">从剪贴板导入结果</button></div>
           <details class="ai-import-details"><summary>或手动粘贴 ChatGPT 返回的 JSON</summary><textarea aria-label="粘贴结构化分析 JSON" id="ai-json" rows="5" placeholder='粘贴包含 version、objective、findings、completed、pending、next、superseded、closure 字段的 JSON'></textarea><button id="ai-import-manual">校验并更新摘要与导图</button></details>
           <p class="ai-status" id="ai-status" role="status" aria-live="polite"></p>
