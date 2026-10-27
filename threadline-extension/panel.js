@@ -133,7 +133,18 @@
     $("#clear-closed").disabled=!state.projects.some(p=>p.stage==="closed");
   }
   function saveLibraryView() {
-    if(surface!=="library"||librarySelectionPending||!libraryTabId)return;
+    if(surface!=="library")return;
+    const header=$("#library-view-project");
+    if(librarySelectionPending){
+      header.textContent="查看课题：正在确认…";
+      return;
+    }
+    const selection=$("#evidence-project");
+    const projectId=selection?.value||null;
+    const project=state.projects.find(p=>p.id===projectId);
+    const name=project?.name||(projectId?selection?.selectedOptions[0]?.textContent:"尚未选择");
+    header.textContent="查看课题："+(name||"尚未选择")+"（仅浏览，不改变来源关联）";
+    if(!libraryTabId)return;
     const query=$("#evidence-query")?.value||"";
     // Very long or control-character queries are not copied into sessionStorage.
     // The current search continues to work; only reload fallback loses the query.
