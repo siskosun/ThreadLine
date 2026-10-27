@@ -470,6 +470,12 @@
     const btn=event.target.closest("[data-action]");
     if (!btn) return;
     const action=btn.dataset.action,key=btn.dataset.key,id=btn.dataset.id;
+    if(surface==="library"&&!["select-project","view-project","collapse-details","go-chat"].includes(action)){
+      // Read-only behavior for the normal library UI. The background still
+      // trusts the same panel.html, so this is not an authorization boundary.
+      notifyCritical("宽页资料库当前只支持查阅；请打开研线侧栏再修改课题或分支。");
+      return;
+    }
     if (action==="open-research") {setWorkspace("research",true);return;}
     if (action==="start-new-topic") {
       setWorkspace("switch");
@@ -495,7 +501,23 @@
     }
     if (action==="collapse-details") {setSelectedId(null);render();return;}
     if (action==="select-project" || action==="view-project") {
-      setSelectedId((action==="select-project" && selectedId===id)?null:id);filter='all';setWorkspace("switch");render();
+      setSelectedId((action==="select-project" && selectedId===id)?null:id);
+      if(surface==="library"&&selectedId){
+        const evidenceSelect=ev$("evidence-project");
+        if([...evidenceSelect.options].some(option=>option.value===selectedId)){
+          if(evidenceSelect.value!==selectedId){
+            evidenceSelect.value=selectedId;
+            evidenceSelect.dispatchEvent(new Event("change"));
+          }
+        }else{
+          // The topics snapshot can outrun the evidence directory. Keep the
+          // requested project explicit; never silently read a different one.
+          libraryInitialProjectId=selectedId;
+          librarySelectionPending=true;
+          renderEvidence().catch(error=>notifyCritical("无法载入所选课题的证据："+error.message));
+        }
+      }
+      filter='all';setWorkspace("switch");render();
       if (selectedId) $("#detail-section").scrollIntoView({block:"start",behavior:"smooth"});
       return;
     }
@@ -616,6 +638,12 @@
           notifyCritical("资料库找不到原课题；未自动切换到其他课题，请明确选择。");
       }
     }else if ([...select.options].some(o => o.value === current)) select.value = current;
+    if(restoringLibraryView){
+      // Initial wide-page project is a *navigation* choice. Keep the topic
+      // detail tab on the same project without changing chat associations.
+      setSelectedId(select.value||null);
+      render();
+    }
     if(select.value!==current&&!restoringLibraryView)
       select.dispatchEvent(new Event("change"));
     else await renderEvidenceProject(); // restoration is not a user project switch
@@ -936,6 +964,12 @@
   });
   ev$("evidence-handoff-view").addEventListener("input",()=>{++handoffEdits;});
   ev$("evidence-project").addEventListener("change",()=>{
+    if(surface==="library"&&!librarySelectionPending){
+      // Evidence and topic sections share a navigation default, not a write
+      // target, capture source or global cross-window selection.
+      setSelectedId(ev$("evidence-project").value||null);
+      render();
+    }
     evidenceListCache=null;evidenceVisibleLimit=ThreadLineEvidenceList.PAGE_SIZE;
     ev$("evidence-query").value="";ev$("evidence-filter-status").value="all";renderEvidenceRows();
     const view=ev$("evidence-handoff-view");
