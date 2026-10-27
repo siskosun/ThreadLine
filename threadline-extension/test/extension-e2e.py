@@ -119,8 +119,10 @@ def run():
         window.__originalCreateSendMessage=original;
         window.__releaseCreate=null;
         window.__createdCreateResponse=null;
+        window.__createCalls=0;
         chrome.runtime.sendMessage=(payload,callback)=>{
           if(payload?.type==='MUTATE'&&payload.action?.type==='createProject'){
+            window.__createCalls++;
             return original(payload,response=>{
               window.__createdCreateResponse=response;
               window.__releaseCreate=()=>callback(response);
@@ -133,9 +135,14 @@ def run():
       panel.locator('#create-form button[type=submit]').click()
       panel.wait_for_function("() => typeof window.__releaseCreate === 'function'")
       panel.wait_for_function("() => document.querySelectorAll('#topic-list .topic-card').length === 2")
+      # Repeated clicks are not a second write and cannot erase the typed name.
+      panel.locator('#create-form button[type=submit]').click()
+      assert panel.evaluate('window.__createCalls') == 1
+      panel.locator('#topic-name').fill('后续输入应保留')
       panel.locator('[data-action="select-project"][data-id="' + pid + '"]').click()
       panel.evaluate("() => window.__releaseCreate()")
-      panel.wait_for_function("() => document.querySelector('#topic-name').value === ''")
+      panel.wait_for_function("() => document.querySelector('#toast').textContent.includes('临时课题已创建')")
+      assert panel.locator('#topic-name').input_value()=='后续输入应保留'
       panel.evaluate("""() => new Promise(resolve => {
         const holder=document.querySelector('#topic-list');
         const observer=new MutationObserver(()=>{observer.disconnect();resolve(true);});
@@ -151,8 +158,31 @@ def run():
       assert panel.locator('#topic-list [data-id="' + delayed_id + '"]').get_attribute('aria-pressed')=='false'
       panel.evaluate("""() => {
         if(window.__originalCreateSendMessage) chrome.runtime.sendMessage=window.__originalCreateSendMessage;
-        for(const key of ['__originalCreateSendMessage','__createdCreateResponse','__releaseCreate']) delete window[key];
+        for(const key of ['__originalCreateSendMessage','__createdCreateResponse','__releaseCreate','__createCalls']) delete window[key];
       }""")
+      # A rejected or unknown CREATE preserves the user's input and alerts
+      # them to check existing projects before a manual retry.
+      panel.evaluate("""() => {
+        const original=chrome.runtime.sendMessage.bind(chrome.runtime);
+        window.__restoreFailedCreate=()=>{chrome.runtime.sendMessage=original;};
+        window.__failedCreateCalls=0;
+        chrome.runtime.sendMessage=(payload,cb)=>{
+          if(payload?.type==='MUTATE'&&payload.action?.type==='createProject'){
+            window.__failedCreateCalls++;
+            cb({ok:false,error:'SIMULATED_CREATE_FAILURE'});
+            return;
+          }
+          return original(payload,cb);
+        };
+      }""")
+      panel.locator('#create-form button[type=submit]').click()
+      panel.wait_for_function("() => document.querySelector('#critical-notice-text').textContent.includes('SIMULATED_CREATE_FAILURE')")
+      assert panel.locator('#topic-name').input_value()=='后续输入应保留'
+      assert panel.evaluate('window.__failedCreateCalls')==1
+      assert panel.locator('#critical-notice').is_visible()
+      panel.evaluate('window.__restoreFailedCreate()')
+      panel.locator('#critical-notice-dismiss').click()
+      panel.locator('#topic-name').fill('')
       panel.get_by_role('tab',name='证据与交接').click()
       panel.get_by_role('button',name='打开研究整理',exact=True).click()
       assert panel.locator('#workspace-research').is_visible()
