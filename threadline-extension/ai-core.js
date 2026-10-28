@@ -7,13 +7,30 @@ const ThreadLineAI = (() => {
   const trim = (value, n=400) => String(value ?? "").replace(/\r/g," ").trim().slice(0,n);
   const sourceNumber = v => {const n=Number(String(v).replace(/^M/i,""));return Number.isSafeInteger(n)&&n>0?n:null;};
   function parseRaw(value){
-    if (value && typeof value === "object" && !Array.isArray(value)) return value;
-    if(typeof value!=="string" || value.length>450000)throw new Error("分析结果不是有效 JSON 或体积过大");
-    let text=value.trim().replace(/^```(?:json)?\s*/i,"").replace(/\s*```\s*$/,"");
+    if(value && typeof value==="object" && !Array.isArray(value))return value;
+    if(typeof value!=="string" || value.length>450000)
+      throw new Error("分析结果不是有效 JSON 或体积过大");
+    const text=value.replace(/^\uFEFF/,"").trim();
+    if(!text)throw new Error("粘贴内容为空。请粘贴 ChatGPT 返回的完整 JSON。");
     try{return JSON.parse(text);}catch{}
+    // A reply may contain a single fenced JSON block inside surrounding prose.
+    // Refuse multiple blocks rather than arbitrarily importing a sample/schema.
+    const blocks=[...text.matchAll(/```(?:json)?[ \t]*\r?\n([\s\S]*?)\r?\n```/gi)];
+    if(blocks.length>1)
+      throw new Error("发现多个 JSON 代码块。请只复制最终结果中的一个完整 JSON 对象，不要复制示例或历史回复。");
+    if(blocks.length===1){
+      try{return JSON.parse(blocks[0][1].trim());}catch{}
+    }
     const start=text.indexOf("{"),end=text.lastIndexOf("}");
-    if(start<0 || end<=start)throw new Error("未找到 JSON 对象。请让模型只输出 JSON。");
-    try{return JSON.parse(text.slice(start,end+1));}catch{throw new Error("JSON 格式无效。请要求 ChatGPT 重新输出严格 JSON。");}
+    if(start<0 || end<=start){
+      if(text.startsWith("{"))
+        throw new Error("JSON 语法错误或内容不完整。请复制完整的单个 JSON 对象；不要拼接示例、多个回答或普通文字总结。");
+      if(/mermaid|mindmap|研究目标|关键结论|待验证|收口/i.test(text))
+        throw new Error("粘贴内容是文字摘要或思维导图，不是可导入 JSON。请使用「预填可导入 JSON」或「复制整理提示」生成结构化结果。");
+      throw new Error("未找到 JSON 对象。请粘贴以 { 开始、以 } 结束的完整结构化结果。");
+    }
+    try{return JSON.parse(text.slice(start,end+1));}
+    catch{throw new Error("JSON 语法错误或内容不完整。请复制完整的单个 JSON 对象；不要拼接示例、多个回答或普通文字总结。");}
   }
   function normalize(raw, messageCount){
     const obj=parseRaw(raw);
@@ -119,7 +136,7 @@ const ThreadLineAI = (() => {
   function importPrompt(messages,brief,maxChars=24000){
     const prompt=`请把以下研究聊天整理为严格 JSON，便于浏览器扩展导入。不要输出代码块或其他正文。消息以 M数字 标识，所有来源必须使用真实出现的编号；不得自行补造。\n${INSTRUCTIONS}\n\n`;
     // Manual ChatGPT handoff retains an explicit indication when only a sample is included.
-    const picked=ThreadLineCaptureCore.analysisPrompt(messages,brief,Math.max(5500,maxChars-prompt.length));
+    const picked=ThreadLineCaptureCore.analysisMaterial(messages,brief,Math.max(5500,maxChars-prompt.length));
     return {text:prompt+picked.text.replace(/\[第(\d+)条 ([^\]]+)\]/g,(_,i,r)=>`[M${i} ${r}]`),omitted:picked.omitted,included:picked.included};
   }
   return {VERSION,FIELDS,INSTRUCTIONS,normalize,parseRaw,segment,analyze,mergeRounds,toBrief,mapGroups,importPrompt,schemaExample};

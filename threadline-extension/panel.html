@@ -119,7 +119,7 @@
           <summary>AI 深度整理 <span>可选 · 按需展开</span></summary>
         <section class="ai-workbench" aria-label="AI 深度分析">
           <div class="ai-head"><h3>AI 深度整理</h3><span class="badge muted">可选</span></div>
-          <p class="ai-help">默认手动分析：复制结构化提示，在 ChatGPT 自行发送，再导入核对后的 JSON。网页自动分析仍是实验功能，只有主动切换并确认后才会操作网页；任何方式均不会自动修改课题收口状态。</p>
+          <p class="ai-help">默认手动分析：点击「预填可导入 JSON」后在 ChatGPT 手动发送，再把完整 JSON 粘贴到下方更新本地摘要与导图。请勿把底部「中文摘要与 Mermaid」的文字结果当作 JSON 导入。网页自动分析仍是实验功能，只有主动切换并确认后才会操作网页；任何方式均不会自动修改课题收口状态。</p>
           <div class="ai-field"><label for="ai-provider">分析方式</label><select id="ai-provider">
             <option value="manual" selected>ChatGPT 手动分析并导入（默认，不自动操作网页）</option>
             <option value="webui">ChatGPT 网页自动分析（实验性，需确认）</option>
@@ -135,8 +135,9 @@
             <div class="ai-actions"><button class="primary" id="ai-run">使用 ChatGPT 网页分析并更新导图</button><button id="ai-stop" hidden>停止分析</button></div>
           </div>
           <div class="ai-actions"><button id="ai-open-webtab" hidden>查看专用分析标签页（不会重复发送）</button></div>
-          <div class="ai-actions"><button id="ai-copy-prompt">复制整理提示（需手动发送）</button><button id="ai-import-clipboard">从剪贴板导入结果</button></div>
-          <details class="ai-import-details"><summary>或手动粘贴 ChatGPT 返回的 JSON</summary><textarea aria-label="粘贴结构化分析 JSON" id="ai-json" rows="5" placeholder='粘贴包含 version、objective、findings、completed、pending、next、superseded、closure 字段的 JSON'></textarea><button id="ai-import-manual">校验并更新摘要与导图</button></details>
+          <div class="ai-actions"><button type="button" class="primary" id="ai-open-json">预填可导入 JSON（手动发送）</button><button type="button" id="ai-copy-prompt">复制可导入 JSON 提示</button></div>
+          <details class="ai-import-details"><summary>粘贴结构化 JSON 并导入（不需要剪贴板读取权限）</summary><textarea aria-label="粘贴结构化分析 JSON" id="ai-json" rows="5" placeholder='粘贴包含 version、objective、findings、completed、pending、next、superseded、closure 字段的 JSON'></textarea><button type="button" id="ai-import-manual">校验并更新摘要与导图</button></details>
+          <div class="ai-actions"><button type="button" id="ai-import-clipboard">尝试从剪贴板读取并导入（需浏览器权限）</button></div>
           <p class="ai-status" id="ai-status" role="status" aria-live="polite"></p>
           <div class="ai-actions"><button id="ai-reset" hidden>恢复原始规则提要</button></div>
           <p class="ai-help">自动模式会将采集到的对话文本发往所选模型服务。官方 ChatGPT 计划 OAuth 授权暂未接入；网页实验模式通过已登录的页面发送提示词，并非官方 Responses API 授权。扩展不读取登录令牌，也不持久保存独立 API Key。</p>
@@ -169,7 +170,7 @@
           <div class="report-actions"><button id="promote-review-save" class="primary" disabled>发布至共享课题</button><button id="promote-review-cancel">取消</button></div>
         </section>
         <p id="report-promote-hint" class="report-promote-hint" role="status" aria-live="polite"></p>
-        <div class="report-actions"><button id="report-copy">复制提要</button><button id="report-ai">预填深度整理草稿（需手动发送）</button><button id="report-delete">清除本次采集</button></div>
+        <div class="report-actions"><button id="report-copy">复制提要</button><button id="report-ai">预填中文摘要与 Mermaid（非 JSON）</button><button id="report-delete">清除本次采集</button></div>
         <div class="report-actions"><button class="handoff-primary" id="report-new-chat">关闭侧栏并开启新对话 →</button></div>
         <p class="report-disclaimer">规则提要与 AI 生成内容均需核查原始记录。ChatGPT 草稿不会自动发送；结构化 JSON 导入后自动更新导图，但不会自动改写课题收口状态。</p>
       </section>

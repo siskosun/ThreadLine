@@ -22,3 +22,39 @@ test('request failure propagates without manufacturing success',async()=>{await 
 test('AI brief never mutates authoritative closed project state',()=>{const rules=C.digest(msgs(),{title:'实际标题',projectName:'玩吧预测',projectStage:'closed',projectDecision:'已经收口',complete:true});const b=A.toBrief(sample({closure:{recommendation:'active',reason:'模型猜测还要研究'}}),rules);assert.equal(b.projectStage,'closed');assert.equal(b.projectDecision,'已经收口');assert.equal(b.closureAdvice.recommendation,'active');assert.match(C.handoff(b),/已收口/);});
 test('manual ChatGPT prompt includes M ids and warns about missing middle history',()=>{const m=msgs(120);const b=C.digest(m,{title:'大课题'});const p=A.importPrompt(m,b,6000);assert.match(p.text,/M\d+ 用户/);assert.ok(p.omitted>0);assert.match(p.text,/未送入 AI/);});
 test('JSON result cannot insert HTML into node structure',()=>{const report=A.normalize(sample({findings:[{text:'<script>alert(1)</script>',sources:[1]}]}),8);const brief=A.toBrief(report,C.digest(msgs(8),{title:'x'}));assert.equal(brief.conclusions[0].text,'<script>alert(1)</script>');assert.ok(A.mapGroups(brief)[1].items.length);});
+
+test('JSON import prompt excludes summary and Mermaid instructions while readable summary stays intact',()=>{
+  const m=msgs(12), b=C.digest(m,{title:'独立研究'});
+  const material=C.analysisMaterial(m,b,12000);
+  const readable=C.analysisPrompt(m,b,12000);
+  const structured=A.importPrompt(m,b,12000);
+  assert.match(readable.text,/Mermaid mindmap/);
+  assert.match(readable.text,/请分析下面这项 ChatGPT 研究的对话记录/);
+  assert.ok(readable.text.endsWith(material.text));
+  assert.doesNotMatch(material.text,/Mermaid mindmap|第一行写/);
+  assert.match(structured.text,/严格只输出可解析 JSON/);
+  assert.match(structured.text,/\[M\d+ (用户|助手)\]/);
+  assert.doesNotMatch(structured.text,/Mermaid mindmap|第一行写|请分析下面这项 ChatGPT 研究的对话记录/);
+});
+test('manual import accepts one labelled JSON block in a prose-wrapped reply',()=>{
+  const payload=JSON.stringify(sample());
+  const text='以下为结构化结果：\n\n```json\n'+payload+'\n```\n\n请核对来源编号。';
+  const output=A.normalize(text,10);
+  assert.equal(output.version,1);
+  assert.equal(output.objective,'验证短期预测');
+});
+test('paste failure distinguishes empty text, narrative summary and malformed JSON',()=>{
+  assert.throws(()=>A.normalize('   ',10),/粘贴内容为空/);
+  assert.throws(()=>A.normalize('## 研究目标\n这是总结。\n```mermaid\nmindmap\n```',10),/文字摘要或思维导图/);
+  assert.throws(()=>A.normalize('{"version":1,"objective":"研究",}',10),/JSON 语法错误/);
+  assert.throws(()=>A.normalize('{"version":1',10),/JSON 语法错误/);
+});
+test('multiple JSON blocks are rejected rather than selecting a sample',()=>{
+  const payload=JSON.stringify(sample());
+  const input='示例：\n```json\n'+payload+'\n```\n结果：\n```json\n'+payload+'\n```';
+  assert.throws(()=>A.normalize(input,10),/多个 JSON 代码块/);
+});
+test('manual import still rejects wrong schema even with valid syntax',()=>{
+  assert.throws(()=>A.normalize('{"version":2,"objective":"更新"}',10),/版本不受支持/);
+  assert.throws(()=>A.normalize('{"version":1,"objective":"更新","pending":"not-array"}',10),/字段 pending 必须是数组/);
+});

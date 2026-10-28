@@ -1,3 +1,12 @@
+## 2026-10-28 深度整理 JSON 导入与剪贴板真实反馈修复候选（独立 Draft）
+
+- **真人最新反馈**：所有者确认 ChatGPT 已可回答“深度整理”；先前无回答未能再次复现，不能仅由此认定 ChatGPT 服务端具体根因。新的可见失败为：Edge 扩展侧栏调用 `navigator.clipboard.readText()` 返回 `Read permission denied`；转为手动粘贴又提示 `JSON 格式无效`。未取得当次粘贴原文，**不能认定该原文是有效 JSON**。
+- **静态代码复核定位到结构性缺陷**：底部 `report-ai` 的 `analysisPrompt` 本就要求“中文摘要＋Mermaid”，不能用作 JSON 导入；更严重的是原 `ThreadLineAI.importPrompt` 将“只输出严格 JSON”指令与同一份 `analysisPrompt` 的“摘要＋Mermaid”指令拼接，可能直接诱导模型回复非 JSON。
+- **修复候选**：将来源文本抽样 `analysisMaterial` 与摘要指令分离，JSON 专用提示不带 Mermaid；侧栏独立保留文字摘要入口，新增“预填可导入 JSON（手动发送）”并保留复制提示方式；浏览器拒绝读取剪贴板时打开并聚焦原有手动粘贴区，不清除已有内容、不请求额外权限；JSON 解析区分空白、文字/导图、语法不合法、多个候选代码块和结构校验失败。原采集/课题权威状态与自动发送策略不变。
+- **验证契约**：Node 需覆盖提示词隔离、仅一个 JSON 代码块、多代码块误导防护、错误语法、真实 UI 事件的剪贴板拒绝回退、手动成功导入与 `NEW_CHAT` 只预填不发送。GitHub Linux/Windows `npm run verify` 与 Linux 合成 MV3 `npm run test:e2e` 以 PR 精确 SHA 为准；真实 Edge/ChatGPT 账户下的 JSON 预填→手动发送→粘贴→导图更新仍 **NOT_EXECUTED**。修改仅限独立 Draft；机器任务状态、#82、Release、main 不变。
+- **工程验证（功能提交 `32d5691857d612e68c0e84deb95cc429696ad4c6`）**：PR [#83](https://github.com/siskosun/ThreadLine/pull/83) 的 [Linux 检查](https://github.com/siskosun/ThreadLine/actions/runs/40617653603) **success**（`npm run verify`、GitHub 计划证据校验、合成 Chromium MV3 E2E），[Windows 基线](https://github.com/siskosun/ThreadLine/actions/runs/40617653463) **success**（Node 回归及合成 Chromium MV3）。首两轮失败源于测试夹具变量/默认值、预期错误类别和旧界面静态断言；已定位修复，未移除测试或修改任务状态。本条记录本身是后续文档提交，不代替该文档提交的准确 HEAD CI。
+
+
 ## 2026-10-26 来源定位预检纳入正式计划
 
 - 新增正式任务 `LOCATE-PREFLIGHT`（planned），目标是在真实登录 ChatGPT 页面执行只读、零发送预检；不自动启动采集、不写产品状态、不读取或提交认证凭据/消息正文。

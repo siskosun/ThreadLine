@@ -13,7 +13,9 @@ test('manual analysis is the only default; experimental webpage mode requires op
   assert.match(selector[1],/<optgroup label="其他模型方式（可选）">/);
   assert.match(selector[1],/<option value="ollama">/);
   assert.match(selector[1],/<option value="openai">/);
-  assert.match(html,/默认手动分析：复制结构化提示/);
+  assert.match(html,/默认手动分析：点击「预填可导入 JSON」/);
+  assert.match(html,/id="ai-open-json"/);
+  assert.match(html,/id="report-ai">预填中文摘要与 Mermaid（非 JSON）/);
   assert.match(js,/if\(kind==="manual"\)\{aiStatus\("当前为手动分析/);
   assert.match(js,/\$\("ai-model"\)\.parentElement\.hidden=true/);
   assert.match(js,/\$\("ai-run"\)\.textContent=mode==="webui"/);
