@@ -191,7 +191,7 @@
     if(!brief)return;
     const prompt=deep?ThreadLineCaptureCore.analysisPrompt(messages,brief,26000).text:ThreadLineCaptureCore.handoff(brief);
     if(!deep&&brief.projectStage==="closed"&&!confirm("关联课题已收口。是否仍然开启新对话？不会自动恢复已收口状态。"))return;
-    if(deep&&!confirm("将采集到的部分文本预填到新 ChatGPT 对话，用于深度整理。不会自动发送。确定继续？"))return;
+    if(deep&&!confirm("此功能预填的是中文摘要与 Mermaid 导图提示，结果不能直接导入本地 JSON。若要更新本地摘要和导图，请使用「AI 深度整理」中的「预填可导入 JSON」。不会自动发送。确定继续？"))return;
     try {
       const win=await chrome.windows.getCurrent();
       await reply({type:"NEW_CHAT",handoff:prompt,windowId:win.id,projectId:!deep&&brief.projectStage==="active"?brief.projectId:""});
@@ -374,17 +374,42 @@
       aiStatus("导入成功。已自动更新研究摘要和思维导图；请注意 ChatGPT 手动分析可能未覆盖全部对话。" );
     }catch(e){aiStatus("导入失败："+e.message,true);}
   }
+  async function openJSONChat(){
+    if(!currentRun||!brief||!messages.length){aiStatus("请先完成对话采集",true);return;}
+    let payload;
+    try{payload=ThreadLineAI.importPrompt(messages,brief,27000);}
+    catch(error){aiStatus("无法创建 JSON 整理提示："+error.message,true);return;}
+    const warning=payload.omitted?`，中间有 ${payload.omitted} 条消息未提供给模型`:"";
+    if(!confirm(`将在新 ChatGPT 聊天中预填可导入 JSON 的结构化提示（包含 ${payload.included} 条消息${warning}）。由你检查后手动发送，研线不会自动提交。继续？`))return;
+    try{
+      const win=await chrome.windows.getCurrent();
+      await reply({type:"NEW_CHAT",handoff:payload.text,windowId:win.id,projectId:""});
+      aiStatus("已打开可导入 JSON 的新聊天草稿。请检查并手动发送，随后复制模型返回的 JSON 到下方粘贴区。不会自动发送或导入。");
+    }catch(error){aiStatus("无法打开 JSON 整理草稿："+error.message,true);}
+  }
   async function copyAIPrompt(){
     if(!brief||!messages.length){aiStatus("请先采集一个对话",true);return;}
     try{
       const prompt=ThreadLineAI.importPrompt(messages,brief,27000);
       await navigator.clipboard.writeText(prompt.text);
       aiStatus(`结构化分析提示已复制。包含 ${prompt.included} 条消息${prompt.omitted?`，中间遗漏 ${prompt.omitted} 条。请在 ChatGPT 发送后，复制其 JSON 结果并导入。`:"，请复制 ChatGPT 的 JSON 回复并导入。"}`);
-    }catch(e){aiStatus("复制失败："+e.message,true);}
+    }catch(e){aiStatus("复制失败："+e.message+"。可使用「预填可导入 JSON」打开新聊天，无需剪贴板复制提示。",true);}
+  }
+  function focusManualJSON(){
+    const input=$("ai-json");
+    const details=input.closest("details");
+    if(details)details.open=true;
+    input.focus();
   }
   async function importClipboard(){
-    try{await importAI(await navigator.clipboard.readText());}
-    catch(e){aiStatus("无法读取剪贴板："+e.message+"。可改为手动粘贴 JSON。",true);}
+    let raw;
+    try{raw=await navigator.clipboard.readText();}
+    catch{
+      focusManualJSON();
+      aiStatus("浏览器拒绝直接读取剪贴板。已展开手动输入框，请按 Ctrl+V 粘贴完整的结构化 JSON，再点「校验并更新摘要与导图」。保留已有输入，不会自动发送或重试。",true);
+      return;
+    }
+    await importAI(raw);
   }
   async function resetAnalysis(){
     if(!currentRun)return;
@@ -406,6 +431,7 @@
     $("ai-run").addEventListener("click",analyzeWithProvider);
     $("ai-stop").addEventListener("click",()=>{aiAbort?.abort();if(webHelperTabId)chrome.tabs.sendMessage(webHelperTabId,{type:"TL_WEB_STOP"}).catch(()=>{});aiStatus("正在停止分析…");});
     $("ai-open-webtab").addEventListener("click",openAnalysisTab);
+    $("ai-open-json").addEventListener("click",openJSONChat);
     $("ai-copy-prompt").addEventListener("click",copyAIPrompt);
     $("ai-import-clipboard").addEventListener("click",importClipboard);
     $("ai-import-manual").addEventListener("click",()=>importAI($("ai-json").value));
