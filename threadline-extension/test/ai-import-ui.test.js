@@ -18,6 +18,7 @@ async function launch({denyClipboard=true}={}){
     createElement(tag){return makeElement(tag);},
     addEventListener(name,fn){if(name==='DOMContentLoaded')startup=fn;}
   };
+  doc.getElementById('ai-provider').value='manual';
   function makeElement(id){
     const handlers={};
     const el={id,handlers,value:'',hidden:false,disabled:false,
