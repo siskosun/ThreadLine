@@ -23,6 +23,8 @@ const ThreadLineAI = (() => {
     }
     const start=text.indexOf("{"),end=text.lastIndexOf("}");
     if(start<0 || end<=start){
+      if(text.startsWith("{"))
+        throw new Error("JSON 语法错误或内容不完整。请复制完整的单个 JSON 对象；不要拼接示例、多个回答或普通文字总结。");
       if(/mermaid|mindmap|研究目标|关键结论|待验证|收口/i.test(text))
         throw new Error("粘贴内容是文字摘要或思维导图，不是可导入 JSON。请使用「预填可导入 JSON」或「复制整理提示」生成结构化结果。");
       throw new Error("未找到 JSON 对象。请粘贴以 { 开始、以 } 结束的完整结构化结果。");
