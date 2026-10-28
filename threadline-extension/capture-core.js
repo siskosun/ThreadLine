@@ -79,7 +79,7 @@ const ThreadLineCaptureCore = (() => {
     const aiDetails=brief.mode==="ai"?`\n${section("已完成的工作",brief.completed||[])}\n${section("已否定或被取代",brief.superseded||[])}\n模型收口建议：${brief.closureAdvice?.recommendation||"unknown"}，不改变权威状态\n`:"";
     return `我要接续一项已有研究。以下内容${brief.mode==="ai"?"来自 AI 归纳，仍需回源核查":"由本地规则从 ChatGPT 对话中提取，并非已核实的最终结论"}。请先辨别哪些只是历史提议或未经检验的推断，不要重复已明确收口的工作。\n\n来源：${brief.title}\n${brief.sourceUrl}\n${brief.projectName?`关联课题：${brief.projectName} / ${brief.projectStage==="closed"?"已收口":"进行中"}\n当前有效结论：${brief.projectDecision||"未填写"}\n`:""}采集：${brief.captureComplete?"全部已返回的文本页":"不完整，部分历史可能缺失"}\n\n${section("原研究目标",[brief.aim])}\n${section("最近提出的问题",brief.latestQuestion?[brief.latestQuestion]:[])}\n${section("历史回答中出现的结论候选（需核实）",brief.conclusions)}\n${aiDetails}${section("尚待核实的问题",brief.pending)}\n${section("下一步候选",brief.next)}\n\n请先对这些条目做去重和证据级别校对，指出真正未完成的任务，再提供最小可执行的下一步。`;
   }
-  function analysisPrompt(messages,brief,maxChars=48000){
+  function analysisMaterial(messages,brief,maxChars=48000){
     const selected=[];
     const rows=messages.map((m,i)=>`[第${i+1}条 ${m.role==="user"?"用户":"助手"}]\n${normalize(m.content)}`).filter(x=>x.length>15);
     const budget=Math.max(5000,Math.min(150000,Number(maxChars)||48000));
@@ -89,11 +89,15 @@ const ThreadLineCaptureCore = (() => {
     for(let j=0;j<Math.min(8,i+1);j++){const s=rows[j].slice(0,3600);if(total+s.length>budget)break;start.push(s);total+=s.length;}
     const omitted=Math.max(0,rows.length-start.length-selected.length);
     return {
-      text:`请分析下面这项 ChatGPT 研究的对话记录，输出准确、简洁的中文摘要。严禁杜撰结论。明确区分已验证事实、未经验证的推断及已经放弃或被替代的方案。重点列出：①研究目标；②最关键的有效结论及可回溯的消息序号；③尚待验证的问题；④下一步最值得执行的具体行动；⑤Mermaid mindmap 思维导图（只使用简洁节点名）。如果课题已明确收口，第一行写“已收口，不建议重复研究”。\n\n来源：${brief.title}\n原对话消息共 ${rows.length} 条；下面是${omitted?`部分抽样，遗漏中间 ${omitted} 条，不得声称通读全文`:"完整选取的文本消息"}。\n\n${start.join("\n\n")}\n${omitted?`\n[中间 ${omitted} 条消息未送入 AI，无法据此判断其结论]\n`:""}\n${selected.join("\n\n")}`,
+      text:`来源：${brief.title}\n原对话消息共 ${rows.length} 条；下面是${omitted?`部分抽样，遗漏中间 ${omitted} 条，不得声称通读全文`:"完整选取的文本消息"}。\n\n${start.join("\n\n")}\n${omitted?`\n[中间 ${omitted} 条消息未送入 AI，无法据此判断其结论]\n`:""}\n${selected.join("\n\n")}`,
       omitted,included:start.length+selected.length
     };
   }
-  return {conversationId,normalizePage,assemble,digest,mapModel,handoff,analysisPrompt};
+  function analysisPrompt(messages,brief,maxChars=48000){
+    const sample=analysisMaterial(messages,brief,maxChars);
+    return {...sample,text:`请分析下面这项 ChatGPT 研究的对话记录，输出准确、简洁的中文摘要。严禁杜撰结论。明确区分已验证事实、未经验证的推断及已经放弃或被替代的方案。重点列出：①研究目标；②最关键的有效结论及可回溯的消息序号；③尚待验证的问题；④下一步最值得执行的具体行动；⑤Mermaid mindmap 思维导图（只使用简洁节点名）。如果课题已明确收口，第一行写“已收口，不建议重复研究”。\n\n${sample.text}`};
+  }
+  return {conversationId,normalizePage,assemble,digest,mapModel,handoff,analysisMaterial,analysisPrompt};
 })();
 if(typeof globalThis!=="undefined") globalThis.ThreadLineCaptureCore=ThreadLineCaptureCore;
 if(typeof module!=="undefined")module.exports=ThreadLineCaptureCore;
