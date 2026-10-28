@@ -59,7 +59,7 @@ async function launch({denyClipboard=true}={}){
     async readText(){clipboardReads++;if(denyClipboard)throw new Error('Read permission denied');return '{"version":1,"objective":"synthetic"}';},
     async writeText(){}
   }};
-  const env={document,chrome,navigator,ThreadLineAI:AI,ThreadLineCaptureCore:Capture,
+  const env={document:doc,chrome,navigator,ThreadLineAI:AI,ThreadLineCaptureCore:Capture,
     ThreadLineCaptureDB:DB,ThreadLineResearchMap:{draw(){}},
     ThreadLineOrganizeCore:{projectName:()=>''},
     confirm:()=>true,setInterval:()=>1,setTimeout:()=>1,clearInterval:()=>{},
