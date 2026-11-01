@@ -1,11 +1,7 @@
 # ThreadLine 开发计划（历史入口）
 
-本文件只作为旧链接的跳转入口，**不再保有正式计划副本**。
+旧版课题/证据库/Fork/UI-D0–D3 计划已于 2026-11-01 被新的对话本地保全与接续路线取代。
 
 唯一正式开发计划：[docs/PLAN.md](../PLAN.md)。
 
-任务目标、阶段、状态、验收标准和实施先后关系只以 `docs/PLAN.md` 为准；`AGENTS.md` 说明 Agent 执行规程。
-
-历史调查记录：[REUSE_AUDIT_20261021.md](REUSE_AUDIT_20261021.md)。
-
-原有详细计划的历史内容可以通过 Git 历史查看，不以历史版本推断当前任务完成情况。
+旧任务状态、历史 PR 和证据只保留审计用途，不得转移为新路线的完成状态。新路线技术架构见 [REBUILD_ARCHITECTURE_20261101.md](../architecture/REBUILD_ARCHITECTURE_20261101.md)。
