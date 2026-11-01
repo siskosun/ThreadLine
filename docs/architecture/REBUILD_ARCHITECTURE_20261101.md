@@ -68,7 +68,7 @@ ChatGPT mapping 是消息节点关系图，不可只按 DOM 当前顺序推断�
 - 若原始沙盒已经过期，记录 HTTP 状态和失败阶段；不能把远端路径作为本地文件替代。
 
 ### 4.3 资源上限
-OpenAI 当前帮助资料列出单文件 512MB、图片 20MB、文本/文档 2M tokens、CSV/表格约 50MB；实际仍受计划、账号、浏览器和峰值限额影响。扩展不应简单照搬所有上限：需用流式下载、IndexedDB 配额测量和 ZIP 构建基准确定自身安全阈值。超限必须在下载前/下载中显式拒绝并记为 missing/rejected，不允许静默截断。
+OpenAI [当前文件上传帮助](https://help.openai.com/en/articles/8555545-uploading-files-and-audio-to-chatgpt)列出单文件 512MB、图片 20MB、文本/文档 2M tokens、CSV/表格约 50MB；实际仍受计划、账号、浏览器和峰值限额影响。扩展不应简单照搬所有上限：需用流式下载、IndexedDB 配额测量和 ZIP 构建基准确定自身安全阈值。超限必须在下载前/下载中显式拒绝并记为 missing/rejected，不允许静默截断。
 
 ## 5. ZIP 档案布局
 
@@ -92,6 +92,7 @@ prepared → target_opened → draft_filled → files_queued → files_uploading
 - 选择目标文件输入时排除 accept="image/*" 的相机/图片专用输入，优先确认通用 Attach files 控件。
 - 使用 DataTransfer 构造 File；仅在新普通聊天、composer 为空、页面身份未变化时注入。
 - 不点击 Send。上传进度可识别则等待实际完成；无法识别时标 upload_unknown 并让用户检查。
+- 自动注入在有界时间内无法确认时，释放控制权并显示侧栏文件暂存区；优先验证拖拽单个/多个 File 条目到 ChatGPT composer 的可行性，失败时退回下载接续包和人工上传。
 - 注入失败后保留本地档案和接续包，不覆盖用户输入；不得自动重试未知操作。
 
 ## 7. 权限和隐私
