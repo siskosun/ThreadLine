@@ -8,10 +8,13 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ALLOWED = new Set(['planned','in_progress','in_review','blocked','done','deferred']);
 export const REQUIRED = Object.freeze([
-  'R-REUSE','Z0-BASE','Z0-LIVE','P1-CORE','P2-FORK','P3-REPORT','BETA-RELEASE','P4-AUTO',
-  'S0A-PROTOTYPE','LOCATE-PREFLIGHT','S0B-LOCATE','S1A-PERSIST','S1B-ADOPT'
+  'UPSTREAM-BASE','CAPTURE-CORE','LOCAL-ARCHIVE','LIVE-ASSET-CACHE','HANDOFF-COMPILE',
+  'HANDOFF-INJECT','UX-REBUILD','INTEGRITY-VALIDATION','REAL-EDGE-E2E','BETA-RELEASE'
 ]);
-const CODE_TASKS = new Set(['Z0-BASE','P1-CORE','P2-FORK','P3-REPORT','BETA-RELEASE','P4-AUTO']);
+const CODE_TASKS = new Set([
+  'UPSTREAM-BASE','CAPTURE-CORE','LOCAL-ARCHIVE','LIVE-ASSET-CACHE','HANDOFF-COMPILE',
+  'HANDOFF-INJECT','UX-REBUILD','INTEGRITY-VALIDATION','REAL-EDGE-E2E','BETA-RELEASE'
+]);
 const SHA40 = /^[a-f0-9]{40}$/;
 
 function check(ok, message) {
@@ -65,13 +68,6 @@ export function parseTaskTable(markdown) {
     if(['in_progress','in_review','done'].includes(task.status))
       for(const dep of task.dependencies)check(lookup.get(dep).status==='done','dependency is not done: '+task.id+' => '+dep);
   }
-  // P4-AUTO enters execution only after explicit owner approval recorded in
-  // this plan's 2026-10-24 governance section; the gate allows deferred or
-  // planned/in_progress/in_review with evidence, but never skips the
-  // done-contract (its manual signoff is still verified online).
-  const p4 = lookup.get('P4-AUTO').status;
-  check(p4 === 'deferred' || ['planned','in_progress','in_review','done','blocked'].includes(p4),
-    'P4-AUTO must be deferred or explicitly approved via plan change');
   return tasks;
 }
 
@@ -96,7 +92,8 @@ function checkEvidence(task,root) {
     check(c && typeof c==='object','test case must be an object: '+task.id);
     check(typeof c.file==='string' && (
       /^threadline-extension\/test\/[a-z0-9-]+\.test\.js$/.test(c.file) ||
-      c.file==='threadline-extension/test/extension-e2e.py'
+      c.file==='threadline-extension/test/extension-e2e.py' ||
+      (c.file.startsWith('threadline-extension/test/') && c.file.endsWith('-e2e.py'))
     ),'non-executed test path: '+task.id);
     check(typeof c.name==='string' && c.name.length>=8 && c.name.length<=160,'test case name missing: '+task.id);
     check(safeRead(root,c.file).includes(c.name),'named test not found in file: '+task.id+' '+c.name);
@@ -118,8 +115,11 @@ export function validatePlan(root=ROOT) {
   check(agents.includes('docs/PLAN.md'),'AGENTS.md must use canonical plan');
   check(legacy.includes('docs/PLAN.md') && legacy.length<1600,
     'historical DEVELOPMENT_PLAN.md must be only a pointer');
-  check(plan.includes('唯一正式') && plan.includes('AGENTS.md'),
+  check(plan.includes('唯一正式计划') && plan.includes('AGENTS.md'),
     'canonical GitHub-only plan statement missing');
+  check(plan.includes('ChatGPT Markdown Export') && plan.includes('MoveChat') &&
+    plan.includes('纯浏览器扩展') && plan.includes('不自动发送') &&
+    plan.includes('彻底移除'),'new rebuild architecture contract missing');
   const tasks=parseTaskTable(plan);
   let blocked=null;
   const done=[];
