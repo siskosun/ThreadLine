@@ -42,7 +42,7 @@
 - 运行时数据只保存在扩展自己的 IndexedDB。大文件以 Blob/分块字节保存，不将 Base64 当作长期存储格式。chrome.storage.local 仅保存小型设置和轻量索引，不存放整份附件。
 - 用户主动导出的 ZIP 是可迁移、可独立保管的正式档案；IndexedDB 是便于浏览和接续的工作副本。UI 必须说明两者区别，不能把浏览器本地缓存说成永久备份。
 - 对话读取、附件下载、文件注入均只在用户明确操作或明确开启单对话缓存后执行。认证信息仅在必要的页面内存中使用，不写入 IndexedDB、ZIP、日志或 GitHub。
-- 默认不请求 <all_urls>。外部签名文件 URL 必须经过 HTTPS、主机白名单、重定向目标和大小检查；不得向外部文件主机转发 ChatGPT Cookie、Authorization 或 Referer。
+- Manifest 不声明 <all_urls>；只使用 ChatGPT 与经验证文件主机的精确 allowlist。外部签名文件 URL 必须经过 HTTPS、主机白名单、重定向目标和大小检查；不得向外部文件主机转发 ChatGPT Cookie、Authorization 或 Referer。
 - 不上传用户对话、附件、截图、导出 ZIP、Token、Cookie 或个人资料到公开 GitHub。自动化测试全部使用合成数据。
 
 详细数据流和威胁边界见 [重建架构说明](architecture/REBUILD_ARCHITECTURE_20261101.md)。
@@ -113,7 +113,7 @@
 接续不能把 100 条历史消息原样塞进输入框，也不能默认重传所有附件。
 
 生成一个接续包：
-1. conversation_history.md：结构化、可检索的历史记录，包含对话目标、按时间排序的消息、分支标识、重要引用和附件索引。
+1. conversation_history.md：结构化、可检索的历史记录，包含对话目标、按时间排序的消息、分支标识、重要引用和附件索引。若超过 ChatGPT 单文件解析限制，拆为带序号的 history-part 文件，并生成 history-index.md；短提示先说明文件顺序和分段范围。
 2. handoff_prompt.md：短提示，只说明研究目标、当前进度、关键决策、尚未解决的问题、文件目录，并明确要求新对话先阅读历史附件。
 3. 用户选择的原始附件：仅把本次任务真正需要的文件加入接续；其他文件留在本地档案，不自动上传。
 4. handoff_manifest.json：记录源对话、归档版本、选中文件、缺失文件和接续状态。
