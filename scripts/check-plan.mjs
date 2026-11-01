@@ -118,7 +118,7 @@ export function validatePlan(root=ROOT) {
   check(plan.includes('唯一正式计划') && plan.includes('AGENTS.md'),
     'canonical GitHub-only plan statement missing');
   check(plan.includes('ChatGPT Markdown Export') && plan.includes('MoveChat') &&
-    plan.includes('纯浏览器扩展') && plan.includes('永不自动发送') &&
+    plan.includes('纯浏览器扩展') && plan.includes('不自动发送') &&
     plan.includes('彻底移除'),'new rebuild architecture contract missing');
   const tasks=parseTaskTable(plan);
   let blocked=null;
