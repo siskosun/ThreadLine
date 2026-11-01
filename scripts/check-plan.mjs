@@ -93,7 +93,7 @@ function checkEvidence(task,root) {
     check(typeof c.file==='string' && (
       /^threadline-extension\/test\/[a-z0-9-]+\.test\.js$/.test(c.file) ||
       c.file==='threadline-extension/test/extension-e2e.py' ||
-      /^threadline-extension\\/test\\/[a-z0-9-]+-e2e\\.py$/.test(c.file)
+      (c.file.startsWith('threadline-extension/test/') && c.file.endsWith('-e2e.py'))
     ),'non-executed test path: '+task.id);
     check(typeof c.name==='string' && c.name.length>=8 && c.name.length<=160,'test case name missing: '+task.id);
     check(safeRead(root,c.file).includes(c.name),'named test not found in file: '+task.id+' '+c.name);
