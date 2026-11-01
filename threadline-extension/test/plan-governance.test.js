@@ -49,7 +49,7 @@ test('missing/duplicate markers and required rebuild tasks are rejected',async()
     assert.throws(()=>validatePlan(dir),/markers/);
   });
   withFixture(dir=>{
-    edit(dir,'docs/PLAN.md',s=>s.replace(/^\\| CAPTURE-CORE \\|[^\\r\\n]*(?:\\r?\\n|$)/m,''));
+    edit(dir,'docs/PLAN.md',s=>s.replace(/^\| CAPTURE-CORE \|[^\r\n]*(?:\r?\n|$)/m,''));
     assert.throws(()=>validatePlan(dir),/required rebuild task IDs/);
   });
   withFixture(dir=>{
