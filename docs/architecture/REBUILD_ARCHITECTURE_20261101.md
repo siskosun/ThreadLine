@@ -86,7 +86,7 @@ OpenAI [当前文件上传帮助](https://help.openai.com/en/articles/8555545-up
 接续状态建议：
 prepared → target_opened → draft_filled → files_queued → files_uploading → files_confirmed | upload_unknown → ready_for_user_review → user_sent（仅用户可确认）
 
-- conversation_history.md 是完整上下文载体；短提示仅负责导航模型读取目标、进度和文件索引。
+- conversation_history.md 是默认上下文载体；超过单文件 token/大小限制时拆分为 history-part-001.md 等分段，并提供 history-index.md；短提示仅负责导航模型读取目标、进度和文件索引。
 - 原始附件按用户选择注入。默认不上传全部资产。
 - 当前官方发布说明报告单条消息最多 20 个文件，但页面能力会变化；启动时探测当前文件输入和页面反馈，按真实限制分批。
 - 选择目标文件输入时排除 accept="image/*" 的相机/图片专用输入，优先确认通用 Attach files 控件。
@@ -97,7 +97,7 @@ prepared → target_opened → draft_filled → files_queued → files_uploading
 
 ## 7. 权限和隐私
 
-- Manifest host permissions 仅限 ChatGPT 页面及经验证的文件下载主机。
+- Manifest 不声明 <all_urls>；host permissions 仅限 ChatGPT 页面及经验证的文件下载主机。
 - 不使用 <all_urls> 作为默认权限，不为采集请求额外云服务。
 - 认证 token 仅内存使用；日志不得包含 token、Cookie、Authorization、签名 URL、消息正文或文件内容。
 - 文件 URL 可能带短期签名，不作为档案唯一定位方式，也不导出到诊断。
